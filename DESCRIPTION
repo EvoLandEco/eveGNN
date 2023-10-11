@@ -12,5 +12,6 @@ RoxygenNote: 7.2.1
 Imports:
   ape,
   eve,
+  furrr,
   purrr,
   treestats
