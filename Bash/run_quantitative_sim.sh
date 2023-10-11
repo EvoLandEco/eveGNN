@@ -16,7 +16,7 @@ nrep=${2}
 
 for (( param_set = 1; param_set <= 72; param_set++ ))
 do
-sbatch ~/eve/Bash/submit_quantitative_sim.sh ${name} \
+sbatch submit_quantitative_sim.sh ${name} \
                                     ${param_set} \
                                     ${nrep}
 done
