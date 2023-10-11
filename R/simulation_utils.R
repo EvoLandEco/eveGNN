@@ -183,3 +183,43 @@ compute_expected_mean <- function(dist_info) {
 }
 
 
+#' Takes samples in the usual manner
+#'
+#' The standard sample function in R samples from n numbers when x = n. This is
+#' unwanted behavior when the size of the vector to sample from changes
+#' dynamically. This is corrected in sample2
+#'
+#'
+#' @param x A vector of one or more elements
+#' @param size A non-negative integer giving the number of items to choose.
+#' @param replace Should sampling be with replacement?
+#' @param prob A vector of probability weights for obtaining the elements of
+#' the vector being sampled.
+#' @return \item{sam}{A vector of length \code{size} that is sampled from
+#' \code{x}. }
+#' @author Rampal S. Etienne
+#' @keywords models
+#' @examples
+#'
+#' sample(x = 10,size = 5,replace = TRUE)
+#' sample2(x = 10,size = 5,replace = TRUE)
+#'
+#' @export sample2
+sample2 <- function(x,size,replace = FALSE,prob = NULL)
+{
+  if(length(x) == 1)
+  {
+    x <- c(x,x)
+    prob <- c(prob,prob)
+    if(is.null(size))
+    {
+      size <- 1
+    }
+    if(replace == FALSE & size > 1)
+    {
+      stop('It is not possible to sample without replacement multiple times from a single item.')
+    }
+  }
+  sam <- sample(x,size,replace,prob)
+  return(sam)
+}

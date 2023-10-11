@@ -2,8 +2,8 @@
 export_to_gnn <- function(data, name) {
   path <- "GNN/tree/"
   path_EL <- "GNN/tree/EL/"
-  eve::check_path(path)
-  eve::check_path(path_EL)
+  eve:::check_path(path)
+  eve:::check_path(path_EL)
 
   for (i in seq_along(data$tas)) {
     file_name <- paste0(path, name, "_", i, ".rds")

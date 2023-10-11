@@ -1,3 +1,7 @@
 ^eveGNN\.Rproj$
 ^\.Rproj\.user$
 ^LICENSE\.md$
+^src$
+^Bash$
+^Script$
+^pyproject\.toml$
