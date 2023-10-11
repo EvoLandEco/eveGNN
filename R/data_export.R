@@ -1,30 +1,22 @@
-for (i in seq_along(target_result_pd$tas)) {
-  file_name <- paste0("D:/Data/GNN/tree/","pd_tas_", i, ".rds")
-  saveRDS(target_result_pd$tas[[i]]$edge - 1, file = file_name)
-}
-for (i in seq_along(target_result_pd$tas)) {
-  file_name <- paste0("D:/Data/GNN/tree/EL/","pd_tas_EL_", i, ".rds")
-  saveRDS(tree_to_adj_mat(target_result_pd$tas[[i]]), file = file_name)
-  print(tree_to_adj_mat(target_result_pd$tas[[i]]))
-}
-for (i in seq_along(target_result_ed$tas)) {
-  file_name <- paste0("D:/Data/GNN/tree/","ed_tas_", i, ".rds")
-  saveRDS(target_result_ed$tas[[i]]$edge - 1, file = file_name)
-}
-for (i in seq_along(target_result_ed$tas)) {
-  file_name <- paste0("D:/Data/GNN/tree/EL/","ed_tas_EL_", i, ".rds")
-  saveRDS(tree_to_adj_mat(target_result_ed$tas[[i]]), file = file_name)
-}
-for (i in seq_along(target_result_nnd$tas)) {
-  file_name <- paste0("D:/Data/GNN/tree/","nnd_tas_", i, ".rds")
-  saveRDS(target_result_nnd$tas[[i]]$edge - 1, file = file_name)
-}
-for (i in seq_along(target_result_nnd$tas)) {
-  file_name <- paste0("D:/Data/GNN/tree/EL/","nnd_tas_EL_", i, ".rds")
-  saveRDS(tree_to_adj_mat(target_result_nnd$tas[[i]]), file = file_name)
+#' @export export_to_gnn
+export_to_gnn <- function(data, name) {
+  path <- "GNN/tree/"
+  path_EL <- "GNN/tree/EL/"
+  eve::check_path(path)
+  eve::check_path(path_EL)
+
+  for (i in seq_along(data$tas)) {
+    file_name <- paste0(path, name, "_", i, ".rds")
+    saveRDS(data$tas[[i]]$edge - 1, file = file_name)
+  }
+  for (i in seq_along(data$tas)) {
+    file_name <- paste0(path_EL, name, "_EL_", i, ".rds")
+    saveRDS(tree_to_adj_mat(data$tas[[i]]), file = file_name)
+  }
 }
 
 
+#' @export get_all_neighbors
 get_all_neighbors <- function(tree) {
   # Initialize an empty list to store neighbors
   all_neighbors <- vector("list", Nnode(tree) + Ntip(tree))
@@ -48,6 +40,7 @@ get_all_neighbors <- function(tree) {
 }
 
 
+#' @export get_all_neighbors_distances
 get_all_neighbors_distances <- function(tree) {
   # Initialize an empty list to store neighbors and edge lengths
   all_neighbors <- vector("list", ape::Nnode(tree) + ape::Ntip(tree))
@@ -78,6 +71,7 @@ get_all_neighbors_distances <- function(tree) {
 }
 
 
+#' @export tree_to_adj_mat
 tree_to_adj_mat <- function(tree) {
   neighbor_dists <- get_all_neighbors_distances(tree)
 
@@ -96,3 +90,4 @@ tree_to_adj_mat <- function(tree) {
 
   return(neighbor_matrix)
 }
+
