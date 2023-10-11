@@ -12,6 +12,6 @@ param_set=${2}
 nrep=${3}
 
 ml R
-Rscript ~/eve/Script/quantitative_data.R ${name} \
+Rscript ./Script/quantitative_data.R ${name} \
                                    ${param_set} \
                                    ${nrep}
