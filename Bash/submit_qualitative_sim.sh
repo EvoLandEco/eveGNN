@@ -4,7 +4,7 @@
 #SBATCH --ntasks=1
 #SBATCH --job-name=gnn_sim_qt
 #SBATCH --output=logs/gnn_sim_qt-%j.log
-#SBATCH --mem=8GB
+#SBATCH --mem=16GB
 #SBATCH --partition=regular
 
 name=${1}
