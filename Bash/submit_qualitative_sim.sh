@@ -12,6 +12,6 @@ param_set=${2}
 nrep=${3}
 
 ml R
-Rscript ../Script/quantitative_data.R ${name} \
+Rscript ../Script/qualitative_data.R ${name} \
                                    ${param_set} \
                                    ${nrep}
