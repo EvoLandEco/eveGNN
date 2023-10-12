@@ -1,5 +1,5 @@
 .Rproj.user
 /eveGNN.Rproj
-/.idea
+.idea/
 .RData
 *.RData
