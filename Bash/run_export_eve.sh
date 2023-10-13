@@ -15,14 +15,13 @@ Rscript -e "devtools::install_github('EvoLandEco/eve')"
 Rscript -e "devtools::install_github('EvoLandEco/eveGNN')"
 
 # Get the list of files in the current directory
-file_list=$(find . -maxdepth 1 -type f)
+file_list=$(find . -maxdepth 1 -type f -name "*_*.RData")
 
-# Initialize a counter
-counter=1
-
-# Iterate through the list of files and call submit_export.sh with each file name
+# Iterate through the list of files and call submit_export.sh with each file name and index
 for file in $file_list; do
-    sbatch ../submit_export_eve.sh "$file" "$counter"
-    # Increment the counter
-    ((counter++))
+    # Extract the index from the file name
+    index=$(echo "$file" | sed -n 's/.*_\([0-9]*\)\.RData/\1/p')
+
+    # Call submit_export.sh with the file name and index
+    ./submit_export.sh "$file" "$index"
 done

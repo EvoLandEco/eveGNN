@@ -11,7 +11,7 @@ ml R
 
 # Capture the arguments
 file=$1
-counter=$2
+index=$2
 
 # Pass the arguments to the R script
-Rscript ../../Script/export_eve_data.R "$file" "$counter"
+Rscript ../../Script/export_eve_data.R "$file" "$index"
