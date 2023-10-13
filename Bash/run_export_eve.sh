@@ -15,7 +15,7 @@ Rscript -e "devtools::install_github('EvoLandEco/eve')"
 Rscript -e "devtools::install_github('EvoLandEco/eveGNN')"
 
 # Get the list of files in the current directory
-file_list=$(find . -type f)
+file_list=$(find . -maxdepth 1 -type f)
 
 # Initialize a counter
 counter=1
