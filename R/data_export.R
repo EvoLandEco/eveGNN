@@ -1,16 +1,16 @@
 #' @export export_to_gnn
 export_to_gnn <- function(data, name) {
-  path <- "GNN/tree/"
-  path_EL <- "GNN/tree/EL/"
+  path <- file.path(paste0("set_", name), "GNN/tree/")
+  path_EL <- file.path(paste0("set_", name), "GNN/tree/EL/")
   eve:::check_path(path)
   eve:::check_path(path_EL)
 
   for (i in seq_along(data$tas)) {
-    file_name <- paste0(path, name, "_", i, ".rds")
+    file_name <- paste0(path, "/tree_", i, ".rds")
     saveRDS(data$tas[[i]]$edge - 1, file = file_name)
   }
   for (i in seq_along(data$tas)) {
-    file_name <- paste0(path_EL, name, "_EL_", i, ".rds")
+    file_name <- paste0(path_EL, "/EL_", i, ".rds")
     saveRDS(tree_to_adj_mat(data$tas[[i]]), file = file_name)
   }
 }

@@ -128,7 +128,9 @@ ggplot(diffs_100_df[-1968,]) +
   ggtitle("MLE Accuracy") +
   theme(legend.position = "none",
         aspect.ratio = 3/4)
+
 diffs_caps_df_extremes <- c(which(diffs_caps_df$Value > 0.6), which(diffs_caps_df$Value < -0.6))
+
 ggplot(diffs_caps_df[-diffs_caps_df_extremes,]) +
   geom_hline(yintercept = 0.0,linewidth=2,linetype=2) +
   geom_smooth(data = diffs_caps_df_stats, aes(x = Group, y = QHigh), linewidth=0.1, linetype=2,se = FALSE) +
@@ -145,3 +147,8 @@ ggplot(diffs_caps_df[-diffs_caps_df_extremes,]) +
   ggtitle("MLE Accuracy") +
   theme(legend.position = "none",
         aspect.ratio = 3/4)
+
+dataset %>% tidyr::gather(key = "Metric", value = "Value", -Epoch) %>%
+  ggplot() + geom_line(aes(Epoch, Value, color = Metric)) +
+  facet_wrap(~ Metric, scales = "free_y")
+ggplot(dataset) + geom_area(aes(Epoch, fitted(loess(Train_Accuracy ~ Epoch))))
