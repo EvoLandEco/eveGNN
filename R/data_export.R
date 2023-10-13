@@ -65,7 +65,7 @@ get_all_neighbors_distances <- function(tree) {
   }
 
   # Name the list elements for clarity
-  names(all_neighbors) <- 1:(Nnode(tree) + Ntip(tree))
+  names(all_neighbors) <- 1:(ape::Nnode(tree) + ape::Ntip(tree))
 
   return(all_neighbors)
 }
