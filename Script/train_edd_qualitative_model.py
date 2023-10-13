@@ -2,6 +2,7 @@ import pyreadr
 import os
 import torch
 import torch_geometric.utils
+import pandas as pd
 from torch_geometric.data import Data
 from torch_geometric.loader import DataLoader
 import torch.nn.functional as F
@@ -183,10 +184,31 @@ def test(loader):
     return correct / len(loader.dataset)  # Derive ratio of correct predictions.
 
 
+train_acc_history = []
+loss_history = []
+
 for epoch in range(1, 200):
     loss = train()
     train_acc = test(train_loader)
     # test_acc = test(test_loader)
     print(f'Epoch: {epoch:03d}, Train Acc: {train_acc:.4f}, Loss: {loss:.4f}')
+
+    # Record the values
+    train_acc_history.append(train_acc)
+    loss_history.append(loss)
+
+# After the loop, create a dictionary to hold the data
+data_dict = {
+    'Epoch': list(range(1, 200)),
+    'Train_Accuracy': train_acc_history,
+    'Loss': loss_history
+}
+
+# Convert the dictionary to a pandas DataFrame
+data_df = pd.DataFrame(data_dict)
+
+# Save the data to a file using pyreadr
+pyreadr.write_rdata('training_data.RData', data_df)
+
 
 #%%
