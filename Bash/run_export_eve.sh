@@ -23,5 +23,5 @@ for file in $file_list; do
     index=$(echo "$file" | sed -n 's/.*_\([0-9]*\)\.RData/\1/p')
 
     # Call submit_export.sh with the file name and index
-    ./submit_export.sh "$file" "$index"
+    sbatch ./submit_export_eve.sh "$file" "$index"
 done
