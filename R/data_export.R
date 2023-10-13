@@ -16,6 +16,17 @@ export_to_gnn <- function(data, name) {
 }
 
 
+#' @export write_pars_to_gnn
+write_pars_to_gnn <- function(data, name) {
+  index <- as.numeric(as.character(name))
+  path <- file.path(paste0("set_", name), "GNN/")
+  eve:::check_path(path)
+
+  params <- read.table("params.txt")
+  write.table(params[index, ], file.path(path, "params.txt"))
+}
+
+
 #' @export get_all_neighbors
 get_all_neighbors <- function(tree) {
   # Initialize an empty list to store neighbors

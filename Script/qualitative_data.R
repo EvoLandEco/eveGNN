@@ -43,7 +43,7 @@ names(combo) <- as.character(seq(1, length(combo)))
 
 if (!file.exists("params")) {
   params <- eve:::combo_to_tibble(combo)
-  write.table(params, "params")
+  write.table(params, file.path(name, "params.txt"))
 }
 
 out <-
