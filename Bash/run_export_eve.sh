@@ -22,7 +22,7 @@ counter=1
 
 # Iterate through the list of files and call submit_export.sh with each file name
 for file in $file_list; do
-    sbatch ../submit_export.sh "$file" "$counter"
+    sbatch ../submit_export_eve.sh "$file" "$counter"
     # Increment the counter
     ((counter++))
 done
