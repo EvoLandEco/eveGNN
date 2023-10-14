@@ -4,7 +4,7 @@
 #SBATCH --ntasks=1
 #SBATCH --job-name=gnn_sim_qt
 #SBATCH --output=logs/gnn_sim_qt-%j.log
-#SBATCH --mem=32GB
+#SBATCH --mem=64GB
 #SBATCH --partition=regular
 
 ml R
