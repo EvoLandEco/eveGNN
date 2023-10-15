@@ -28,7 +28,7 @@ while IFS= read -r line || [ -n "$line" ]; do
     # Replace commas with spaces to get the columns as separate arguments
     args=$(echo $line | tr ',' ' ')
     # Call the Python script with the columns as arguments
-    python ../Script/test.py $name $args
+    python ../Script/train_edd_qualitative_model.py $name $args
 done < "$combination"
 
 deactivate
