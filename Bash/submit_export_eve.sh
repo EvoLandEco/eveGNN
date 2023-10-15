@@ -4,7 +4,7 @@
 #SBATCH --ntasks=1
 #SBATCH --job-name=export_eve
 #SBATCH --output=logs/export_eve-%j.log
-#SBATCH --mem=8GB
+#SBATCH --mem=32GB
 #SBATCH --partition=regular
 
 ml R
