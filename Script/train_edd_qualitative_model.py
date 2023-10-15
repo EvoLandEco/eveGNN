@@ -206,21 +206,21 @@ def main():
             self.conv3 = GCNConv(hidden_size, hidden_size)
             self.linear = Linear(hidden_size, training_dataset.num_classes)
 
-    def forward(self, x, edge_index, batch):
-        # 1. Obtain node embeddings
-        x = self.conv1(x, edge_index)
-        x = x.relu()
-        x = self.conv2(x, edge_index)
-        x = x.relu()
-        x = self.conv3(x, edge_index)
-        # 2. Readout layer
-        x = global_mean_pool(x, batch)  # [batch_size, hidden_channels]
+        def forward(self, x, edge_index, batch):
+            # 1. Obtain node embeddings
+            x = self.conv1(x, edge_index)
+            x = x.relu()
+            x = self.conv2(x, edge_index)
+            x = x.relu()
+            x = self.conv3(x, edge_index)
+            # 2. Readout layer
+            x = global_mean_pool(x, batch)  # [batch_size, hidden_channels]
 
-        # 3. Apply a final classifier
-        x = F.dropout(x, p=0.5, training=self.training)
-        x = self.linear(x)
+            # 3. Apply a final classifier
+            x = F.dropout(x, p=0.5, training=self.training)
+            x = self.linear(x)
 
-        return x
+            return x
 
     def train():
         model.train()
