@@ -11,9 +11,6 @@ def main():
     # The set_i folder names are passed as the remaining arguments
     set_paths = sys.argv[2:]
 
-    for i, arg in enumerate(sys.argv[2:], start=1):
-        print(f'Argument {i}: {arg}')
-
     for path in set_paths:
         # Concatenate the base directory path with the set_i folder name
         full_dir = os.path.join(name, path)
