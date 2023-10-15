@@ -2,8 +2,15 @@ import sys
 
 
 def main():
-    # sys.argv[0] is the script name, so we start from sys.argv[1]
-    for i, arg in enumerate(sys.argv[1:], start=1):
+    # The base directory path is passed as the first argument
+    name = sys.argv[1]
+
+    print(f'Project: {name}')
+
+    # The set_i folder names are passed as the remaining arguments
+    set_paths = sys.argv[2:]
+
+    for i, arg in enumerate(sys.argv[2:], start=1):
         print(f'Argument {i}: {arg}')
 
 
