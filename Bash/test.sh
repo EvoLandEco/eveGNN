@@ -1,5 +1,7 @@
 #!/bin/bash
 
+ml Python/3.8.16-GCCcore-11.2.0
+
 # Check if the correct number of arguments is provided
 if [ "$#" -ne 1 ]; then
     echo "Usage: $0 <path_to_directory>"
@@ -22,7 +24,7 @@ if [ ! -f "$path/params.txt" ]; then
 fi
 
 # Call the Python script
-python process_params.py "$path"
+python ../Script/split_data.py "$path"
 
 # Check if the Python script executed successfully
 if [ "$?" -ne 0 ]; then
