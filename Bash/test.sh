@@ -1,7 +1,22 @@
 #!/bin/bash
 
+# Get the name argument
+name=$1
+
+# Check if the name argument is provided
+if [[ -z $name ]]; then
+    echo "Usage: $0 <name>"
+    exit 1
+fi
+
 # File name
-file=params.txt
+file="${name}/data.txt"
+
+# Check if the file exists
+if [[ ! -f $file ]]; then
+    echo "Error: File $file not found."
+    exit 1
+fi
 
 # Temporary file to hold intermediate results
 temp_file=$(mktemp)
