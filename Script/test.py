@@ -11,9 +11,10 @@ def main():
     # The set_i folder names are passed as the remaining arguments
     set_paths = sys.argv[2:]
 
-    for path in set_paths:
+    for set_index in set_paths:
+        set_path = f'set_{set_index}'
         # Concatenate the base directory path with the set_i folder name
-        full_dir = os.path.join(name, "set_", path)
+        full_dir = os.path.join(name, set_path)
         # Call read_rds_to_pytorch with the full directory path
         print(full_dir)  # The set_i folder names are passed as the remaining arguments
 
