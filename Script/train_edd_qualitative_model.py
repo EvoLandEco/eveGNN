@@ -55,8 +55,8 @@ def check_rds_files_count(tree_path, el_path):
         raise ValueError("The number of .rds files in the two paths are not equal")
 
 
-def read_rds_to_pytorch(path, set_index, count):
-    params_current = get_params(path, set_index)
+def read_rds_to_pytorch(name, path, set_index, count):
+    params_current = get_params(name, set_index)
 
     metric = params_current['metric']
 
@@ -172,7 +172,7 @@ def main():
 
         print(f"Now reading set_{set_index}...")
         # Read the .rds files into a list of PyTorch Geometric Data objects
-        current_dataset = read_rds_to_pytorch(full_dir, set_index, rds_count)
+        current_dataset = read_rds_to_pytorch(name, full_dir, set_index, rds_count)
         current_training_data = get_training_data(current_dataset)
         current_testing_data = get_testing_data(current_dataset)
         training_dataset_list.append(current_training_data)
@@ -282,7 +282,7 @@ def main():
 
     # Convert the dictionary to a pandas DataFrame
     model_performance = pd.DataFrame(data_dict)
-    params = get_params(os.path.join(name, f'set_{set_paths[0]}'), set_paths[0])
+    params = get_params(name, set_paths[0])
     write_data_name = '_'.join(params.drop(['metric', 'offset']).astype(str))
     # Save the data to a file using pyreadr
     pyreadr.write_rds(os.path.join(name, f"{write_data_name}.rds"), model_performance)
