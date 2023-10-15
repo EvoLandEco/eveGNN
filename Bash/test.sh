@@ -38,7 +38,16 @@ awk '
 ' $file > $temp_file
 
 # Sort the result based on the group identifier
-sort $temp_file > grouped_indices.txt
+sort $temp_file | awk '
+  {
+    # Split the indices into an array
+    split($NF, indices, ",")
+
+    # Print the indices on separate lines
+    for (i in indices)
+      print indices[i]
+  }
+' > grouped_indices.txt
 
 # Remove the temporary file
 rm $temp_file
