@@ -70,7 +70,8 @@ def main():
         set_path = f'set_{set_index}'
         # Concatenate the base directory path with the set_i folder name
         full_dir = os.path.join(name, set_path)
-        full_dir_el = os.path.join(full_dir, 'EL')
+        full_dir_tree = os.path.join(full_dir, 'GNN', 'tree')
+        full_dir_el = os.path.join(full_dir, 'GNN', 'EL')
         # Call read_rds_to_pytorch with the full directory path
         print(full_dir)  # The set_i folder names are passed as the remaining arguments
         params_current = get_params(name, set_index)
@@ -78,7 +79,7 @@ def main():
         params_list.append(params_current)
 
         # Check if the number of .rds files in the tree and el paths are equal
-        rds_count = check_rds_files_count(full_dir, full_dir_el)
+        rds_count = check_rds_files_count(full_dir_tree, full_dir_el)
         print(f'There are: {rds_count} trees in the set_{set_index} folder.')
 
     # Check if all the list elements have the same lambda, mu, beta_n, and beta_phi
