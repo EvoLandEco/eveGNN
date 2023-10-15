@@ -10,7 +10,7 @@ if [[ -z $name ]]; then
 fi
 
 # File name
-file="${name}/data.txt"
+file="${name}/params.txt"
 
 # Check if the file exists
 if [[ ! -f $file ]]; then
