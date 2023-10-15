@@ -30,4 +30,4 @@ if [ "$?" -ne 0 ]; then
     exit 1
 fi
 
-echo "Script executed successfully, output written to $path/output.txt"
+echo "Successfully written combinations to $path/combination.txt"
