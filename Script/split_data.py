@@ -35,7 +35,7 @@ if __name__ == '__main__':
     combo_indices = find_unique_combinations(path)
 
     # Combine path with output.txt
-    output_path = f'{path}/output.txt'
+    output_path = f'{path}/combination.txt'
 
     # Write the output to output.txt
     with open(output_path, 'w') as file:
