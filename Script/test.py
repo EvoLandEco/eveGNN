@@ -13,7 +13,7 @@ def main():
 
     for path in set_paths:
         # Concatenate the base directory path with the set_i folder name
-        full_dir = os.path.join(name, path)
+        full_dir = os.path.join(name, "set_", path)
         # Call read_rds_to_pytorch with the full directory path
         print(full_dir)  # The set_i folder names are passed as the remaining arguments
 
