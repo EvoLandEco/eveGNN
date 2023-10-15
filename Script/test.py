@@ -5,10 +5,10 @@ import pandas as pd
 
 def get_params(name, set_index):
     # Form the filename by concatenating the base directory with 'params.txt'
-    filename = os.path.join(name, 'params.txt')
+    file_path = os.path.join(name, 'params.txt')
 
-    # Read the table from the text file
-    df = pd.read_csv(filename, delim_whitespace=True, header=None)
+    # Read the data from params.txt
+    df = pd.read_csv(file_path, sep="\s+", header=0)
 
     # Convert set_index to integer
     set_index = int(set_index) - 1  # subtract 1 because iloc is 0-based
