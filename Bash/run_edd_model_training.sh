@@ -1,4 +1,11 @@
 #!/bin/bash
+#SBATCH --time=00:10:00
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --job-name=gnn_training_start
+#SBATCH --output=logs/gnn_training_start-%j.log
+#SBATCH --mem=500MB
+#SBATCH --partition=short
 
 ml Python/3.8.16-GCCcore-11.2.0
 source $HOME/venvs/eve/bin/activate
@@ -28,7 +35,5 @@ while IFS= read -r line || [ -n "$line" ]; do
     # Replace commas with spaces to get the columns as separate arguments
     args=$(echo $line | tr ',' ' ')
     # Call the Python script with the columns as arguments
-    python ../Script/train_edd_qualitative_model.py $name $args
+    sbatch submit_edd_model_training.sh $name $args
 done < "$combination"
-
-deactivate
