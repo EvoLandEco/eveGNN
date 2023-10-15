@@ -1,8 +1,5 @@
 #!/bin/bash
 
-ml Python/3.8.16-GCCcore-11.2.0
-ml SciPy-bundle/2023.02-gfbf-2022b
-
 # Check if the correct number of arguments is provided
 if [ "$#" -ne 1 ]; then
     echo "Usage: $0 <path_to_directory>"

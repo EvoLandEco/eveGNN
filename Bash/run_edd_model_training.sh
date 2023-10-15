@@ -1,7 +1,6 @@
 #!/bin/bash
 
 ml Python/3.8.16-GCCcore-11.2.0
-ml SciPy-bundle/2023.02-gfbf-2022b
 source $HOME/venvs/eve/bin/activate
 
 # Check if the correct number of arguments is provided
@@ -12,6 +11,8 @@ fi
 
 # Get the path to the directory from the command line arguments
 name=$1
+
+bash split_data.sh $name
 
 # Construct the full path to the txt file
 combination="$name/combination.txt"
