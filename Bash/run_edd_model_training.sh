@@ -2,6 +2,7 @@
 
 ml Python/3.8.16-GCCcore-11.2.0
 ml SciPy-bundle/2023.02-gfbf-2022b
+source $HOME/venvs/eve/bin/activate
 
 # Check if the correct number of arguments is provided
 if [ "$#" -ne 1 ]; then
@@ -28,3 +29,5 @@ while IFS= read -r line || [ -n "$line" ]; do
     # Call the Python script with the columns as arguments
     python ../Script/test.py $name $args
 done < "$combination"
+
+deactivate
