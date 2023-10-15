@@ -23,7 +23,7 @@ def check_params(params):
     for row in params[1:]:
         if not (first_row[['lambda', 'mu', 'beta_n', 'beta_phi']].equals(row[['lambda', 'mu', 'beta_n', 'beta_phi']])):
             print("Parameter mismatch found. Data is not consistent.")
-            return
+            sys.exit()
     print("All rows have the same lambda, mu, beta_n, and beta_phi.")
 
 
@@ -45,7 +45,9 @@ def main():
         full_dir = os.path.join(name, set_path)
         # Call read_rds_to_pytorch with the full directory path
         print(full_dir)  # The set_i folder names are passed as the remaining arguments
-        params_list.append(get_params(name, set_index))
+        params_current = get_params(name, set_index)
+        print(params_current.transpose())
+        params_list.append(params_current)
 
     # Check if all the list elements have the same lambda, mu, beta_n, and beta_phi
     check_params(params_list)
