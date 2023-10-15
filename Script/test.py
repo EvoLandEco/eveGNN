@@ -71,7 +71,7 @@ def main():
         # Concatenate the base directory path with the set_i folder name
         full_dir = os.path.join(name, set_path)
         full_dir_tree = os.path.join(full_dir, 'GNN', 'tree')
-        full_dir_el = os.path.join(full_dir, 'GNN', 'EL')
+        full_dir_el = os.path.join(full_dir, 'GNN', 'tree', 'EL')
         # Call read_rds_to_pytorch with the full directory path
         print(full_dir)  # The set_i folder names are passed as the remaining arguments
         params_current = get_params(name, set_index)
