@@ -34,6 +34,8 @@ fi
 while IFS= read -r line || [ -n "$line" ]; do
     # Replace commas with spaces to get the columns as separate arguments
     args=$(echo $line | tr ',' ' ')
+    # Print the arguments
+    echo "Now submitting job with $args"
     # Call the Python script with the columns as arguments
     bash test_submit.sh $name $args
 done < "$combination"
