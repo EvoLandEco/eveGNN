@@ -38,7 +38,7 @@ def check_params(params):
 
 def count_rds_files(path):
     # Get the list of .rds files in the specified path
-    rds_files = glob.glob(os.path.join(path, '**/*.rds'), recursive=True)
+    rds_files = glob.glob(os.path.join(path, '*.rds'), recursive=True)
     return len(rds_files)
 
 
