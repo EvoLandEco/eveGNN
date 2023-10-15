@@ -1,4 +1,5 @@
 import sys
+import os
 
 
 def main():
@@ -12,6 +13,12 @@ def main():
 
     for i, arg in enumerate(sys.argv[2:], start=1):
         print(f'Argument {i}: {arg}')
+
+    for path in set_paths:
+        # Concatenate the base directory path with the set_i folder name
+        full_dir = os.path.join(name, path)
+        # Call read_rds_to_pytorch with the full directory path
+        print(full_dir)  # The set_i folder names are passed as the remaining arguments
 
 
 if __name__ == '__main__':
