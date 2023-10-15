@@ -1,6 +1,7 @@
 #!/bin/bash
 
 ml Python/3.8.16-GCCcore-11.2.0
+ml pandas/1.5.3
 
 # Check if the correct number of arguments is provided
 if [ "$#" -ne 1 ]; then
