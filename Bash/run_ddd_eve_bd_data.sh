@@ -4,7 +4,7 @@
 #SBATCH --ntasks=1
 #SBATCH --job-name=ddd_eve_bd_data
 #SBATCH --output=logs/ddd_eve_bd_data-%j.log
-#SBATCH --mem=32GB
+#SBATCH --mem=16GB
 #SBATCH --partition=regular
 
 name=${1}
