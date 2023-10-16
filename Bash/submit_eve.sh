@@ -1,10 +1,10 @@
 #!/bin/bash
-#SBATCH --time=12:00:00
+#SBATCH --time=16:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --job-name=gnn_eve_data
 #SBATCH --output=logs/gnn_eve_data-%j.log
-#SBATCH --mem=800MB
+#SBATCH --mem=500MB
 #SBATCH --partition=regular
 
 

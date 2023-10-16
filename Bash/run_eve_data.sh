@@ -24,7 +24,7 @@ name=$1
 index=1  # Initialize index
 
 # Loop over beta_n values
-for beta_n in -0.001 -0.0008 -0.0006 -0.0004 -0.0002; do
+for beta_n in -0.0010 -0.0008 -0.0006 -0.0004 -0.0002 -0.0000; do
 
     # Loop over batch values
     for batch in {1..100}; do
