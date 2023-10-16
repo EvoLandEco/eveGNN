@@ -2,8 +2,8 @@
 #SBATCH --time=6:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --job-name=gnn_training
-#SBATCH --output=logs/gnn_training-%j.log
+#SBATCH --job-name=gnn_bd_training
+#SBATCH --output=logs/gnn_bd_training-%j.log
 #SBATCH --mem=32GB
 #SBATCH --partition=regular
 

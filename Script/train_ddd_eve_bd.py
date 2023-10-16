@@ -93,7 +93,7 @@ def list_subdirectories(path):
         return None
 
 
-def get_params(model_name, set_string):
+def get_params(name, model_name, set_string):
     try:
         # Split the string on the underscore
         parts = set_string.split('_')
@@ -103,10 +103,10 @@ def get_params(model_name, set_string):
         index = int(parts[1])
 
         # Construct the path to the params file
-        file_path = f'{model_name}/{model_name}_params.txt'
+        file_path = f'{name}/{model_name}/{model_name}_params.txt'
 
         # Read the table
-        df = pd.read_table(file_path, delimiter="\t")
+        df = read_table(file_path)
 
         # Get the specified row (Python uses 0-based indexing, so we subtract 1 from index)
         row = df.iloc[index - 1]
@@ -216,6 +216,8 @@ def main():
     os.path.join(bd_tree_path, 'GNN', 'tree')
     os.path.join(bd_tree_path, 'GNN', 'tree', 'EL')
     rds_count = check_rds_files_count(os.path.join(bd_tree_path, 'GNN', 'tree'), os.path.join(bd_tree_path, 'GNN', 'tree', 'EL'))
+    print(f'There are: {rds_count} trees in the {set_i} folder.')
+    print(f"Now reading BD trees...")
     bd_dataset = read_rds_to_pytorch(bd_tree_path, "BD_TAS", rds_count)
     bd_training_data = get_training_data(bd_dataset)
     bd_testing_data = get_testing_data(bd_dataset)
@@ -223,12 +225,12 @@ def main():
     testing_dataset_list.append(bd_testing_data)
 
     # Concatenate the base directory path with the set_i folder name
-    full_dir = os.path.join(task_type, set_i)
+    full_dir = os.path.join(name, task_type, set_i)
     full_dir_tree = os.path.join(full_dir, 'GNN', 'tree')
     full_dir_el = os.path.join(full_dir, 'GNN', 'tree', 'EL')
     # Call read_rds_to_pytorch with the full directory path
     print(full_dir)  # The set_i folder names are passed as the remaining arguments
-    params_current = get_params(task_type, set_i)
+    params_current = get_params(name, task_type, set_i)
     print(params_current)
 
     # Check if the number of .rds files in the tree and el paths are equal
