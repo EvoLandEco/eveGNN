@@ -14,4 +14,4 @@ index=$3
 ml R
 
 # Call the R script test.R with the variables name and cap as arguments
-Rscript ddd_data.R "$name" "$cap" "$index"
+Rscript ../Script/ddd_data.R "$name" "$cap" "$index"

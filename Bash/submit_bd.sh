@@ -12,4 +12,4 @@ name=$1
 ml R
 
 # Call the R script test.R with the variables name and cap as arguments
-Rscript bd_data.R "$name"
+Rscript ../Script/bd_data.R "$name"
