@@ -347,7 +347,7 @@ def main():
     model_performance = pd.DataFrame(data_dict)
     write_data_name = '_'.join(params_current.astype(str))
     # Save the data to a file using pyreadr
-    pyreadr.write_rds(os.path.join(task_type, f"{write_data_name}.rds"), model_performance)
+    pyreadr.write_rds(os.path.join(name, task_type, f"{write_data_name}.rds"), model_performance)
 
 
 if __name__ == '__main__':
