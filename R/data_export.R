@@ -1,18 +1,30 @@
 #' @export export_to_gnn
-export_to_gnn <- function(data, name) {
+export_to_gnn <- function(data, name, which = "tas") {
   path <- file.path(paste0("set_", name), "GNN/tree/")
   path_EL <- file.path(paste0("set_", name), "GNN/tree/EL/")
   eve:::check_path(path)
   eve:::check_path(path_EL)
 
-  for (i in seq_along(data$tas)) {
-    file_name <- paste0(path, "/tree_", i, ".rds")
-    saveRDS(data$tas[[i]]$edge - 1, file = file_name)
+  if (which == "tas") {
+    for (i in seq_along(data$tas)) {
+      file_name <- paste0(path, "/tree_", i, ".rds")
+      saveRDS(data$tas[[i]]$edge - 1, file = file_name)
+    }
+    for (i in seq_along(data$tas)) {
+      file_name <- paste0(path_EL, "/EL_", i, ".rds")
+      saveRDS(tree_to_adj_mat(data$tas[[i]]), file = file_name)
+    }
+  } else if (which == "tes") {
+    for (i in seq_along(data$tes)) {
+      file_name <- paste0(path, "/tree_", i, ".rds")
+      saveRDS(data$tes[[i]]$edge - 1, file = file_name)
+    }
+    for (i in seq_along(data$tes)) {
+      file_name <- paste0(path_EL, "/EL_", i, ".rds")
+      saveRDS(tree_to_adj_mat(data$tes[[i]]), file = file_name)
+    }
   }
-  for (i in seq_along(data$tas)) {
-    file_name <- paste0(path_EL, "/EL_", i, ".rds")
-    saveRDS(tree_to_adj_mat(data$tas[[i]]), file = file_name)
-  }
+
 }
 
 

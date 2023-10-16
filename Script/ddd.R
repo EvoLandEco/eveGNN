@@ -112,26 +112,27 @@ diffs_caps_df_stats <- diffs_caps_df[-diffs_caps_df_extremes,] %>%
 diffs_caps_df_stats$Group <- as.numeric(as.character(diffs_caps_df_stats$Group))
 diffs_caps_df$Group <- as.numeric(as.character(diffs_caps_df$Group))
 
-ggplot(diffs_100_df[-1968,]) +
+p_cap <- ggplot(diffs_100_df[-1968,]) +
   geom_hline(yintercept = 0.0,linewidth=2,linetype=2) +
-  geom_smooth(data = diffs_100_df_stats, aes(x = Group, y = QHigh), linewidth=0.1, linetype=2,se = FALSE) +
+  geom_smooth(data = diffs_100_df_stats, aes(x = Group, y = QHigh), linewidth=0.1, linetype=2, se = FALSE) +
   geom_smooth(data = diffs_100_df_stats, aes(x = Group, y = QLow), linewidth=0.1, linetype=2 , se = FALSE) +
-  geom_ribbon(data = diffs_100_df_stats,
-              aes(x = Group,
-                  ymin = fitted(loess(QLow ~ Group, data = diffs_100_df_stats)),
-                  ymax = fitted(loess(QHigh ~ Group, data = diffs_100_df_stats))),
-              alpha = 0.2) +
+  #geom_ribbon(data = diffs_100_df_stats,
+              #aes(x = Group,
+                  #ymin = fitted(loess(QLow ~ Group, data = diffs_100_df_stats)),
+                  #ymax = fitted(loess(QHigh ~ Group, data = diffs_100_df_stats))),
+              #alpha = 0.2) +
   geom_boxplot(aes(x = Group, y = Value, fill = Group, group = Group), outlier.shape = 1, outlier.alpha = 0.3) +
   viridis::scale_fill_viridis(option = "D", discrete = FALSE, limits = c(0, 20)) +
   coord_cartesian(ylim = c(-0.45, 0.3)) +
   labs(x = "Crown age", y = "Mean differences") +
-  ggtitle("MLE Accuracy") +
   theme(legend.position = "none",
-        aspect.ratio = 3/4)
+        aspect.ratio = 3/4,
+        panel.background = element_rect(fill = "transparent", color = NA),
+        legend.background = element_rect(fill = "transparent", color = NA))
 
 diffs_caps_df_extremes <- c(which(diffs_caps_df$Value > 0.6), which(diffs_caps_df$Value < -0.6))
 
-ggplot(diffs_caps_df[-diffs_caps_df_extremes,]) +
+p_age <- ggplot(diffs_caps_df[-diffs_caps_df_extremes,]) +
   geom_hline(yintercept = 0.0,linewidth=2,linetype=2) +
   geom_smooth(data = diffs_caps_df_stats, aes(x = Group, y = QHigh), linewidth=0.1, linetype=2,se = FALSE) +
   geom_smooth(data = diffs_caps_df_stats, aes(x = Group, y = QLow), linewidth=0.1, linetype=2 , se = FALSE) +
@@ -144,11 +145,19 @@ ggplot(diffs_caps_df[-diffs_caps_df_extremes,]) +
   viridis::scale_fill_viridis(option = "D", discrete = FALSE, limits = c(0, 100)) +
   #coord_cartesian(ylim = c(-0.45, 0.3)) +
   labs(x = "Carrying capacity", y = "Mean differences") +
-  ggtitle("MLE Accuracy") +
   theme(legend.position = "none",
-        aspect.ratio = 3/4)
+        aspect.ratio = 3/4,
+        panel.background = element_rect(fill = "transparent", color = NA),
+        legend.background = element_rect(fill = "transparent", color = NA))
 
 dataset %>% tidyr::gather(key = "Metric", value = "Value", -Epoch) %>%
   ggplot() + geom_line(aes(Epoch, Value, color = Metric)) +
   facet_wrap(~ Metric, scales = "free_y")
 ggplot(dataset) + geom_area(aes(Epoch, fitted(loess(Train_Accuracy ~ Epoch))))
+
+p_age + p_cap + patchwork::plot_layout(ncol = 2, guides = "collect") +
+  patchwork::plot_annotation(title = "MLE Accuracy",
+    subtitle = "Mean differences between true and estimated parameters",
+  caption = "Distributions of parameters: lambda = uniform(0.5, 1.0), mu = uniform(0.0, 0.4)\n
+  Crown age was fixed to 20 while changing carrying capacity\n
+  Carrying capacity was fixed to 100 while changing crown age.")
