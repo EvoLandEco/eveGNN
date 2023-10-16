@@ -43,7 +43,6 @@ edd_sim_fix_n <- function(n, pars, age, model, metric, offset) {
   while(is.null(desired_data)) {
     tryCatch({
       sim_data <- eve::edd_sim(pars, age, model = model, metric = metric, offset = offset, history = FALSE)
-      print(sim_data$tes$Nnode+1)
       if(sim_data$tes$Nnode == (n - 1)) {
         desired_data <- sim_data
       }
