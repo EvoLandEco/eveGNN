@@ -1,8 +1,8 @@
 args <- commandArgs(TRUE)
 
-name <- args[1]
-cap <- args[2]
-index <- args[3]
+name <- as.character(args[1])
+cap <- as.numeric(args[2])
+index <- as.character(args[3])
 
 if (!dir.exists(name)) {
   dir.create(name)
