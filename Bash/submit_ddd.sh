@@ -4,7 +4,7 @@
 #SBATCH --ntasks=1
 #SBATCH --job-name=gnn_ddd_data
 #SBATCH --output=logs/gnn_ddd_data-%j.log
-#SBATCH --mem=4GB
+#SBATCH --mem=2GB
 #SBATCH --partition=regular
 
 name=$1
