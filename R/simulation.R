@@ -36,3 +36,23 @@ dd_sim_fix_n <- function(n, pars, age, ddmodel = 1) {
   return(desired_data)
 }
 
+
+#' @export edd_sim_fix_n
+edd_sim_fix_n <- function(n, pars, age, model, metric, offset) {
+  desired_data <- NULL
+  while(is.null(desired_data)) {
+    tryCatch({
+      sim_data <- eve::edd_sim(pars, age, model = model, metric = metric, offset = offset, history = FALSE)
+      print(sim_data$tes$Nnode+1)
+      if(sim_data$tes$Nnode == (n - 1)) {
+        desired_data <- sim_data
+      }
+    }, error = function(e) {
+      # Handle error
+      message("Error in edd_sim: ", e$message)
+    })
+  }
+  return(desired_data)
+}
+
+

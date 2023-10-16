@@ -7,6 +7,12 @@
 #SBATCH --mem=500MB
 #SBATCH --partition=regular
 
+# Ensure the script is called with the necessary argument for 'name'
+if [ "$#" -ne 1 ]; then
+    echo "Usage: $0 <name>"
+    exit 1
+fi
+
 name=${1}
 
 # Ensure the "logs" directory exists
