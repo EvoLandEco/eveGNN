@@ -19,3 +19,20 @@ batch_sim_ddd <- function(dists, cap, age, model, nrep = 10) {
 }
 
 
+#' @export dd_sim_fix_n
+dd_sim_fix_n <- function(n, pars, age, ddmodel = 1) {
+  desired_data <- NULL
+  while(is.null(desired_data)) {
+    tryCatch({
+      sim_data <- dd_sim(pars, age, ddmodel = ddmodel)
+      if(sim_data$tes$Nnode == (n - 1)) {
+        desired_data <- sim_data
+      }
+    }, error = function(e) {
+      # Handle error
+      message("Error in dd_sim: ", e$message)
+    })
+  }
+  return(desired_data)
+}
+
