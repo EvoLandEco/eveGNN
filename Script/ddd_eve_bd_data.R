@@ -26,7 +26,7 @@ dists_bd <- list(
 ddd_list <- list()
 j <- 1
 for (i in seq(from = 100, to = 600, by = 100)) {
-  ddd_list[[j]] <- eveGNN::batch_sim_ddd(dists = dists_bd, cap = i, 10, 1, 3000)
+  ddd_list[[j]] <- eveGNN::batch_sim_ddd(dists = dists_bd, cap = i, age = 10, model = 1, nrep = 3000)
   j <- j + 1
 }
 

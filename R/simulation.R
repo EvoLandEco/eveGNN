@@ -11,7 +11,7 @@ randomized_ddd_fixed_age_cap <- function(dists, cap, age, model) {
 batch_sim_ddd <- function(dists, cap, age, model, nrep = 10) {
   batch <- list()
   for (i in 1:nrep) {
-    batch[[i]] <- randomized_ddd_fixed_age_cap(dists, cap, age, model)
+    batch[[i]] <- randomized_ddd_fixed_age_cap(dists = dists, cap = cap, age = age, model = model)
   }
   trans_batch <- purrr::transpose(batch)
 

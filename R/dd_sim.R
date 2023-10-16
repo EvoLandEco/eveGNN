@@ -203,7 +203,7 @@ dd_sim <- function(pars, age, ddmodel = 1)
   tas <- treestats::l_to_phylo(L, drop_extinct = F)
   brts <- treestats::branching_times(tes)
   pars <- pars
-  out <- list(tes = tes, tas = tas, brts = brts, age = age, model = model, pars = pars, L = L)
+  out <- list(tes = tes, tas = tas, brts = brts, age = age, model = ddmodel, pars = pars, L = L)
 
   return(out)
 }
