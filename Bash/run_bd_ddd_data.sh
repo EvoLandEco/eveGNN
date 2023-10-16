@@ -16,6 +16,8 @@ ml R
 Rscript -e "devtools::install_github('EvoLandEco/eve')"
 Rscript -e "devtools::install_github('EvoLandEco/eveGNN')"
 
+sbatch submit_bd.sh "${name}"
+
 # Initialize a counter for the iteration index
 index=1
 
