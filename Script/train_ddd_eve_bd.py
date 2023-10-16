@@ -238,8 +238,7 @@ def main():
     print(f'There are: {rds_count} trees in the {set_i} folder.')
     print(f"Now reading {task_type}:{set_i}...")
     # Read the .rds files into a list of PyTorch Geometric Data objects
-    current_path = os.path.join(task_type, set_i)
-    current_dataset = read_rds_to_pytorch(current_path, task_type, rds_count)
+    current_dataset = read_rds_to_pytorch(full_dir, task_type, rds_count)
     current_training_data = get_training_data(current_dataset)
     current_testing_data = get_testing_data(current_dataset)
     training_dataset_list.append(current_training_data)
