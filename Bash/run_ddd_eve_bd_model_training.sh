@@ -33,14 +33,26 @@ name=$1
 ddd_path="$name/DDD_TES"
 eve_path="$name/EVE_TES"
 
-# Iterate through the sets in DDD_TES and submit jobs
-for set_dir in "$ddd_path"/set_*; do
-    set_i=$(basename "$set_dir")
-    submit_job "$name" "$set_i" "DDD_TES"
-done
+# Function to iterate through sets and submit jobs
+submit_jobs_in_path() {
+    local path=$1
+    local task_type=$2
 
-# Iterate through the sets in EVE_TES and submit jobs
-for set_dir in "$eve_path"/set_*; do
-    set_i=$(basename "$set_dir")
-    submit_job "$name" "$set_i" "EVE_TES"
-done
+    # Check if the directory is non-empty
+    if [ "$(ls -A "$path")" ]; then
+        # Iterate through the sets and submit jobs
+        for set_dir in "$path"/set_*; do
+            # Check if the path is a directory before proceeding
+            if [ -d "$set_dir" ]; then
+                set_i=$(basename "$set_dir")
+                submit_job "$name" "$set_i" "$task_type"
+            fi
+        done
+    else
+        echo "No subpaths in $path. Skipping..."
+    fi
+}
+
+# Call the function for DDD_TES and EVE_TES
+submit_jobs_in_path "$ddd_path" "DDD_TES"
+submit_jobs_in_path "$eve_path" "EVE_TES"
