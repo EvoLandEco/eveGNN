@@ -118,7 +118,7 @@ def get_params(name, model_name, set_string):
 
 def read_rds_to_pytorch(path, model, count):
     # Map metrics to category values
-    metric_to_category = {'BD_TAS': 0, 'DDD_TAS': 1, 'EVE_TAS': 2}
+    metric_to_category = {'BD_TES': 0, 'DDD_TES': 1, 'EVE_TES': 2}
 
     # Check if the provided metric is valid
     if model not in metric_to_category:
@@ -208,7 +208,7 @@ def main():
     # Now you can use the variables name and set_i in your code
     print(f'Name: {name}, Set: {set_i}, Task Type: {task_type}')
 
-    bd_tree_path = os.path.join(name, "BD_TAS/set_1")
+    bd_tree_path = os.path.join(name, "BD_TES/set_1")
 
     training_dataset_list = []
     testing_dataset_list = []
@@ -218,7 +218,7 @@ def main():
     rds_count = check_rds_files_count(os.path.join(bd_tree_path, 'GNN', 'tree'), os.path.join(bd_tree_path, 'GNN', 'tree', 'EL'))
     print(f'There are: {rds_count} trees in the {set_i} folder.')
     print(f"Now reading BD trees...")
-    bd_dataset = read_rds_to_pytorch(bd_tree_path, "BD_TAS", rds_count)
+    bd_dataset = read_rds_to_pytorch(bd_tree_path, "BD_TES", rds_count)
     bd_training_data = get_training_data(bd_dataset)
     bd_testing_data = get_testing_data(bd_dataset)
     training_dataset_list.append(bd_training_data)
