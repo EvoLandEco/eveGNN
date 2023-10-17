@@ -5,3 +5,6 @@
 *.RData
 /Test/
 *.rds
+/Bash/*/
+/Bash/params
+/Bash/grouped_indices.txt
