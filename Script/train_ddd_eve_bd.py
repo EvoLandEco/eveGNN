@@ -353,15 +353,14 @@ def main():
             out, embeddings = model(data.x, data.edge_index, data.batch, return_embeddings=True)
             preds = out.argmax(dim=1).cpu().numpy()
             labels = data.y.cpu().numpy()
-
             all_embeddings.append(embeddings.cpu().detach().numpy())
-            all_preds.extend(preds)
-            all_labels.extend(labels)
+            all_preds.append(preds)
+            all_labels.append(labels)
 
         all_embeddings = np.vstack(all_embeddings)  # Stack the embeddings into one array
-        all_labels = np.concatenate(all_labels)  # Convert list of arrays to one array
         overall_accuracy = np.mean(np.array(all_preds) == np.array(all_labels))
         class_accuracies = per_class_accuracy(all_labels, all_preds, 2)
+        all_labels = np.concatenate(all_labels)  # Convert list of arrays to one array
 
         return overall_accuracy, class_accuracies, all_embeddings, all_labels
 
