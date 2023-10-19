@@ -8,6 +8,7 @@ import torch
 import glob
 import functools
 import umap
+from sklearn.metrics import confusion_matrix
 from torch_geometric.loader import DataLoader
 import torch.nn.functional as F
 from torch.nn import Linear
@@ -199,6 +200,31 @@ def get_testing_data(data_list):
     return testing_data
 
 
+def per_class_accuracy(y_true, y_pred, num_classes):
+    """
+    Compute the per-class accuracy given ground-truth and predicted labels.
+
+    :param y_true: Ground-truth labels.
+    :param y_pred: Predicted labels.
+    :param num_classes: Total number of classes.
+    :return: A list of per-class accuracies.
+    """
+    cm = confusion_matrix(y_true, y_pred)
+    class_accuracies = []
+
+    for i in range(num_classes):
+        true_positive = cm[i][i]
+        total_in_class = np.sum(cm[i, :])
+
+        if total_in_class == 0:
+            accuracy = 0  # Handle case where there are no samples in class i
+        else:
+            accuracy = true_positive / total_in_class
+        class_accuracies.append(accuracy)
+
+    return class_accuracies
+
+
 def main():
     if len(sys.argv) != 4:
         print(f"Usage: {sys.argv[0]} <name> <set_i> <task_type>")
@@ -295,8 +321,8 @@ def main():
     def train():
         model.train()
 
-        loss_all = 0
-        all_embeddings = []
+        loss_all = 0  # Keep track of the loss
+        all_embeddings = []  # Collect embeddings
         all_labels = []  # Collect labels
         for data in train_loader:
             data.to(device)
@@ -310,7 +336,7 @@ def main():
             all_embeddings.append(embeddings.cpu().detach().numpy())
             all_labels.append(data.y.cpu().numpy())  # Save the labels
 
-        all_embeddings = np.vstack(all_embeddings)
+        all_embeddings = np.vstack(all_embeddings)  # Stack the embeddings into one array
         all_labels = np.concatenate(all_labels)  # Convert list of arrays to one array
         return loss_all / len(train_loader.dataset), all_embeddings, all_labels
 
@@ -319,19 +345,24 @@ def main():
 
         correct = 0
         all_embeddings = []
+        all_preds = []  # Collect predictions
         all_labels = []  # Collect labels
         for data in loader:
             data.to(device)
             out, embeddings = model(data.x, data.edge_index, data.batch, return_embeddings=True)
-            pred = out.argmax(dim=1)
-            correct += int((pred == data.y).sum())
+            preds = out.argmax(dim=1).cpu().numpy()
+            labels = data.y.cpu().numpy()
 
             all_embeddings.append(embeddings.cpu().detach().numpy())
-            all_labels.append(data.y.cpu().numpy())  # Save the labels
+            all_preds.extend(preds)
+            all_labels.extend(labels)
 
-        all_embeddings = np.vstack(all_embeddings)
+        all_embeddings = np.vstack(all_embeddings)  # Stack the embeddings into one array
         all_labels = np.concatenate(all_labels)  # Convert list of arrays to one array
-        return correct / len(loader.dataset), all_embeddings, all_labels
+        overall_accuracy = np.mean(np.array(all_preds) == np.array(all_labels))
+        class_accuracies = per_class_accuracy(all_labels, all_preds, 2)
+
+        return overall_accuracy, class_accuracies, all_embeddings, all_labels
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Training using {device}")
@@ -347,6 +378,8 @@ def main():
 
     train_acc_history = []
     loss_history = []
+    test_class0_acc_history = []
+    test_class1_acc_history = []
 
     train_dir = os.path.join(name, task_type, set_i, "training")
     test_dir = os.path.join(name, task_type, set_i, "testing")
@@ -359,12 +392,14 @@ def main():
 
     for epoch in range(1, 200):
         loss, train_embeddings, train_labels = train()
-        train_acc, test_embeddings, test_labels = test(test_loader)
-        print(f'Epoch: {epoch:03d}, Train Acc: {train_acc:.4f}, Loss: {loss:.4f}')
+        test_acc_all, test_acc_per_class, test_embeddings, test_labels = test(test_loader)
+        print(f'Epoch: {epoch:03d}, Test Acc: {test_acc_all:.4f}, Loss: {loss:.4f}')
 
         # Record the values
-        train_acc_history.append(train_acc)
+        train_acc_history.append(test_acc_all)
         loss_history.append(loss)
+        test_class0_acc_history.append(test_acc_per_class[0])
+        test_class1_acc_history.append(test_acc_per_class[1])
 
         # Helper function to generate and save UMAP plot
         def generate_umap_plot(embeddings, labels, epoch, path):
@@ -384,7 +419,9 @@ def main():
     # After the loop, create a dictionary to hold the data
     data_dict = {
         'Epoch': list(range(1, 200)),
-        'Train_Accuracy': train_acc_history,
+        'Test_Accuracy_Overall': train_acc_history,
+        'Test_Class0_Accuracy': test_class0_acc_history,
+        'Test_Class1_Accuracy': test_class1_acc_history,
         'Loss': loss_history
     }
 
