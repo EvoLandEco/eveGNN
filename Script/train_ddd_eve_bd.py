@@ -201,28 +201,14 @@ def get_testing_data(data_list):
     return testing_data
 
 
-def per_class_accuracy(y_true, y_pred, num_classes):
-    """
-    Compute the per-class accuracy given ground-truth and predicted labels.
-
-    :param y_true: Ground-truth labels.
-    :param y_pred: Predicted labels.
-    :param num_classes: Total number of classes.
-    :return: A list of per-class accuracies.
-    """
+def per_class_accuracy(y_true, y_pred, classes):
     cm = confusion_matrix(y_true, y_pred)
-    class_accuracies = []
-
-    for i in range(num_classes):
+    class_accuracies = {}
+    for i, class_label in enumerate(classes):
         true_positive = cm[i][i]
         total_in_class = np.sum(cm[i, :])
-
-        if total_in_class == 0:
-            accuracy = 0  # Handle case where there are no samples in class i
-        else:
-            accuracy = true_positive / total_in_class
-        class_accuracies.append(accuracy)
-
+        accuracy = 0 if total_in_class == 0 else true_positive / total_in_class
+        class_accuracies[class_label] = accuracy
     return class_accuracies
 
 
@@ -361,7 +347,7 @@ def main():
 
         all_embeddings = np.vstack(all_embeddings)  # Stack the embeddings into one array
         overall_accuracy = np.mean(np.array(all_preds) == np.array(all_labels))
-        class_accuracies = per_class_accuracy(all_labels, all_preds, 2)
+        class_accuracies = per_class_accuracy(all_labels, all_preds, unique_class_labels)
         all_labels_out = np.concatenate(all_labels_out)  # Convert list of arrays to one array
 
         return overall_accuracy, class_accuracies, all_embeddings, all_labels_out
@@ -378,10 +364,10 @@ def main():
 
     print(model)
 
-    train_acc_history = []
+    test_acc_history = []
     loss_history = []
-    test_class0_acc_history = []
-    test_class1_acc_history = []
+    unique_class_labels = sorted(list(set(training_dataset.y.numpy())))  # Get the unique class labels
+    test_per_class_accuracies = {label: [] for label in unique_class_labels}
 
     train_dir = os.path.join(name, task_type, set_i, "training")
     test_dir = os.path.join(name, task_type, set_i, "testing")
@@ -398,12 +384,12 @@ def main():
         print(f'Epoch: {epoch:03d}, Test Acc: {test_acc_all:.4f}, Loss: {loss:.4f}')
 
         # Record the values
-        train_acc_history.append(test_acc_all)
+        test_acc_history.append(test_acc_all)
         loss_history.append(loss)
-        test_class0_acc_history.append(test_acc_per_class[0])
-        test_class1_acc_history.append(test_acc_per_class[1])
+        for label in unique_class_labels:
+            test_per_class_accuracies[label].append(test_acc_per_class[label])
 
-        # Helper function to generate and save UMAP plot
+    # Helper function to generate and save UMAP plot
         def generate_umap_plot(embeddings, labels, epoch, path):
             reducer = umap.UMAP()
             umap_embeddings = reducer.fit_transform(embeddings)
@@ -415,17 +401,18 @@ def main():
             plt.close()
 
         # Generate UMAP plots for both train and test embeddings
-        generate_umap_plot(train_embeddings, train_labels, epoch, train_dir)
-        generate_umap_plot(test_embeddings, test_labels, epoch, test_dir)
+        # generate_umap_plot(train_embeddings, train_labels, epoch, train_dir)
+        # generate_umap_plot(test_embeddings, test_labels, epoch, test_dir)
 
     # After the loop, create a dictionary to hold the data
     data_dict = {
         'Epoch': list(range(1, 200)),
-        'Test_Accuracy_Overall': train_acc_history,
-        'Test_Class0_Accuracy': test_class0_acc_history,
-        'Test_Class1_Accuracy': test_class1_acc_history,
+        'Test_Accuracy_Overall': test_acc_history,
         'Loss': loss_history
     }
+
+    for label in unique_class_labels:
+        data_dict[f'Test_{label}_Accuracy'] = test_per_class_accuracies[label]
 
     # Convert the dictionary to a pandas DataFrame
     model_performance = pd.DataFrame(data_dict)
