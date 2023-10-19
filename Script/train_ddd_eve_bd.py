@@ -212,6 +212,19 @@ def per_class_accuracy(y_true, y_pred, classes):
     return class_accuracies
 
 
+def export_to_rds(embeddings, labels, epoch, name, task_type, set_i, which_set):
+    # Convert to DataFrame
+    df = pd.DataFrame(embeddings, columns=[f"dim_{i}" for i in range(embeddings.shape[1])])
+    df['label'] = labels
+
+    # Export to RDS
+    rds_path = os.path.join(name, task_type, "umap")
+    if not os.path.exists(rds_path):
+        os.makedirs(rds_path)
+    rds_filename = os.path.join(rds_path, f'{set_i}_{which_set}_umap_epoch_{epoch}.rds')
+    pyreadr.write_rds(rds_filename, df)
+
+
 def main():
     if len(sys.argv) != 4:
         print(f"Usage: {sys.argv[0]} <name> <set_i> <task_type>")
@@ -403,6 +416,8 @@ def main():
         # Generate UMAP plots for both train and test embeddings
         # generate_umap_plot(train_embeddings, train_labels, epoch, train_dir)
         # generate_umap_plot(test_embeddings, test_labels, epoch, test_dir)
+        export_to_rds(train_embeddings, train_labels, epoch, name, task_type, set_i, 'train')
+        export_to_rds(test_embeddings, test_labels, epoch, name, task_type, set_i, 'test')
 
     # After the loop, create a dictionary to hold the data
     data_dict = {
