@@ -8,6 +8,7 @@ import torch
 import glob
 import functools
 import umap
+import imageio
 from sklearn.metrics import confusion_matrix
 from torch_geometric.loader import DataLoader
 import torch.nn.functional as F
@@ -430,6 +431,15 @@ def main():
     write_data_name = '_'.join(params_current.astype(str))
     # Save the data to a file using pyreadr
     pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_{set_i}_{write_data_name}.rds"), model_performance)
+
+    # List of saved UMAP images from each epoch for training
+    train_image_files = [os.path.join(train_dir, f'umap_epoch_{i}.png') for i in range(1, 200)]
+    # Create a gif animation
+    imageio.mimsave(os.path.join(train_dir, f'umap_train_animation_{task_type}_{set_i}.gif'), [imageio.imread(file) for file in train_image_files], duration=0.5)
+
+    # Similarly, for testing images
+    test_image_files = [os.path.join(test_dir, f'umap_epoch_{i}.png') for i in range(1, 200)]
+    imageio.mimsave(os.path.join(test_dir, f'umap_test_animation_{task_type}_{set_i}.gif'), [imageio.imread(file) for file in test_image_files], duration=0.025)
 
 
 if __name__ == '__main__':
