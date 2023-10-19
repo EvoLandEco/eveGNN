@@ -14,4 +14,5 @@ Imports:
   eve,
   furrr,
   purrr,
+  stringr,
   treestats
