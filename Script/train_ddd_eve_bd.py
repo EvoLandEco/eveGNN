@@ -348,8 +348,8 @@ def main():
     train_acc_history = []
     loss_history = []
 
-    train_dir = "training"
-    test_dir = "testing"
+    train_dir = os.path.join(name, task_type, set_i, "training")
+    test_dir = os.path.join(name, task_type, set_i, "testing")
 
     # Check and create directories if not exist
     if not os.path.exists(train_dir):
