@@ -1,10 +1,13 @@
 import sys
 import os
 import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
 import pyreadr
 import torch
 import glob
 import functools
+import umap
 from torch_geometric.loader import DataLoader
 import torch.nn.functional as F
 from torch.nn import Linear
@@ -269,47 +272,66 @@ def main():
             self.conv3 = GCNConv(hidden_size, hidden_size)
             self.linear = Linear(hidden_size, training_dataset.num_classes)
 
-        def forward(self, x, edge_index, batch):
+        def forward(self, x, edge_index, batch, return_embeddings=False):
             # 1. Obtain node embeddings
             x = self.conv1(x, edge_index)
             x = x.relu()
             x = self.conv2(x, edge_index)
             x = x.relu()
             x = self.conv3(x, edge_index)
-            # 2. Readout layer
-            x = global_mean_pool(x, batch)  # [batch_size, hidden_channels]
 
-            # 3. Apply a final classifier
-            x = F.dropout(x, p=0.5, training=self.training)
-            x = self.linear(x)
+            # Readout layer
+            embeddings = global_mean_pool(x, batch)
 
-            return x
+            # Apply a final classifier
+            x = F.dropout(embeddings, p=0.5, training=self.training)
+            out = self.linear(x)
+
+            if return_embeddings:
+                return out, embeddings
+            else:
+                return out
 
     def train():
         model.train()
 
-        lost_all = 0
+        loss_all = 0
+        all_embeddings = []
+        all_labels = []  # Collect labels
         for data in train_loader:
             data.to(device)
-            optimizer.zero_grad()  # Clear gradients.
-            out = model(data.x, data.edge_index, data.batch)  # Perform a single forward pass.
-            loss = criterion(out, data.y)   # Compute the loss.
-            loss.backward()  # Derive gradients.
-            lost_all += loss.item() * data.num_graphs
-            optimizer.step()  # Update parameters based on gradients.
+            optimizer.zero_grad()
+            out, embeddings = model(data.x, data.edge_index, data.batch, return_embeddings=True)
+            loss = criterion(out, data.y)
+            loss.backward()
+            loss_all += loss.item() * data.num_graphs
+            optimizer.step()
 
-        return lost_all / len(train_loader.dataset)
+            all_embeddings.append(embeddings.cpu().detach().numpy())
+            all_labels.append(data.y.cpu().numpy())  # Save the labels
+
+        all_embeddings = np.vstack(all_embeddings)
+        all_labels = np.concatenate(all_labels)  # Convert list of arrays to one array
+        return loss_all / len(train_loader.dataset), all_embeddings, all_labels
 
     def test(loader):
         model.eval()
 
         correct = 0
-        for data in loader:  # Iterate in batches over the training/test dataset.
+        all_embeddings = []
+        all_labels = []  # Collect labels
+        for data in loader:
             data.to(device)
-            out = model(data.x, data.edge_index, data.batch)
-            pred = out.argmax(dim=1)  # Use the class with the highest probability.
-            correct += int((pred == data.y).sum())  # Check against ground-truth labels.
-        return correct / len(loader.dataset)  # Derive ratio of correct predictions.
+            out, embeddings = model(data.x, data.edge_index, data.batch, return_embeddings=True)
+            pred = out.argmax(dim=1)
+            correct += int((pred == data.y).sum())
+
+            all_embeddings.append(embeddings.cpu().detach().numpy())
+            all_labels.append(data.y.cpu().numpy())  # Save the labels
+
+        all_embeddings = np.vstack(all_embeddings)
+        all_labels = np.concatenate(all_labels)  # Convert list of arrays to one array
+        return correct / len(loader.dataset), all_embeddings, all_labels
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Training using {device}")
@@ -326,15 +348,38 @@ def main():
     train_acc_history = []
     loss_history = []
 
+    train_dir = "training"
+    test_dir = "testing"
+
+    # Check and create directories if not exist
+    if not os.path.exists(train_dir):
+        os.makedirs(train_dir)
+    if not os.path.exists(test_dir):
+        os.makedirs(test_dir)
+
     for epoch in range(1, 200):
-        loss = train()
-        train_acc = test(test_loader)
-        # test_acc = test(test_loader)
+        loss, train_embeddings, train_labels = train()
+        train_acc, test_embeddings, test_labels = test(test_loader)
         print(f'Epoch: {epoch:03d}, Train Acc: {train_acc:.4f}, Loss: {loss:.4f}')
 
         # Record the values
         train_acc_history.append(train_acc)
         loss_history.append(loss)
+
+        # Helper function to generate and save UMAP plot
+        def generate_umap_plot(embeddings, labels, epoch, path):
+            reducer = umap.UMAP()
+            umap_embeddings = reducer.fit_transform(embeddings)
+
+            plt.scatter(umap_embeddings[:, 0], umap_embeddings[:, 1], c=labels, cmap='Spectral', s=5)
+            plt.colorbar()
+            plt.title(f'UMAP projection (Epoch {epoch})')
+            plt.savefig(os.path.join(path, f'umap_epoch_{epoch}.png'))
+            plt.close()
+
+        # Generate UMAP plots for both train and test embeddings
+        generate_umap_plot(train_embeddings, train_labels, epoch, train_dir)
+        generate_umap_plot(test_embeddings, test_labels, epoch, test_dir)
 
     # After the loop, create a dictionary to hold the data
     data_dict = {
