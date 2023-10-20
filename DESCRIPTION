@@ -15,4 +15,5 @@ Imports:
   furrr,
   purrr,
   stringr,
-  treestats
+  treestats,
+  umap

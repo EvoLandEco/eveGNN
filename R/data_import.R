@@ -95,3 +95,48 @@ joint_by_type <- function(input_list) {
 
   return(input_list)
 }
+
+
+#' @export read_umap_data
+read_umap_data <- function(path) {
+  # List all .rds files recursively within the umap_folder
+  all_files <- list.files(path = file.path(path, "umap"), pattern = "\\.rds$", recursive = TRUE, full.names = FALSE)
+
+  # Initialize an empty list to store the datasets
+  dataset <- list()
+  i <- 1
+  # Loop through each file and read the .rds file and parse metadata
+  for (file_name in all_files) {
+    data <- readRDS(file.path(path, "umap", file_name))
+
+    # Parse metadata from the filename and path
+    path_parts <- unlist(strsplit(file_path, split = "/"))
+    file_name <- tail(path_parts, n=1) # Get the last part (filename) from the path
+    sub_folder <- tail(path_parts, n=2)[1] # Get the second last part (subfolder) from the path
+
+    # Extract metadata components
+    sub_folder_parts <- unlist(strsplit(sub_folder, split = "_"))
+    model <- sub_folder_parts[1]
+    which <- sub_folder_parts[2]
+
+    file_name_parts <- unlist(strsplit(file_name, split = "_"))
+    set <- as.numeric(gsub("set", "", file_name_parts[2]))
+    type <- file_name_parts[3]
+    stat <- file_name_parts[4]
+    epoch <- as.numeric(gsub("epoch", "", gsub("\\.rds", "", file_name_parts[6])))
+
+    dataset[[i]] <- list(
+      data = data,
+      model = model,
+      which = which,
+      set = set,
+      type = type,
+      stat = stat,
+      epoch = epoch
+    )
+
+    i <- i + 1
+  }
+
+  return(dataset)
+}
