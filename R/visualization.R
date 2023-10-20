@@ -81,10 +81,11 @@ plot_umap <- function(dataset, sets, grouping_var, params, target_model, target_
   all_plot_data <- list()
 
   for (i in sets) {
-    all_plot_data[[length(all_plot_data) + 1]] <- extract_umap_data_by_metadata(dataset = dataset,
-                                                                                target_model = target_model, target_which = target_which,
-                                                                                target_set = i, target_type = target_type,
-                                                                                target_stat = "umap")
+    all_plot_data[[length(all_plot_data) + 1]] <-
+      extract_umap_data_by_metadata(dataset = dataset,
+                                    target_model = target_model, target_which = target_which,
+                                    target_set = i, target_type = target_type,
+                                    target_stat = "umap")
   }
 
   plot_list <- list()
@@ -104,10 +105,13 @@ plot_umap <- function(dataset, sets, grouping_var, params, target_model, target_
         stop("Invalid data")
       }
       plot_list[[length(plot_list) + 1]] <- ggplot2::ggplot(plot_data$data[[1]]) +
-        ggplot2::geom_point(ggplot2::aes(x = V1, y = V2, color = as.factor(label))) +
-        ggplot2::scale_color_discrete(labels = c("BD Tree", "DDD Tree")) +
-        ggplot2::theme(aspect.ratio = 1) +
-        ggplot2::labs(x = "", y = "", color = "Class")
+        ggtrace::geom_point_trace(ggplot2::aes(x = V1, y = V2,
+                                               #color = as.factor(label),
+                                               fill = as.factor(label))) +
+        ggplot2::scale_fill_discrete(labels = c("BD Tree", "DDD Tree")) +
+        ggplot2::theme(aspect.ratio = 1,
+                       plot.margin = unit(c(0, 0, 0, 0), "pt")) +
+        ggplot2::labs(x = "", y = "", fill = "Class")
       if (k %% length(epochs) == 1) {
         grouping_var_value <- params[sets[j], grouping_var]
         plot_list[[length(plot_list)]] <- plot_list[[length(plot_list)]] +
