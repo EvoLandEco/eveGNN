@@ -138,5 +138,49 @@ read_umap_data <- function(path) {
     i <- i + 1
   }
 
+  dataset <- purrr::transpose(dataset)
+
   return(dataset)
+}
+
+
+#' @export compute_umap
+compute_umap <- function(dataset) {
+  dataset$data <- lapply(dataset$data, function(x) {
+    x[-ncol(x)] <- lapply(x[-ncol(x)], as.numeric)
+    x_data <- x[-ncol(x)]
+    x_data <- umap(x_data)
+    x_plot_data <- cbind(as.data.frame(x_data$layout), label = x$label)
+
+    return(x_plot_data)
+  })
+
+  return(dataset)
+}
+
+
+#' @export extract_umap_data
+extract_umap_data <- function(dataset, target_epochs = c(1, 50, 199)) {
+  # Check the validity of target_epochs
+  if (!all(is.numeric(target_epochs))) {
+    stop("All target epochs must be numeric values.")
+  }
+
+  # Check if 'epoch' sublist exists within the dataset
+  if (!"epoch" %in% names(dataset)) {
+    stop("The dataset must have 'epoch' as a sublist.")
+  }
+
+  # Find the indices where epoch is in target_epochs
+  selected_indices <- which(sapply(dataset$epoch, function(e) e %in% target_epochs))
+
+  # Extract elements based on the indices from all sublists
+  results <- lapply(names(dataset), function(name) {
+    dataset[[name]][selected_indices]
+  })
+
+  # Convert the results to a named list for clarity
+  names(results) <- names(dataset)
+
+  return(results)
 }
