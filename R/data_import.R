@@ -106,9 +106,8 @@ read_umap_data <- function(path) {
   dataset <- list()
   i <- 1
   # Loop through each file and read the .rds file and parse metadata
-  for (file_name in all_files) {
-    data <- readRDS(file.path(path, "umap", file_name))
-
+  for (file_path in all_files) {
+    data <- readRDS(file.path(path, "umap", file_path))
     # Parse metadata from the filename and path
     path_parts <- unlist(strsplit(file_path, split = "/"))
     file_name <- tail(path_parts, n=1) # Get the last part (filename) from the path
@@ -159,8 +158,8 @@ compute_umap <- function(dataset) {
 }
 
 
-#' @export extract_umap_data
-extract_umap_data <- function(dataset, target_epochs = c(1, 50, 199)) {
+#' @export extract_umap_data_by_epoch
+extract_umap_data_by_epoch <- function(dataset, target_epochs = c(1, 50, 199)) {
   # Check the validity of target_epochs
   if (!all(is.numeric(target_epochs))) {
     stop("All target epochs must be numeric values.")
@@ -183,4 +182,66 @@ extract_umap_data <- function(dataset, target_epochs = c(1, 50, 199)) {
   names(results) <- names(dataset)
 
   return(results)
+}
+
+
+#' @export extract_umap_data_by_metadata
+extract_umap_data_by_metadata <- function(dataset,
+                                          target_model = NULL,
+                                          target_which = NULL,
+                                          target_set = NULL,
+                                          target_type = NULL,
+                                          target_stat = NULL) {
+
+  # Check if the required sublists exist within the dataset
+  required_sublists <- c("model", "which", "set", "type", "stat", "data")
+  if (!all(required_sublists %in% names(dataset))) {
+    stop("The dataset must have 'model', 'which', 'set', 'type', 'stat', and 'data' as sublists.")
+  }
+
+  # Setting default values for the logical checks to TRUE
+  selected_logic <- rep(TRUE, length(dataset$data))
+
+  # Update the logical checks based on provided criteria
+  if (!is.null(target_model)) selected_logic <- selected_logic & dataset$model %in% target_model
+  if (!is.null(target_which)) selected_logic <- selected_logic & dataset$which %in% target_which
+  if (!is.null(target_set)) selected_logic <- selected_logic & dataset$set %in% target_set
+  if (!is.null(target_type)) selected_logic <- selected_logic & dataset$type %in% target_type
+  if (!is.null(target_stat)) selected_logic <- selected_logic & dataset$stat %in% target_stat
+
+  # Identify the selected indices
+  selected_indices <- which(selected_logic)
+
+  # Extract elements based on the indices from all sublists
+  results <- lapply(names(dataset), function(name) {
+    dataset[[name]][selected_indices]
+  })
+
+  # Convert the results to a named list for clarity
+  names(results) <- names(dataset)
+
+  return(results)
+}
+
+
+#' @export find_unique_combinations
+find_unique_combinations <- function(dataset, ...) {
+
+  # Convert ... to a list
+  targets <- as.character(substitute(list(...)))[-1]
+
+  # Extract values for each target across the dataset
+  target_values <- lapply(targets, function(target) {
+    sapply(dataset[[target]], function(sublist_val) sublist_val)
+  })
+
+  # Convert the list of values into a dataframe
+  df <- as.data.frame(target_values)
+  colnames(df) <- targets
+
+  # Find unique combinations
+  unique_combinations <- unique(df)
+  rownames(unique_combinations) <- NULL
+
+  return(unique_combinations)
 }
