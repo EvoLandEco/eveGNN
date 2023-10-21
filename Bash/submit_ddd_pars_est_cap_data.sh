@@ -1,10 +1,10 @@
 #!/bin/bash
-#SBATCH --time=3-04:00:00
+#SBATCH --time=06:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --job-name=gnn_ddd_pars_cap
 #SBATCH --output=logs/gnn_ddd_pars_cap-%j.log
-#SBATCH --mem=16GB
+#SBATCH --mem=1GB
 #SBATCH --partition=regular
 
 name=${1}

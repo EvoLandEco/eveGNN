@@ -226,46 +226,29 @@ def export_to_rds(embeddings, labels, epoch, name, task_type, set_i, which_set):
 
 
 def main():
-    if len(sys.argv) != 4:
-        print(f"Usage: {sys.argv[0]} <name> <set_i> <task_type>")
+    if len(sys.argv) != 3:
+        print(f"Usage: {sys.argv[0]} <name> <task_type>")
         sys.exit(1)
 
     name = sys.argv[1]
-    set_i = sys.argv[2]
-    task_type = sys.argv[3]
+    task_type = sys.argv[2]
 
     # Now you can use the variables name and set_i in your code
-    print(f'Name: {name}, Set: {set_i}, Task Type: {task_type}')
-
-    bd_tree_path = os.path.join(name, "BD_TES/set_1")
+    print(f'Name: {name}, Task Type: {task_type}')
 
     training_dataset_list = []
     testing_dataset_list = []
 
-    os.path.join(bd_tree_path, 'GNN', 'tree')
-    os.path.join(bd_tree_path, 'GNN', 'tree', 'EL')
-    rds_count = check_rds_files_count(os.path.join(bd_tree_path, 'GNN', 'tree'), os.path.join(bd_tree_path, 'GNN', 'tree', 'EL'))
-    print(f'There are: {rds_count} trees in the {set_i} folder.')
-    print(f"Now reading BD trees...")
-    bd_dataset = read_rds_to_pytorch(bd_tree_path, "BD_TES", rds_count)
-    bd_training_data = get_training_data(bd_dataset)
-    bd_testing_data = get_testing_data(bd_dataset)
-    training_dataset_list.append(bd_training_data)
-    testing_dataset_list.append(bd_testing_data)
-
     # Concatenate the base directory path with the set_i folder name
-    full_dir = os.path.join(name, task_type, set_i)
+    full_dir = os.path.join(name, task_type)
     full_dir_tree = os.path.join(full_dir, 'GNN', 'tree')
     full_dir_el = os.path.join(full_dir, 'GNN', 'tree', 'EL')
     # Call read_rds_to_pytorch with the full directory path
-    print(full_dir)  # The set_i folder names are passed as the remaining arguments
-    params_current = get_params(name, task_type, set_i)
-    print(params_current)
-
+    print(full_dir)
     # Check if the number of .rds files in the tree and el paths are equal
     rds_count = check_rds_files_count(full_dir_tree, full_dir_el)
-    print(f'There are: {rds_count} trees in the {set_i} folder.')
-    print(f"Now reading {task_type}:{set_i}...")
+    print(f'There are: {rds_count} trees in the {task_type} folder.')
+    print(f"Now reading {task_type}...")
     # Read the .rds files into a list of PyTorch Geometric Data objects
     current_dataset = read_rds_to_pytorch(full_dir, task_type, rds_count)
     current_training_data = get_training_data(current_dataset)
