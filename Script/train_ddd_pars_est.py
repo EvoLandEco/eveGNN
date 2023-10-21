@@ -26,39 +26,6 @@ def check_same_across_rows(df):
     return df.apply(lambda x: x.nunique() == 1)
 
 
-def compare_tables(bd_path, ddd_path, eve_path):
-    bd_df = read_table(bd_path)
-    ddd_df = read_table(ddd_path)
-    eve_df = read_table(eve_path)
-
-    # Check if each table has the same lambda, mu, age across rows
-    bd_check = check_same_across_rows(bd_df[['lambda', 'mu', 'age']])
-    ddd_check = check_same_across_rows(ddd_df[['lambda', 'mu', 'age']])
-    eve_check = check_same_across_rows(eve_df[['lambda', 'mu', 'age']])
-
-    print("BD Params Consistency Check:", bd_check.to_dict())
-    print("DDD Params Consistency Check:", ddd_check.to_dict())
-    print("EVE Params Consistency Check:", eve_check.to_dict())
-
-    # Check if the three tables' first row have the same lambda, mu, and age
-    bd_first_row = bd_df.iloc[0][['lambda', 'mu', 'age']]
-    ddd_first_row = ddd_df.iloc[0][['lambda', 'mu', 'age']]
-    eve_first_row = eve_df.iloc[0][['lambda', 'mu', 'age']]
-
-    first_row_check = (bd_first_row == ddd_first_row).all() and (bd_first_row == eve_first_row).all()
-    print("Params Consistency Check across BD, DDD and EVE:", first_row_check)
-
-    # Combine all check results
-    all_checks_pass = bd_check.all() & ddd_check.all() & eve_check.all() & first_row_check
-
-    if all_checks_pass:
-        print("All checks passed.")
-    else:
-        print("Some checks failed.")
-
-    return all_checks_pass
-
-
 def count_rds_files(path):
     # Get the list of .rds files in the specified path
     rds_files = glob.glob(os.path.join(path, '*.rds'))
@@ -93,29 +60,6 @@ def list_subdirectories(path):
 
         return subdirectories
 
-    except Exception as e:
-        print(f"An error occurred: {e}")
-        return None
-
-
-def get_params(name, model_name, set_string):
-    try:
-        # Split the string on the underscore
-        parts = set_string.split('_')
-        if len(parts) != 2 or not parts[1].isdigit():
-            raise ValueError(f"Invalid format: {set_string}")
-        # Convert the second part to an integer
-        index = int(parts[1])
-
-        # Construct the path to the params file
-        file_path = f'{name}/{model_name}/{model_name}_params.txt'
-
-        # Read the table
-        df = read_table(file_path)
-
-        # Get the specified row (Python uses 0-based indexing, so we subtract 1 from index)
-        row = df.iloc[index - 1]
-        return row
     except Exception as e:
         print(f"An error occurred: {e}")
         return None
@@ -201,27 +145,15 @@ def get_testing_data(data_list):
     return testing_data
 
 
-def per_class_accuracy(y_true, y_pred, classes):
-    cm = confusion_matrix(y_true, y_pred)
-    class_accuracies = {}
-    for i, class_label in enumerate(classes):
-        true_positive = cm[i][i]
-        total_in_class = np.sum(cm[i, :])
-        accuracy = 0 if total_in_class == 0 else true_positive / total_in_class
-        class_accuracies[class_label] = accuracy
-    return class_accuracies
-
-
-def export_to_rds(embeddings, labels, epoch, name, task_type, set_i, which_set):
+def export_to_rds(embeddings, epoch, name, task_type, which_set):
     # Convert to DataFrame
     df = pd.DataFrame(embeddings, columns=[f"dim_{i}" for i in range(embeddings.shape[1])])
-    df['label'] = labels
 
     # Export to RDS
     rds_path = os.path.join(name, task_type, "umap")
     if not os.path.exists(rds_path):
         os.makedirs(rds_path)
-    rds_filename = os.path.join(rds_path, f'{set_i}_{which_set}_umap_epoch_{epoch}.rds')
+    rds_filename = os.path.join(rds_path, f'{which_set}_umap_epoch_{epoch}.rds')
     pyreadr.write_rds(rds_filename, df)
 
 
@@ -274,12 +206,12 @@ def main():
     testing_dataset = TreeData(root=None, data_list=sum_testing_data)
 
     class GCN(torch.nn.Module):
-        def __init__(self, hidden_size=32):
+        def __init__(self, hidden_size=32, num_params=3):
             super(GCN, self).__init__()
             self.conv1 = GCNConv(training_dataset.num_node_features, hidden_size)
             self.conv2 = GCNConv(hidden_size, hidden_size)
             self.conv3 = GCNConv(hidden_size, hidden_size)
-            self.linear = Linear(hidden_size, training_dataset.num_classes)
+            self.linear = Linear(hidden_size, num_params)
 
         def forward(self, x, edge_index, batch, return_embeddings=False):
             # 1. Obtain node embeddings
@@ -306,7 +238,6 @@ def main():
 
         loss_all = 0  # Keep track of the loss
         all_embeddings = []  # Collect embeddings
-        all_labels = []  # Collect labels
         for data in train_loader:
             data.to(device)
             optimizer.zero_grad()
@@ -317,36 +248,26 @@ def main():
             optimizer.step()
 
             all_embeddings.append(embeddings.cpu().detach().numpy())
-            all_labels.append(data.y.cpu().numpy())  # Save the labels
 
         all_embeddings = np.vstack(all_embeddings)  # Stack the embeddings into one array
-        all_labels = np.concatenate(all_labels)  # Convert list of arrays to one array
-        return loss_all / len(train_loader.dataset), all_embeddings, all_labels
+        return loss_all / len(train_loader.dataset), all_embeddings
 
     def test(loader):
         model.eval()
 
-        correct = 0
+        loss_all = 0
         all_embeddings = []
-        all_preds = []  # Collect predictions
-        all_labels = []  # Collect labels
-        all_labels_out = []  # Collect labels
+
         for data in loader:
             data.to(device)
             out, embeddings = model(data.x, data.edge_index, data.batch, return_embeddings=True)
-            preds = out.argmax(dim=1).cpu().numpy()
-            labels = data.y.cpu().numpy()
             all_embeddings.append(embeddings.cpu().detach().numpy())  # Save the embeddings
-            all_labels_out.append(labels)  # Save the labels for returning
-            all_preds.extend(preds)  # Save the predictions
-            all_labels.extend(labels)  # Save the labels for accuracy calculation
+            loss = criterion(out, data.y)
+            loss_all += loss.item() * data.num_graphs
 
         all_embeddings = np.vstack(all_embeddings)  # Stack the embeddings into one array
-        overall_accuracy = np.mean(np.array(all_preds) == np.array(all_labels))
-        class_accuracies = per_class_accuracy(all_labels, all_preds, unique_class_labels)
-        all_labels_out = np.concatenate(all_labels_out)  # Convert list of arrays to one array
 
-        return overall_accuracy, class_accuracies, all_embeddings, all_labels_out
+        return loss_all / len(loader.dataset), all_embeddings
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Training using {device}")
@@ -354,19 +275,17 @@ def main():
     model = GCN(hidden_size=64)
     model = model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-    criterion = torch.nn.CrossEntropyLoss().to(device)
+    criterion = torch.nn.MSELoss().to(device)
     train_loader = DataLoader(training_dataset, batch_size=64, shuffle=True)
     test_loader = DataLoader(testing_dataset, batch_size=64, shuffle=False)
 
     print(model)
 
-    test_acc_history = []
-    loss_history = []
-    unique_class_labels = sorted(list(set(training_dataset.y.numpy())))  # Get the unique class labels
-    test_per_class_accuracies = {label: [] for label in unique_class_labels}
+    test_loss_history = []
+    train_loss_history = []
 
-    train_dir = os.path.join(name, task_type, set_i, "training")
-    test_dir = os.path.join(name, task_type, set_i, "testing")
+    train_dir = os.path.join(name, task_type, "training")
+    test_dir = os.path.join(name, task_type, "testing")
 
     # Check and create directories if not exist
     if not os.path.exists(train_dir):
@@ -375,57 +294,29 @@ def main():
         os.makedirs(test_dir)
 
     for epoch in range(1, 200):
-        loss, train_embeddings, train_labels = train()
-        test_acc_all, test_acc_per_class, test_embeddings, test_labels = test(test_loader)
-        print(f'Epoch: {epoch:03d}, Test Acc: {test_acc_all:.4f}, Loss: {loss:.4f}')
+        train_loss_all, train_embeddings = train()
+        test_loss_all, test_embeddings = test(test_loader)
+        print(f'Epoch: {epoch:03d}, Test Acc: {test_loss_all:.4f}, Loss: {train_loss_all:.4f}')
 
         # Record the values
-        test_acc_history.append(test_acc_all)
-        loss_history.append(loss)
-        for label in unique_class_labels:
-            test_per_class_accuracies[label].append(test_acc_per_class[label])
+        test_loss_history.append(test_loss_all)
+        train_loss_history.append(train_loss_all)
 
-        # Helper function to generate and save UMAP plot
-        def generate_umap_plot(embeddings, labels, epoch, path):
-            reducer = umap.UMAP()
-            umap_embeddings = reducer.fit_transform(embeddings)
-
-            plt.scatter(umap_embeddings[:, 0], umap_embeddings[:, 1], c=labels, cmap='Spectral', s=5)
-            plt.colorbar()
-            plt.title(f'UMAP projection (Epoch {epoch})')
-            plt.savefig(os.path.join(path, f'umap_epoch_{epoch}.png'))
-            plt.close()
-
-        # Generate UMAP plots for both train and test embeddings
-        # generate_umap_plot(train_embeddings, train_labels, epoch, train_dir)
-        # generate_umap_plot(test_embeddings, test_labels, epoch, test_dir)
-        export_to_rds(train_embeddings, train_labels, epoch, name, task_type, set_i, 'train')
-        export_to_rds(test_embeddings, test_labels, epoch, name, task_type, set_i, 'test')
+        export_to_rds(train_embeddings, epoch, name, task_type, 'train')
+        export_to_rds(test_embeddings, epoch, name, task_type, 'test')
 
     # After the loop, create a dictionary to hold the data
     data_dict = {
         'Epoch': list(range(1, 200)),
-        'Test_Accuracy_Overall': test_acc_history,
-        'Loss': loss_history
+        'Test_LOSS': test_loss_history,
+        'Train_LOSS': train_loss_history
     }
-
-    for label in unique_class_labels:
-        data_dict[f'Test_{label}_Accuracy'] = test_per_class_accuracies[label]
 
     # Convert the dictionary to a pandas DataFrame
     model_performance = pd.DataFrame(data_dict)
     write_data_name = '_'.join(params_current.astype(str))
     # Save the data to a file using pyreadr
-    pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_{set_i}_{write_data_name}.rds"), model_performance)
-
-    # List of saved UMAP images from each epoch for training
-    train_image_files = [os.path.join(train_dir, f'umap_epoch_{i}.png') for i in range(1, 200)]
-    # Create a gif animation
-    imageio.mimsave(os.path.join(train_dir, f'umap_train_animation_{task_type}_{set_i}.gif'), [imageio.imread(file) for file in train_image_files], duration=0.5)
-
-    # Similarly, for testing images
-    test_image_files = [os.path.join(test_dir, f'umap_epoch_{i}.png') for i in range(1, 200)]
-    imageio.mimsave(os.path.join(test_dir, f'umap_test_animation_{task_type}_{set_i}.gif'), [imageio.imread(file) for file in test_image_files], duration=0.025)
+    pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_{write_data_name}.rds"), model_performance)
 
 
 if __name__ == '__main__':
