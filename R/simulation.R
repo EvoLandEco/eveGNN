@@ -16,6 +16,16 @@ randomized_ddd_fixed_la_mu_age <- function(cap_range, la, mu, age, model) {
 }
 
 
+#' @export randomized_ddd_fixed_age
+randomized_ddd_fixed_age <- function(dists, cap_range, age, model) {
+  params <- generate_params(dists)
+  cap <- sample(cap_range[1]:cap_range[2], 1)
+  result <- dd_sim(c(unlist(params), cap), age = age, ddmodel = model)
+
+  return(result)
+}
+
+
 #' @export batch_sim_ddd
 batch_sim_ddd <- function(dists, cap, age, model, nrep = 10) {
   batch <- list()
