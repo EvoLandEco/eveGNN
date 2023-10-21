@@ -12,7 +12,6 @@ RoxygenNote: 7.2.1
 Imports:
   ape,
   eve,
-  ggradar,
   ggtrace,
   furrr,
   purrr,
