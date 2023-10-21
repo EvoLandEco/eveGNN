@@ -126,7 +126,7 @@ plot_umap <- function(dataset, sets, grouping_var, params, target_model, target_
 
   patch <- patchwork::wrap_plots(plot_list) + patchwork::plot_layout(ncol = length(epochs), guides = "collect") &
     ggplot2::theme(legend.position = 'bottom',
-                   plot.margin = unit(c(0, 0, 0, 0), "pt"))
+                   plot.margin = unit(c(5, 5, 5, 5), "pt"))
 
   return(patch)
 }

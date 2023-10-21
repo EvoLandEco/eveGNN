@@ -27,6 +27,51 @@ export_to_gnn <- function(data, name, which = "tas") {
 }
 
 
+#' @export export_to_gnn_with_params
+export_to_gnn_with_params <- function(data, name, which = "tas") {
+  path <- file.path(paste0(name), "GNN/tree/")
+  path_EL <- file.path(paste0(name), "GNN/tree/EL/")
+  eve:::check_path(path)
+  eve:::check_path(path_EL)
+
+  if (which == "tas") {
+    for (i in seq_along(data$tas)) {
+      la <- data$pars[[i]][1]
+      mu <- data$pars[[i]][2]
+      cap <- data$pars[[i]][3]
+      age <- data$age[[i]]
+      file_name <- paste0(path, "/tree_", la, "_", mu, "_", cap, "_", age, "_", i, ".rds")
+      saveRDS(data$tas[[i]]$edge - 1, file = file_name)
+    }
+    for (i in seq_along(data$tas)) {
+      la <- data$pars[[i]][1]
+      mu <- data$pars[[i]][2]
+      cap <- data$pars[[i]][3]
+      age <- data$age[[i]]
+      file_name <- paste0(path_EL, "/EL_", la, "_", mu, "_", cap, "_", age, "_", i, ".rds")
+      saveRDS(tree_to_adj_mat(data$tas[[i]]), file = file_name)
+    }
+  } else if (which == "tes") {
+    for (i in seq_along(data$tes)) {
+      la <- data$pars[[i]][1]
+      mu <- data$pars[[i]][2]
+      cap <- data$pars[[i]][3]
+      age <- data$age[[i]]
+      file_name <- paste0(path, "/tree_", la, "_", mu, "_", cap, "_", age, "_", i, ".rds")
+      saveRDS(data$tes[[i]]$edge - 1, file = file_name)
+    }
+    for (i in seq_along(data$tes)) {
+      la <- data$pars[[i]][1]
+      mu <- data$pars[[i]][2]
+      cap <- data$pars[[i]][3]
+      age <- data$age[[i]]
+      file_name <- paste0(path_EL, "/EL_", la, "_", mu, "_", cap, "_", age, "_", i, ".rds")
+      saveRDS(tree_to_adj_mat(data$tes[[i]]), file = file_name)
+    }
+  }
+}
+
+
 #' @export export_to_gnn_batch
 export_to_gnn_batch <- function(data, name, batch, batch_size, which = "tas") {
   path <- file.path(paste0("set_", name), "GNN/tree/")
