@@ -24,4 +24,4 @@ ddd_free_tes_list <- replicate(8000, eveGNN::randomized_ddd_fixed_age(dists,
 
 ddd_free_tes_list <- purrr::transpose(ddd_free_tes_list)
 
-eveGNN::export_to_gnn_with_params(ddd_free_tes_list, name, "tes")
+eveGNN::export_to_gnn_with_params(ddd_free_tes_list, "tes")

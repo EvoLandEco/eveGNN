@@ -17,4 +17,4 @@ dists <- list(
 
 ddd_lamu_tes_list <- eveGNN::batch_sim_ddd(dists, 100, 10, 1, 5000)
 
-eveGNN::export_to_gnn_with_params(ddd_lamu_tes_list, name, "tes")
+eveGNN::export_to_gnn_with_params(ddd_lamu_tes_list, "tes")

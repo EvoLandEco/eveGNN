@@ -28,9 +28,9 @@ export_to_gnn <- function(data, name, which = "tas") {
 
 
 #' @export export_to_gnn_with_params
-export_to_gnn_with_params <- function(data, name, which = "tas") {
-  path <- file.path(paste0(name), "GNN/tree/")
-  path_EL <- file.path(paste0(name), "GNN/tree/EL/")
+export_to_gnn_with_params <- function(data, which = "tas") {
+  path <- file.path("GNN/tree/")
+  path_EL <- file.path("GNN/tree/EL/")
   eve:::check_path(path)
   eve:::check_path(path_EL)
 
