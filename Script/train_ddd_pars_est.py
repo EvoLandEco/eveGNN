@@ -197,7 +197,7 @@ def read_rds_to_pytorch(path, count):
 
         params_current = params_list[i]
 
-        params_current_tensor = torch.tensor(params_current, dtype=torch.float)
+        params_current_tensor = torch.tensor(params_current[0:3], dtype=torch.float)
 
         # Create a Data object with the edge index, number of nodes, and category value
         data = Data(x=edge_length_tensor,
@@ -324,9 +324,7 @@ def main():
             data.to(device)
             optimizer.zero_grad()
             out, embeddings = model(data.x, data.edge_index, data.batch, return_embeddings=True)
-            print(out.size())
-            print(data.y.size())
-            loss = criterion(out, data.y)
+            loss = criterion(out, data.y.view(data.num_graphs, 3))
             loss.backward()
             loss_all += loss.item() * data.num_graphs
             optimizer.step()
@@ -346,12 +344,29 @@ def main():
             data.to(device)
             out, embeddings = model(data.x, data.edge_index, data.batch, return_embeddings=True)
             all_embeddings.append(embeddings.cpu().detach().numpy())  # Save the embeddings
-            loss = criterion(out, data.y)
+            loss = criterion(out, data.y.view(data.num_graphs, 3))
             loss_all += loss.item() * data.num_graphs
 
         all_embeddings = np.vstack(all_embeddings)  # Stack the embeddings into one array
 
         return loss_all / len(loader.dataset), all_embeddings
+
+    def test_diff(loader):
+        model.eval()
+
+        diffs_all = torch.tensor([], dtype=torch.float)
+        all_embeddings = []
+
+        for data in loader:
+            data.to(device)
+            out, embeddings = model(data.x, data.edge_index, data.batch, return_embeddings=True)
+            all_embeddings.append(embeddings.cpu().detach().numpy())  # Save the embeddings
+            diffs = torch.abs(out - data.y.view(data.num_graphs, 3))
+            diffs_all = torch.cat((diffs_all, diffs), dim=0)
+
+        all_embeddings = np.vstack(all_embeddings)  # Stack the embeddings into one array
+        mean_diffs = torch.sum(diffs_all, dim=0) / len(train_loader.dataset)
+        return mean_diffs.cpu().detach().numpy(), diffs_all.cpu().detach().numpy(), all_embeddings
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Training using {device}")
@@ -360,13 +375,14 @@ def main():
     model = model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     criterion = torch.nn.MSELoss().to(device)
-    train_loader = DataLoader(training_dataset, batch_size=64, shuffle=True)
+    train_loader = DataLoader(training_dataset, batch_size=64, shuffle=False)
     test_loader = DataLoader(testing_dataset, batch_size=64, shuffle=False)
 
     print(model)
 
-    test_loss_history = []
+    test_mean_diffs_history = []
     train_loss_history = []
+    final_test_diffs = []
 
     train_dir = os.path.join(name, task_type, "training")
     test_dir = os.path.join(name, task_type, "testing")
@@ -379,27 +395,33 @@ def main():
 
     for epoch in range(1, 200):
         train_loss_all, train_embeddings = train()
-        test_loss_all, test_embeddings = test(test_loader)
-        print(f'Epoch: {epoch:03d}, Test Acc: {test_loss_all:.4f}, Loss: {train_loss_all:.4f}')
+        test_mean_diffs, test_diffs_all, test_embeddings = test_diff(test_loader)
+        print(f'Epoch: {epoch:03d}, Par 1 Mean Diff: {test_mean_diffs[0]:.4f}, Par 2 Mean Diff: {test_mean_diffs[1]:.4f}, Par 3 Mean Diff: {test_mean_diffs[2]:.4f}, Train Loss: {train_loss_all:.4f}')
 
         # Record the values
-        test_loss_history.append(test_loss_all)
+        test_mean_diffs_history.append(test_mean_diffs)
         train_loss_history.append(train_loss_all)
+        final_test_diffs = test_diffs_all
 
         export_to_rds(train_embeddings, epoch, name, task_type, 'train')
         export_to_rds(test_embeddings, epoch, name, task_type, 'test')
 
     # After the loop, create a dictionary to hold the data
-    data_dict = {
-        'Epoch': list(range(1, 200)),
-        'Test_LOSS': test_loss_history,
-        'Train_LOSS': train_loss_history
-    }
+    data_dict = {"lambda_diff": [], "mu_diff": [], "cap_diff": []}
+    # Iterate through test_mean_diffs_history
+    for array in test_mean_diffs_history:
+        # It's assumed that the order of elements in the array corresponds to the keys in data_dict
+        data_dict["lambda_diff"].append(array[0])
+        data_dict["mu_diff"].append(array[1])
+        data_dict["cap_diff"].append(array[2])
+    data_dict["Epoch"] = list(range(1, 200))
+    data_dict["Train_Loss"] = train_loss_history
 
     # Convert the dictionary to a pandas DataFrame
     model_performance = pd.DataFrame(data_dict)
     # Save the data to a file using pyreadr
     pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}.rds"), model_performance)
+    pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_diffs.rds"), final_test_diffs)
 
 
 if __name__ == '__main__':
