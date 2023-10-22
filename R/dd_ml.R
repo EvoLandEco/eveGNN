@@ -1,7 +1,7 @@
 #' @export compute_accuracy_dd_ml
 compute_accuracy_dd_ml <- function(dist_info, data, strategy = "sequential", workers = 1) {
   eve:::check_parallel_arguments(strategy, workers)
-  mean_pars <- compute_expected_mean(dist_info)
+  mean_pars <- eveGNN::compute_expected_mean(dist_info)
   diffs <- furrr::future_map(.x = seq_along(data$brts),
                              .f = function(i) {
                                ml <- tryCatch(
@@ -31,7 +31,7 @@ compute_accuracy_dd_ml <- function(dist_info, data, strategy = "sequential", wor
                                }
                                # If no error occurred, proceed as before.
                                names(ml) <- NULL
-                               all_differences(as.numeric(ml[1:3]), data$pars[[i]])
+                               eveGNN::all_differences(as.numeric(ml[1:3]), data$pars[[i]])
                              })
   return(diffs)
 }
@@ -70,7 +70,7 @@ compute_accuracy_dd_ml_fix_lamu <- function(cap_range, data, strategy = "sequent
                                }
                                # If no error occurred, proceed as before.
                                names(ml) <- NULL
-                               all_differences(as.numeric(ml[1:3]), data$pars[[i]])
+                               eveGNN::all_differences(as.numeric(ml[1:3]), data$pars[[i]])
                              })
   return(diffs)
 }
@@ -79,7 +79,7 @@ compute_accuracy_dd_ml_fix_lamu <- function(cap_range, data, strategy = "sequent
 #' @export compute_accuracy_dd_ml_free
 compute_accuracy_dd_ml_free <- function(dist_info, cap_range, data, strategy = "sequential", workers = 1) {
   eve:::check_parallel_arguments(strategy, workers)
-  mean_pars <- compute_expected_mean(dist_info)
+  mean_pars <- eveGNN::compute_expected_mean(dist_info)
   mean_cap <- mean(cap_range)
   diffs <- furrr::future_map(.x = seq_along(data$brts),
                              .f = function(i) {
@@ -101,7 +101,7 @@ compute_accuracy_dd_ml_free <- function(dist_info, cap_range, data, strategy = "
                                }
                                # If no error occurred, proceed as before.
                                names(ml) <- NULL
-                               all_differences(as.numeric(ml[1:3]), data$pars[[i]])
+                               eveGNN::all_differences(as.numeric(ml[1:3]), data$pars[[i]])
                              })
   return(diffs)
 }
