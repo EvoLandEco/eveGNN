@@ -12,8 +12,8 @@ source $HOME/venvs/eve/bin/activate
 
 # Check if at least two arguments are provided (name and at least one arg)
 if [ "$#" -lt 2 ]; then
-echo "Usage: $0 <name> <arg1> [arg2 arg3 ... argN]"
-exit 1
+    echo "Usage: $0 <name> <arg1> [arg2 arg3 ... argN]"
+    exit 1
 fi
 
 # Get the name argument

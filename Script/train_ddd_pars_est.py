@@ -2,14 +2,10 @@ import sys
 import os
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 import pyreadr
 import torch
 import glob
 import functools
-import umap
-import imageio
-from sklearn.metrics import confusion_matrix
 from torch_geometric.loader import DataLoader
 import torch.nn.functional as F
 from torch.nn import Linear
@@ -65,42 +61,124 @@ def list_subdirectories(path):
         return None
 
 
-def read_rds_to_pytorch(path, model, count):
-    # Map metrics to category values
-    metric_to_category = {'BD_TES': 0, 'DDD_TES': 1, 'EVE_TES': 2}
+def get_params_string(filename):
+    # Function to extract parameters from the filename
+    params = filename.split('_')[1:-1]  # Exclude the first and last elements
+    return "_".join(params)
 
-    # Check if the provided metric is valid
-    if model not in metric_to_category:
-        raise ValueError(f"Unknown model: {model}. Expected one of: {', '.join(metric_to_category.keys())}")
 
-    # Get the category value for the provided prefix
-    category_value = torch.tensor([metric_to_category[model]], dtype=torch.long)
+def get_params(filename):
+    params = filename.split('_')[1:-1]
+    params = list(map(float, params))  # Convert string to float
+    return params
+
+
+def get_sort_key(filename):
+    # Split the filename by underscores, convert the parameter values to floats, and return them as a tuple
+    params = tuple(map(float, filename.split('_')[1:-1]))
+    return params
+
+
+def sort_files(files):
+    # Sort the files based on the parameters extracted by the get_sort_key function
+    return sorted(files, key=get_sort_key)
+
+
+def check_file_consistency(files_tree, files_el):
+    # Check if the two lists have the same length
+    if len(files_tree) != len(files_el):
+        raise ValueError("Mismatched lengths")
+
+    # Define a function to extract parameters from filename
+    def get_params_tuple(filename):
+        return tuple(map(float, filename.split('_')[1:-1]))
+
+    # Check each pair of files for matching parameters
+    for tree_file, el_file in zip(files_tree, files_el):
+        tree_params = get_params_tuple(tree_file)
+        el_params = get_params_tuple(el_file)
+        if tree_params != el_params:
+            raise ValueError(f"Mismatched parameters: {tree_file} vs {el_file}")
+
+    # If we get here, all checks passed
+    print("File lists consistency check passed")
+
+
+def check_params_consistency(params_tree_list, params_el_list):
+    is_consistent = all(a == b for a, b in zip(params_tree_list, params_el_list))
+    if is_consistent:
+        print("Parameters are consistent across the tree and EL datasets.")
+    else:
+        raise ValueError("Mismatch in parameters between the tree and EL datasets.")
+    return is_consistent
+
+
+def check_list_count(count, data_list, length_list, params_list):
+    # Get the number of elements in each list
+    data_count = len(data_list)
+    length_count = len(length_list)
+    params_count = len(params_list)
+
+    # Check if the count matches the number of elements in each list
+    if count != data_count:
+        raise ValueError(f"Count mismatch: input argument count is {count}, data_list has {data_count} elements.")
+
+    if count != length_count:
+        raise ValueError(f"Count mismatch: input argument count is {count}, length_list has {length_count} elements.")
+
+    if count != params_count:
+        raise ValueError(f"Count mismatch: input argument count is {count}, params_list has {params_count} elements.")
+
+    # If all checks pass, print a success message
+    print("Count check passed")
+
+
+def read_rds_to_pytorch(path, count):
+    # List all files in the directory
+    files_tree = [f for f in os.listdir(os.path.join(path, 'GNN', 'tree'))
+                  if f.startswith('tree_') and f.endswith('.rds')]
+    files_el = [f for f in os.listdir(os.path.join(path, 'GNN', 'tree', 'EL'))
+                if f.startswith('EL_') and f.endswith('.rds')]
+
+    # Sort the files based on the parameters
+    files_tree = sort_files(files_tree)
+    files_el = sort_files(files_el)
+
+    # Check if the files are consistent
+    check_file_consistency(files_tree, files_el)
 
     # List to hold the data from each .rds file
     data_list = []
+    params_tree_list = []
 
-    # Loop through the files for the specified prefix
-    for i in range(1, count + 1):
-        # Construct the file path using the specified prefix
-        file_path = os.path.join(path, 'GNN', 'tree', f"tree_{i}.rds")
-
-        # Read the .rds file
+    # Loop through the files with the prefix 'tree_'
+    for filename in files_tree:
+        file_path = os.path.join(path, 'GNN', 'tree', filename)
         result = pyreadr.read_r(file_path)
-
-        # The result is a dictionary where keys are the name of objects and the values python dataframes
-        # Since RDS can only contain one object, it will be the first item in the dictionary
         data = result[None]
-
-        # Append the data to data_list
         data_list.append(data)
+        params_tree_list.append(get_params_string(filename))
 
     length_list = []
+    params_el_list = []
 
-    for i in range(1, count + 1):
-        length_file_path = os.path.join(path, 'GNN', 'tree', "EL", f"EL_{i}.rds")
+    # Loop through the files with the prefix 'EL_'
+    for filename in files_el:
+        length_file_path = os.path.join(path, 'GNN', 'tree', 'EL', filename)
         length_result = pyreadr.read_r(length_file_path)
         length_data = length_result[None]
         length_list.append(length_data)
+        params_el_list.append(get_params_string(filename))
+
+    check_params_consistency(params_tree_list, params_el_list)
+
+    params_list = []
+
+    for filename in files_tree:
+        params = get_params(filename)
+        params_list.append(params)
+
+    check_list_count(count, data_list, length_list, params_list)
 
     # List to hold the Data objects
     pytorch_geometric_data_list = []
@@ -117,11 +195,15 @@ def read_rds_to_pytorch(path, model, count):
 
         edge_length_tensor = torch.tensor(length_list[i].values, dtype=torch.float)
 
+        params_current = params_list[i]
+
+        params_current_tensor = torch.tensor(params_current, dtype=torch.float)
+
         # Create a Data object with the edge index, number of nodes, and category value
         data = Data(x=edge_length_tensor,
                     edge_index=edge_index_tensor,
                     num_nodes=num_nodes,
-                    y=category_value)
+                    y=params_current_tensor)
 
         # Append the Data object to the list
         pytorch_geometric_data_list.append(data)
@@ -182,7 +264,7 @@ def main():
     print(f'There are: {rds_count} trees in the {task_type} folder.')
     print(f"Now reading {task_type}...")
     # Read the .rds files into a list of PyTorch Geometric Data objects
-    current_dataset = read_rds_to_pytorch(full_dir, task_type, rds_count)
+    current_dataset = read_rds_to_pytorch(full_dir, rds_count)
     current_training_data = get_training_data(current_dataset)
     current_testing_data = get_testing_data(current_dataset)
     training_dataset_list.append(current_training_data)
@@ -314,9 +396,8 @@ def main():
 
     # Convert the dictionary to a pandas DataFrame
     model_performance = pd.DataFrame(data_dict)
-    write_data_name = '_'.join(params_current.astype(str))
     # Save the data to a file using pyreadr
-    pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_{write_data_name}.rds"), model_performance)
+    pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}.rds"), model_performance)
 
 
 if __name__ == '__main__':
