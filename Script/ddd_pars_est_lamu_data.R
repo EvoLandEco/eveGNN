@@ -21,6 +21,6 @@ eveGNN::export_to_gnn_with_params(ddd_lamu_tes_list, "tes")
 
 ddd_lamu_tes_list_test <- eveGNN::get_test_data(ddd_lamu_tes_list, 0.1)
 
-mean_diffs <- eveGNN::compute_accuracy_dd_ml(dists, ddd_lamu_tes_list_test, strategy = "multisession", workers = 8)
+mean_diffs <- eveGNN::compute_accuracy_dd_ml(dists, ddd_lamu_tes_list_test, strategy = "multicore", workers = 8)
 
 saveRDS(mean_diffs, "mean_diffs_DDD_LAMU_TES.rds")
