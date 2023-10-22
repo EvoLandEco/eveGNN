@@ -21,6 +21,7 @@ mkdir -p logs
 ml R
 Rscript -e "devtools::install_github('EvoLandEco/eve')"
 Rscript -e "devtools::install_github('EvoLandEco/eveGNN')"
+Rscript -e "devtools::install_github('rsetienne/DDD')"
 
 sbatch submit_ddd_pars_est_cap_data.sh "$name"
 sbatch submit_ddd_pars_est_lamu_data.sh "$name"
