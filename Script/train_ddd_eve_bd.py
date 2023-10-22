@@ -2,13 +2,10 @@ import sys
 import os
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 import pyreadr
 import torch
 import glob
 import functools
-import umap
-import imageio
 from sklearn.metrics import confusion_matrix
 from torch_geometric.loader import DataLoader
 import torch.nn.functional as F
@@ -402,20 +399,6 @@ def main():
         for label in unique_class_labels:
             test_per_class_accuracies[label].append(test_acc_per_class[label])
 
-    # Helper function to generate and save UMAP plot
-        def generate_umap_plot(embeddings, labels, epoch, path):
-            reducer = umap.UMAP()
-            umap_embeddings = reducer.fit_transform(embeddings)
-
-            plt.scatter(umap_embeddings[:, 0], umap_embeddings[:, 1], c=labels, cmap='Spectral', s=5)
-            plt.colorbar()
-            plt.title(f'UMAP projection (Epoch {epoch})')
-            plt.savefig(os.path.join(path, f'umap_epoch_{epoch}.png'))
-            plt.close()
-
-        # Generate UMAP plots for both train and test embeddings
-        # generate_umap_plot(train_embeddings, train_labels, epoch, train_dir)
-        # generate_umap_plot(test_embeddings, test_labels, epoch, test_dir)
         export_to_rds(train_embeddings, train_labels, epoch, name, task_type, set_i, 'train')
         export_to_rds(test_embeddings, test_labels, epoch, name, task_type, set_i, 'test')
 
@@ -434,15 +417,6 @@ def main():
     write_data_name = '_'.join(params_current.astype(str))
     # Save the data to a file using pyreadr
     pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_{set_i}_{write_data_name}.rds"), model_performance)
-
-    # List of saved UMAP images from each epoch for training
-    train_image_files = [os.path.join(train_dir, f'umap_epoch_{i}.png') for i in range(1, 200)]
-    # Create a gif animation
-    imageio.mimsave(os.path.join(train_dir, f'umap_train_animation_{task_type}_{set_i}.gif'), [imageio.imread(file) for file in train_image_files], duration=0.5)
-
-    # Similarly, for testing images
-    test_image_files = [os.path.join(test_dir, f'umap_epoch_{i}.png') for i in range(1, 200)]
-    imageio.mimsave(os.path.join(test_dir, f'umap_test_animation_{task_type}_{set_i}.gif'), [imageio.imread(file) for file in test_image_files], duration=0.025)
 
 
 if __name__ == '__main__':
