@@ -324,6 +324,8 @@ def main():
             data.to(device)
             optimizer.zero_grad()
             out, embeddings = model(data.x, data.edge_index, data.batch, return_embeddings=True)
+            print(out.size())
+            print(data.y.size())
             loss = criterion(out, data.y)
             loss.backward()
             loss_all += loss.item() * data.num_graphs
