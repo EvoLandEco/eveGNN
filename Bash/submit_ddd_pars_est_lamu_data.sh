@@ -2,9 +2,10 @@
 #SBATCH --time=08:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
+#SBATCH --cpus-per-task=8
 #SBATCH --job-name=gnn_ddd_pars_lamu
 #SBATCH --output=logs/gnn_ddd_pars_lamu-%j.log
-#SBATCH --mem=2GB
+#SBATCH --mem=4GB
 #SBATCH --partition=regular
 
 name=${1}

@@ -74,3 +74,31 @@ edd_sim_fix_n <- function(n, pars, age, model, metric, offset) {
 }
 
 
+#' @export get_test_data
+get_test_data <- function(original_list, quantile) {
+  # Ensure the quantile argument is within a valid range
+  if (quantile <= 0 || quantile > 1) {
+    stop("Quantile must be between 0 and 1 (exclusive).")
+  }
+
+  # Initialize an empty list to store the extracted data
+  test_data_list <- list()
+
+  # Iterate through each sublist in the original list
+  for (sublist_name in names(original_list)) {
+    # Retrieve the current sublist
+    sublist <- original_list[[sublist_name]]
+
+    # Determine the number of elements to extract based on the quantile argument
+    num_sublists <- length(sublist)
+    num_to_extract <- floor(quantile * num_sublists)
+
+    # Extract the specified proportion of data from the end of the sublist
+    test_data <- tail(sublist, n = num_to_extract)
+
+    # Store the extracted data in the test_data_list using the sublist_name as the list name
+    test_data_list[[sublist_name]] <- test_data
+  }
+
+  return(test_data_list)
+}
