@@ -419,9 +419,10 @@ def main():
 
     # Convert the dictionary to a pandas DataFrame
     model_performance = pd.DataFrame(data_dict)
+    final_differences = pd.DataFrame(final_test_diffs, columns=["lambda_diff", "mu_diff", "cap_diff"])
     # Save the data to a file using pyreadr
     pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}.rds"), model_performance)
-    pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_diffs.rds"), final_test_diffs)
+    pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_diffs.rds"), final_differences)
 
 
 if __name__ == '__main__':
