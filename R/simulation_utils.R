@@ -9,6 +9,17 @@ mean_difference <- function(x, y) {
 }
 
 
+#' @export all_differences
+all_differences <- function(x, y) {
+  if (length(x) != length(y)) {
+    stop("Vectors must be the same length")
+  }
+
+  all_diff <- x - y
+  return(all_diff)
+}
+
+
 #' Generate Random Parameters Based on Specified Distributions
 #'
 #' This function generates random parameters based on the distribution information provided.

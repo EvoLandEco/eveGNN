@@ -31,7 +31,7 @@ compute_accuracy_dd_ml <- function(dist_info, data, strategy = "sequential", wor
                                }
                                # If no error occurred, proceed as before.
                                names(ml) <- NULL
-                               mean_difference(as.numeric(ml[1:3]), data$pars[[i]])
+                               all_differences(as.numeric(ml[1:3]), data$pars[[i]])
                              })
   return(diffs)
 }
@@ -70,7 +70,7 @@ compute_accuracy_dd_ml_fix_lamu <- function(cap_range, data, strategy = "sequent
                                }
                                # If no error occurred, proceed as before.
                                names(ml) <- NULL
-                               mean_difference(as.numeric(ml[1:3]), data$pars[[i]])
+                               all_differences(as.numeric(ml[1:3]), data$pars[[i]])
                              })
   return(diffs)
 }
@@ -83,9 +83,7 @@ compute_accuracy_dd_ml_free <- function(dist_info, cap_range, data, strategy = "
   mean_cap <- mean(cap_range)
   diffs <- furrr::future_map(.x = seq_along(data$brts),
                              .f = function(i) {
-                               ml <- tryCatch(
-                               {
-                                 DDD::dd_ML(
+                               ml <- DDD::dd_ML(
                                    brts = data$brts[[i]],
                                    initparsopt = c(mean_pars, mean_cap),
                                    idparsopt = c(1, 2, 3),
@@ -95,11 +93,6 @@ compute_accuracy_dd_ml_free <- function(dist_info, cap_range, data, strategy = "
                                    ddmodel = 1,
                                    num_cycles = 1
                                  )
-                               },
-                                 error = function(e) {
-                                   NA
-                                 }
-                               )
                                # If an error occurred, ml will be NA and we return NA right away.
                                if (length(ml) == 1) {
                                  if (is.na(ml)) {
@@ -108,7 +101,7 @@ compute_accuracy_dd_ml_free <- function(dist_info, cap_range, data, strategy = "
                                }
                                # If no error occurred, proceed as before.
                                names(ml) <- NULL
-                               mean_difference(as.numeric(ml[1:3]), data$pars[[i]])
+                               all_differences(as.numeric(ml[1:3]), data$pars[[i]])
                              })
   return(diffs)
 }
