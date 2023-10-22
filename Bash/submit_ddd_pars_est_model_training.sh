@@ -4,7 +4,7 @@
 #SBATCH --ntasks=1
 #SBATCH --job-name=gnn_ddd_pars_est_model_train
 #SBATCH --output=logs/gnn_ddd_pars_est_model_train-%j.log
-#SBATCH --mem=4GB
+#SBATCH --mem=3GB
 #SBATCH --partition=regular
 
 ml Python/3.8.16-GCCcore-11.2.0
