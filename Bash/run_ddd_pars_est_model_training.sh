@@ -22,6 +22,6 @@ for task_type in "$name"/*; do
         # Extract the folder name from the path
         task_type=$(basename "$task_type")
         # Call the other script with "name" and "task_type" as arguments
-        ./submit_ddd_pars_est_model_training.sh "$name" "$task_type"
+        sbatch submit_ddd_pars_est_model_training.sh "$name" "$task_type"
     fi
 done
