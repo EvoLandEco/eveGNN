@@ -1,11 +1,11 @@
 #!/bin/bash
-#SBATCH --time=06:00:00
+#SBATCH --time=16:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=8
+#SBATCH --cpus-per-task=12
 #SBATCH --job-name=gnn_ddd_pars_cap
 #SBATCH --output=logs/gnn_ddd_pars_cap-%j.log
-#SBATCH --mem=8GB
+#SBATCH --mem=12GB
 #SBATCH --partition=regular
 
 name=${1}
