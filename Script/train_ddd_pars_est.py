@@ -371,7 +371,7 @@ def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Training using {device}")
 
-    model = GCN(hidden_size=64)
+    model = GCN(hidden_size=128)
     model = model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     criterion = torch.nn.MSELoss().to(device)
