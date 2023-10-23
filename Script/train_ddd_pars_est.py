@@ -365,7 +365,7 @@ def main():
             diffs_all = torch.cat((diffs_all, diffs), dim=0)
 
         all_embeddings = np.vstack(all_embeddings)  # Stack the embeddings into one array
-        mean_diffs = torch.sum(diffs_all, dim=0) / len(train_loader.dataset)
+        mean_diffs = torch.sum(diffs_all, dim=0) / len(test_loader.dataset)
         return mean_diffs.cpu().detach().numpy(), diffs_all.cpu().detach().numpy(), all_embeddings
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
