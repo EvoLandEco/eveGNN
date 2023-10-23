@@ -15,7 +15,7 @@ dists <- list(
   list(distribution = "uniform", n = 1, min = 0, max = 0.4)
 )
 
-ddd_lamu_tes_list <- eveGNN::batch_sim_ddd(dists, 100, 10, 1, 5000)
+ddd_lamu_tes_list <- eveGNN::batch_sim_ddd(dists, 100, 10, 1, 10000)
 
 eveGNN::export_to_gnn_with_params(ddd_lamu_tes_list, "tes")
 

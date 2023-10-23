@@ -17,7 +17,7 @@ dists <- list(
 
 cap_range <- c(10,1000)
 
-ddd_free_tes_list <- replicate(8000, eveGNN::randomized_ddd_fixed_age(dists,
+ddd_free_tes_list <- replicate(10000, eveGNN::randomized_ddd_fixed_age(dists,
                                                                           cap_range = cap_range,
                                                                           age = 10,
                                                                           model = 1), simplify = FALSE)
