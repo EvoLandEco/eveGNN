@@ -319,20 +319,16 @@ def main():
         model.train()
 
         loss_all = 0  # Keep track of the loss
-        all_embeddings = []  # Collect embeddings
         for data in train_loader:
             data.to(device)
             optimizer.zero_grad()
-            out, embeddings = model(data.x, data.edge_index, data.batch, return_embeddings=True)
+            out = model(data.x, data.edge_index, data.batch, return_embeddings=False)
             loss = criterion(out, data.y.view(data.num_graphs, 3))
             loss.backward()
             loss_all += loss.item() * data.num_graphs
             optimizer.step()
 
-            all_embeddings.append(embeddings.cpu().detach().numpy())
-
-        all_embeddings = np.vstack(all_embeddings)  # Stack the embeddings into one array
-        return loss_all / len(train_loader.dataset), all_embeddings
+        return loss_all / len(train_loader.dataset)
 
     def test(loader):
         model.eval()
@@ -355,18 +351,15 @@ def main():
         model.eval()
 
         diffs_all = torch.tensor([], dtype=torch.float)
-        all_embeddings = []
 
         for data in loader:
             data.to(device)
-            out, embeddings = model(data.x, data.edge_index, data.batch, return_embeddings=True)
-            all_embeddings.append(embeddings.cpu().detach().numpy())  # Save the embeddings
+            out = model(data.x, data.edge_index, data.batch, return_embeddings=False)
             diffs = torch.abs(out - data.y.view(data.num_graphs, 3))
             diffs_all = torch.cat((diffs_all, diffs), dim=0)
 
-        all_embeddings = np.vstack(all_embeddings)  # Stack the embeddings into one array
         mean_diffs = torch.sum(diffs_all, dim=0) / len(test_loader.dataset)
-        return mean_diffs.cpu().detach().numpy(), diffs_all.cpu().detach().numpy(), all_embeddings
+        return mean_diffs.cpu().detach().numpy(), diffs_all.cpu().detach().numpy()
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Training using {device}")
@@ -394,17 +387,14 @@ def main():
         os.makedirs(test_dir)
 
     for epoch in range(1, 200):
-        train_loss_all, train_embeddings = train()
-        test_mean_diffs, test_diffs_all, test_embeddings = test_diff(test_loader)
+        train_loss_all = train()
+        test_mean_diffs, test_diffs_all = test_diff(test_loader)
         print(f'Epoch: {epoch:03d}, Par 1 Mean Diff: {test_mean_diffs[0]:.4f}, Par 2 Mean Diff: {test_mean_diffs[1]:.4f}, Par 3 Mean Diff: {test_mean_diffs[2]:.4f}, Train Loss: {train_loss_all:.4f}')
 
         # Record the values
         test_mean_diffs_history.append(test_mean_diffs)
         train_loss_history.append(train_loss_all)
         final_test_diffs = test_diffs_all
-
-        export_to_rds(train_embeddings, epoch, name, task_type, 'train')
-        export_to_rds(test_embeddings, epoch, name, task_type, 'test')
 
     # After the loop, create a dictionary to hold the data
     data_dict = {"lambda_diff": [], "mu_diff": [], "cap_diff": []}
