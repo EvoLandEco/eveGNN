@@ -16,7 +16,7 @@ all_differences <- function(x, y) {
   }
 
   all_diff <- x - y
-  return(all_diff)
+  return(abs(all_diff))
 }
 
 
