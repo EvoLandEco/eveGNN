@@ -372,8 +372,8 @@ def main():
     model = model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     criterion = torch.nn.MSELoss().to(device)
-    train_loader = DataLoader(training_dataset, batch_size=64, shuffle=False)
-    test_loader = DataLoader(testing_dataset, batch_size=64, shuffle=False)
+    train_loader = DataLoader(training_dataset, batch_size=512, shuffle=False)
+    test_loader = DataLoader(testing_dataset, batch_size=512, shuffle=False)
 
     print(model)
 
