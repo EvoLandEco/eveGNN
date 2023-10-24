@@ -12,7 +12,7 @@ setwd("DDD_CAP_TES")
 
 cap_range <- c(10,1000)
 
-ddd_cap_tes_list <- replicate(15000, eveGNN::randomized_ddd_fixed_la_mu_age(cap_range = cap_range,
+ddd_cap_tes_list <- replicate(20000, eveGNN::randomized_ddd_fixed_la_mu_age(cap_range = cap_range,
                                                                      la = 0.6,
                                                                      mu = 0.1,
                                                                      age = 10,
