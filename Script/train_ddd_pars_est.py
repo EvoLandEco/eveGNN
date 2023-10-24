@@ -370,7 +370,7 @@ def main():
 
     model = GCN(hidden_size=128)
     model = model.to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
     criterion = torch.nn.MSELoss().to(device)
     train_loader = DataLoader(training_dataset, batch_size=512, shuffle=False)
     test_loader = DataLoader(testing_dataset, batch_size=512, shuffle=False)
