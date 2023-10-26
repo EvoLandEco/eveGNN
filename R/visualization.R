@@ -110,7 +110,7 @@ plot_umap <- function(dataset, sets, grouping_var, params, target_model, target_
                                                fill = as.factor(label))) +
         ggplot2::scale_fill_discrete(labels = c("BD Tree", "DDD Tree")) +
         ggplot2::theme(aspect.ratio = 1,
-                       plot.margin = unit(c(0, 0, 0, 0), "pt")) +
+                       plot.margin = ggplot2::unit(c(0, 0, 0, 0), "pt")) +
         ggplot2::labs(x = "", y = "", fill = "Class")
       if (k %% length(epochs) == 1) {
         grouping_var_value <- params[sets[j], grouping_var]
@@ -126,7 +126,7 @@ plot_umap <- function(dataset, sets, grouping_var, params, target_model, target_
 
   patch <- patchwork::wrap_plots(plot_list) + patchwork::plot_layout(ncol = length(epochs), guides = "collect") &
     ggplot2::theme(legend.position = 'bottom',
-                   plot.margin = unit(c(5, 5, 5, 5), "pt"))
+                   plot.margin = ggplot2::unit(c(5, 5, 5, 5), "pt"))
 
   return(patch)
 }
