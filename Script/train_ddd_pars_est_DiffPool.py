@@ -277,24 +277,27 @@ def main():
 
     sum_training_data = functools.reduce(lambda x, y: x + y, training_dataset_list)
     sum_testing_data = functools.reduce(lambda x, y: x + y, testing_dataset_list)
+    # Filtering out elements with None in edge_index
+    filtered_training_data = [data for data in sum_training_data if data.edge_index is not None]
+    filtered_testing_data = [data for data in sum_testing_data if data.edge_index is not None]
 
     class TreeData(InMemoryDataset):
-        def __init__(self, root, data_list, transform=None, pre_transform=None):
-            super(TreeData, self).__init__(root, transform, pre_transform)
-            self.data, self.slices = self.collate(data_list)
+            def __init__(self, root, data_list, transform=None, pre_transform=None):
+                super(TreeData, self).__init__(root, transform, pre_transform)
+                self.data, self.slices = self.collate(data_list)
 
-        def _download(self):
-            pass  # No download required
+            def _download(self):
+                pass  # No download required
 
-        def _process(self):
-            pass  # No processing required
+            def _process(self):
+                pass  # No processing required
 
-    max_nodes_train = max([data.num_nodes for data in sum_training_data])
-    max_nodes_test = max([data.num_nodes for data in sum_testing_data])
+    max_nodes_train = max([data.num_nodes for data in filtered_training_data])
+    max_nodes_test = max([data.num_nodes for data in filtered_testing_data])
     max_nodes = max(max_nodes_train, max_nodes_test)
 
-    training_dataset = TreeData(root=None, data_list=sum_training_data, transform=T.ToDense(max_nodes))
-    testing_dataset = TreeData(root=None, data_list=sum_testing_data, transform=T.ToDense(max_nodes))
+    training_dataset = TreeData(root=None, data_list=filtered_training_data, transform=T.ToDense(max_nodes))
+    testing_dataset = TreeData(root=None, data_list=filtered_testing_data, transform=T.ToDense(max_nodes))
 
     class GNN(torch.nn.Module):
         def __init__(self, in_channels, hidden_channels, out_channels,
