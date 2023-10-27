@@ -410,7 +410,12 @@ def main():
                     data.adj.shape != torch.Size([max_nodes, max_nodes]) or \
                     data.mask.shape != torch.Size([max_nodes]):
                 incorrect_shapes.append(i)  # Add index to the list if any shape is incorrect
-        return incorrect_shapes
+
+        # Print the indices of incorrect data elements or a message if all shapes are correct
+        if incorrect_shapes:
+            print(f"Incorrect shapes found at indices: {incorrect_shapes}")
+        else:
+            print("No incorrect shapes found.")
 
     shape_check(training_dataset, max_nodes)
     shape_check(testing_dataset, max_nodes)
