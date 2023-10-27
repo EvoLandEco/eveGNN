@@ -289,10 +289,12 @@ def main():
         def _process(self):
             pass  # No processing required
 
-    max_nodes = max([data.num_nodes for data in sum_training_data])
+    max_nodes_train = max([data.num_nodes for data in sum_training_data])
+    max_nodes_test = max([data.num_nodes for data in sum_testing_data])
+    max_nodes = max(max_nodes_train, max_nodes_test)
 
-    training_dataset = TreeData(root=None, data_list=sum_training_data, transform=T.ToDense())
-    testing_dataset = TreeData(root=None, data_list=sum_testing_data, transform=T.ToDense())
+    training_dataset = TreeData(root=None, data_list=sum_training_data, transform=T.ToDense(max_nodes))
+    testing_dataset = TreeData(root=None, data_list=sum_testing_data, transform=T.ToDense(max_nodes))
 
     class GCN(torch.nn.Module):
         def __init__(self, hidden_size=32, num_params=3):
@@ -343,7 +345,10 @@ def main():
             batch_size, num_nodes, in_channels = x.size()
 
             for step in range(len(self.convs)):
-                x = self.bns[step](F.relu(self.convs[step](x, adj, mask)))
+                x = F.relu(self.convs[step](x, adj, mask))
+                x = torch.permute(x, (0, 2, 1))
+                x = self.bns[step](x)
+                x = torch.permute(x, (0, 2, 1))
 
             return x
 
@@ -389,10 +394,10 @@ def main():
         for data in train_loader:
             data.to(device)
             optimizer.zero_grad()
-            out = model(data.x, data.adj, data.mask)
-            loss = criterion(out, data.y.view(data.num_graphs, 3))
+            out, _, _ = model(data.x, data.adj, data.mask)
+            loss = criterion(out, data.y.view(data.num_nodes.__len__(), 3))
             loss.backward()
-            loss_all += loss.item() * data.num_graphs
+            loss_all += loss.item() * data.num_nodes.__len__()
             optimizer.step()
 
         return loss_all / len(train_loader.dataset)
@@ -407,8 +412,8 @@ def main():
             data.to(device)
             out, embeddings = model(data.x, data.edge_index, data.batch, return_embeddings=True)
             all_embeddings.append(embeddings.cpu().detach().numpy())  # Save the embeddings
-            loss = criterion(out, data.y.view(data.num_graphs, 3))
-            loss_all += loss.item() * data.num_graphs
+            loss = criterion(out, data.y.view(data.num_nodes.__len__(), 3))
+            loss_all += loss.item() * data.num_nodes.__len__()
 
         all_embeddings = np.vstack(all_embeddings)  # Stack the embeddings into one array
 
@@ -422,8 +427,8 @@ def main():
 
         for data in loader:
             data.to(device)
-            out = model(data.x, data.adj, data.mask)
-            diffs = torch.abs(out - data.y.view(data.num_graphs, 3))
+            out, _, _ = model(data.x, data.adj, data.mask)
+            diffs = torch.abs(out - data.y.view(data.num_nodes.__len__(), 3))
             diffs_all = torch.cat((diffs_all, diffs), dim=0)
 
         mean_diffs = torch.sum(diffs_all, dim=0) / len(test_loader.dataset)
@@ -455,7 +460,7 @@ def main():
     if not os.path.exists(test_dir):
         os.makedirs(test_dir)
 
-    for epoch in range(1, 200):
+    for epoch in range(1, 31):
         train_loss_all = train()
         test_mean_diffs, test_diffs_all = test_diff(test_loader)
         print(f'Epoch: {epoch:03d}, Par 1 Mean Diff: {test_mean_diffs[0]:.4f}, Par 2 Mean Diff: {test_mean_diffs[1]:.4f}, Par 3 Mean Diff: {test_mean_diffs[2]:.4f}, Train Loss: {train_loss_all:.4f}')
