@@ -296,34 +296,6 @@ def main():
     training_dataset = TreeData(root=None, data_list=sum_training_data, transform=T.ToDense(max_nodes))
     testing_dataset = TreeData(root=None, data_list=sum_testing_data, transform=T.ToDense(max_nodes))
 
-    class GCN(torch.nn.Module):
-        def __init__(self, hidden_size=32, num_params=3):
-            super(GCN, self).__init__()
-            self.conv1 = GCNConv(training_dataset.num_node_features, hidden_size)
-            self.conv2 = GCNConv(hidden_size, hidden_size)
-            self.conv3 = GCNConv(hidden_size, hidden_size)
-            self.linear = Linear(hidden_size, num_params)
-
-        def forward(self, x, edge_index, batch, return_embeddings=False):
-            # 1. Obtain node embeddings
-            x = self.conv1(x, edge_index)
-            x = x.relu()
-            x = self.conv2(x, edge_index)
-            x = x.relu()
-            x = self.conv3(x, edge_index)
-
-            # Readout layer
-            embeddings = global_mean_pool(x, batch)
-
-            # Apply a final classifier
-            x = F.dropout(embeddings, p=0.5, training=self.training)
-            out = self.linear(x)
-
-            if return_embeddings:
-                return out, embeddings
-            else:
-                return out
-
     class GNN(torch.nn.Module):
         def __init__(self, in_channels, hidden_channels, out_channels,
                      normalize=False, lin=True):
@@ -402,23 +374,6 @@ def main():
 
         return loss_all / len(train_loader.dataset)
 
-    def test(loader):
-        model.eval()
-
-        loss_all = 0
-        all_embeddings = []
-
-        for data in loader:
-            data.to(device)
-            out, embeddings = model(data.x, data.edge_index, data.batch, return_embeddings=True)
-            all_embeddings.append(embeddings.cpu().detach().numpy())  # Save the embeddings
-            loss = criterion(out, data.y.view(data.num_nodes.__len__(), 3))
-            loss_all += loss.item() * data.num_nodes.__len__()
-
-        all_embeddings = np.vstack(all_embeddings)  # Stack the embeddings into one array
-
-        return loss_all / len(loader.dataset), all_embeddings
-
     @torch.no_grad()
     def test_diff(loader):
         model.eval()
@@ -460,7 +415,7 @@ def main():
     if not os.path.exists(test_dir):
         os.makedirs(test_dir)
 
-    for epoch in range(1, 200):
+    for epoch in range(1, 3):
         train_loss_all = train()
         test_mean_diffs, test_diffs_all = test_diff(test_loader)
         print(f'Epoch: {epoch:03d}, Par 1 Mean Diff: {test_mean_diffs[0]:.4f}, Par 2 Mean Diff: {test_mean_diffs[1]:.4f}, Par 3 Mean Diff: {test_mean_diffs[2]:.4f}, Train Loss: {train_loss_all:.4f}')
