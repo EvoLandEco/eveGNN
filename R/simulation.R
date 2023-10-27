@@ -20,7 +20,13 @@ randomized_ddd_fixed_la_mu_age <- function(cap_range, la, mu, age, model) {
 randomized_ddd_fixed_age <- function(dists, cap_range, age, model) {
   params <- generate_params(dists)
   cap <- sample(cap_range[1]:cap_range[2], 1)
-  result <- dd_sim(c(unlist(params), cap), age = age, ddmodel = model)
+
+  ntip <- 0
+  result <- list()
+  while (ntip < 10) {
+    result <- dd_sim(c(unlist(params), cap), age = age, ddmodel = model)
+    ntip <- result$tes$Nnode + 1
+  }
 
   return(result)
 }
