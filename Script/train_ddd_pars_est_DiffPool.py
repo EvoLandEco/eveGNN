@@ -278,8 +278,8 @@ def main():
     sum_training_data = functools.reduce(lambda x, y: x + y, training_dataset_list)
     sum_testing_data = functools.reduce(lambda x, y: x + y, testing_dataset_list)
     # Filtering out elements with None in edge_index
-    filtered_training_data = [data for data in sum_training_data if data.edge_index is not None]
-    filtered_testing_data = [data for data in sum_testing_data if data.edge_index is not None]
+    filtered_training_data = [data for data in sum_training_data if data.edge_index.shape != torch.Size([2, 2])]
+    filtered_testing_data = [data for data in sum_testing_data if data.edge_index.shape != torch.Size([2, 2])]
 
     class TreeData(InMemoryDataset):
             def __init__(self, root, data_list, transform=None, pre_transform=None):
@@ -418,6 +418,9 @@ def main():
         else:
             print("No incorrect shapes found.")
 
+    # Check the shapes of the training and testing datasets
+    # Be aware that ToDense will pad the data with zeros to the max_nodes value
+    # However, ToDense may create malformed data.y when the number of nodes is 2
     shape_check(training_dataset, max_nodes)
     shape_check(testing_dataset, max_nodes)
 
