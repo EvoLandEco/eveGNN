@@ -332,8 +332,8 @@ def main():
             super(DiffPool, self).__init__()
 
             num_nodes = ceil(0.25 * max_nodes)
-            self.gnn1_pool = GNN(training_dataset.num_features, 64, num_nodes)
-            self.gnn1_embed = GNN(training_dataset.num_features, 64, 64)
+            self.gnn1_pool = GNN(training_dataset.num_node_features, 64, num_nodes)
+            self.gnn1_embed = GNN(training_dataset.num_node_features, 64, 64)
 
             num_nodes = ceil(0.25 * num_nodes)
             self.gnn2_pool = GNN(64, 64, num_nodes)
@@ -401,29 +401,19 @@ def main():
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     criterion = torch.nn.MSELoss().to(device)
 
-    transformed_training_dataset = []
-    for index in range(len(training_dataset)):
-        data = training_dataset[index]  # Get data element by index
-        try:
-            transformed_data = T.ToDense(max_nodes)(data)
-            transformed_training_dataset.append(transformed_data)
-        except AssertionError:
-            print(f"AssertionError encountered at index {index} in training_dataset")
-            print("Shape of data.edge_index:")
-            print(data.edge_index)
-            print("Shape of data.x:")
-            print(data.x)
+    def shape_check(dataset, max_nodes):
+        incorrect_shapes = []  # List to store indices of data elements with incorrect shapes
+        for i in range(len(dataset)):
+            data = dataset[i]
+            # Check the shapes of data.x, data.adj, and data.mask
+            if data.x.shape != torch.Size([max_nodes, 3]) or \
+                    data.adj.shape != torch.Size([max_nodes, max_nodes]) or \
+                    data.mask.shape != torch.Size([max_nodes]):
+                incorrect_shapes.append(i)  # Add index to the list if any shape is incorrect
+        return incorrect_shapes
 
-    transformed_testing_dataset = []
-    for index in range(len(testing_dataset)):
-        data = testing_dataset[index]  # Get data element by index
-        try:
-            transformed_data = T.ToDense(max_nodes)(data)
-            transformed_testing_dataset.append(transformed_data)
-        except AssertionError:
-            print(f"AssertionError encountered at index {index} in testing_dataset")
-            print(f"Shape of data.edge_index: {data.edge_index.shape}")
-            print(f"Shape of data.x: {data.x.shape}")
+    shape_check(training_dataset, max_nodes)
+    shape_check(testing_dataset, max_nodes)
 
     train_loader = DenseDataLoader(training_dataset, batch_size=64, shuffle=False)
     test_loader = DenseDataLoader(testing_dataset, batch_size=64, shuffle=False)
