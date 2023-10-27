@@ -6,15 +6,12 @@ import pyreadr
 import torch
 import glob
 import functools
-from math import ceil
-from sklearn.metrics import confusion_matrix
-from torch_geometric.loader import DataLoader
-import torch.nn.functional as F
-from torch.nn import Linear
-from torch_geometric.nn import global_mean_pool
-from torch_geometric.data import InMemoryDataset, Data
 import torch_geometric.transforms as T
-from torch_geometric.data import DenseDataLoader
+import torch.nn.functional as F
+from math import ceil
+from torch.nn import Linear
+from torch_geometric.data import InMemoryDataset, Data
+from torch_geometric.loader import DenseDataLoader
 from torch_geometric.nn import DenseGCNConv as GCNConv, dense_diff_pool
 
 
@@ -24,39 +21,6 @@ def read_table(path):
 
 def check_same_across_rows(df):
     return df.apply(lambda x: x.nunique() == 1)
-
-
-def compare_tables(bd_path, ddd_path, eve_path):
-    bd_df = read_table(bd_path)
-    ddd_df = read_table(ddd_path)
-    eve_df = read_table(eve_path)
-
-    # Check if each table has the same lambda, mu, age across rows
-    bd_check = check_same_across_rows(bd_df[['lambda', 'mu', 'age']])
-    ddd_check = check_same_across_rows(ddd_df[['lambda', 'mu', 'age']])
-    eve_check = check_same_across_rows(eve_df[['lambda', 'mu', 'age']])
-
-    print("BD Params Consistency Check:", bd_check.to_dict())
-    print("DDD Params Consistency Check:", ddd_check.to_dict())
-    print("EVE Params Consistency Check:", eve_check.to_dict())
-
-    # Check if the three tables' first row have the same lambda, mu, and age
-    bd_first_row = bd_df.iloc[0][['lambda', 'mu', 'age']]
-    ddd_first_row = ddd_df.iloc[0][['lambda', 'mu', 'age']]
-    eve_first_row = eve_df.iloc[0][['lambda', 'mu', 'age']]
-
-    first_row_check = (bd_first_row == ddd_first_row).all() and (bd_first_row == eve_first_row).all()
-    print("Params Consistency Check across BD, DDD and EVE:", first_row_check)
-
-    # Combine all check results
-    all_checks_pass = bd_check.all() & ddd_check.all() & eve_check.all() & first_row_check
-
-    if all_checks_pass:
-        print("All checks passed.")
-    else:
-        print("Some checks failed.")
-
-    return all_checks_pass
 
 
 def count_rds_files(path):
@@ -98,65 +62,128 @@ def list_subdirectories(path):
         return None
 
 
-def get_params(name, model_name, set_string):
-    try:
-        # Split the string on the underscore
-        parts = set_string.split('_')
-        if len(parts) != 2 or not parts[1].isdigit():
-            raise ValueError(f"Invalid format: {set_string}")
-        # Convert the second part to an integer
-        index = int(parts[1])
-
-        # Construct the path to the params file
-        file_path = f'{name}/{model_name}/{model_name}_params.txt'
-
-        # Read the table
-        df = read_table(file_path)
-
-        # Get the specified row (Python uses 0-based indexing, so we subtract 1 from index)
-        row = df.iloc[index - 1]
-        return row
-    except Exception as e:
-        print(f"An error occurred: {e}")
-        return None
+def get_params_string(filename):
+    # Function to extract parameters from the filename
+    params = filename.split('_')[1:-1]  # Exclude the first and last elements
+    return "_".join(params)
 
 
-def read_rds_to_pytorch(path, model, count):
-    # Map metrics to category values
-    metric_to_category = {'BD_TES': 0, 'DDD_TES': 1, 'EVE_TES': 2}
+def get_params(filename):
+    params = filename.split('_')[1:-1]
+    params = list(map(float, params))  # Convert string to float
+    return params
 
-    # Check if the provided metric is valid
-    if model not in metric_to_category:
-        raise ValueError(f"Unknown model: {model}. Expected one of: {', '.join(metric_to_category.keys())}")
 
-    # Get the category value for the provided prefix
-    category_value = torch.tensor([metric_to_category[model]], dtype=torch.long)
+def get_sort_key(filename):
+    # Split the filename by underscores, convert the parameter values to floats, and return them as a tuple
+    params = tuple(map(float, filename.split('_')[1:-1]))
+    return params
+
+
+def sort_files(files):
+    # Sort the files based on the parameters extracted by the get_sort_key function
+    return sorted(files, key=get_sort_key)
+
+
+def check_file_consistency(files_tree, files_el):
+    # Check if the two lists have the same length
+    if len(files_tree) != len(files_el):
+        raise ValueError("Mismatched lengths")
+
+    # Define a function to extract parameters from filename
+    def get_params_tuple(filename):
+        return tuple(map(float, filename.split('_')[1:-1]))
+
+    # Check each pair of files for matching parameters
+    for tree_file, el_file in zip(files_tree, files_el):
+        tree_params = get_params_tuple(tree_file)
+        el_params = get_params_tuple(el_file)
+        if tree_params != el_params:
+            raise ValueError(f"Mismatched parameters: {tree_file} vs {el_file}")
+
+    # If we get here, all checks passed
+    print("File lists consistency check passed")
+
+
+def check_params_consistency(params_tree_list, params_el_list):
+    is_consistent = all(a == b for a, b in zip(params_tree_list, params_el_list))
+    if is_consistent:
+        print("Parameters are consistent across the tree and EL datasets.")
+    else:
+        raise ValueError("Mismatch in parameters between the tree and EL datasets.")
+    return is_consistent
+
+
+def check_list_count(count, data_list, length_list, params_list):
+    # Get the number of elements in each list
+    data_count = len(data_list)
+    length_count = len(length_list)
+    params_count = len(params_list)
+
+    # Check if the count matches the number of elements in each list
+    if count != data_count:
+        raise ValueError(f"Count mismatch: input argument count is {count}, data_list has {data_count} elements.")
+
+    if count != length_count:
+        raise ValueError(f"Count mismatch: input argument count is {count}, length_list has {length_count} elements.")
+
+    if count != params_count:
+        raise ValueError(f"Count mismatch: input argument count is {count}, params_list has {params_count} elements.")
+
+    # If all checks pass, print a success message
+    print("Count check passed")
+
+
+def read_rds_to_pytorch(path, count):
+    # List all files in the directory
+    files_tree = [f for f in os.listdir(os.path.join(path, 'GNN', 'tree'))
+                  if f.startswith('tree_') and f.endswith('.rds')]
+    files_el = [f for f in os.listdir(os.path.join(path, 'GNN', 'tree', 'EL'))
+                if f.startswith('EL_') and f.endswith('.rds')]
+
+    # Sort the files based on the parameters
+    files_tree = sort_files(files_tree)
+    files_el = sort_files(files_el)
+
+    # Check if the files are consistent
+    check_file_consistency(files_tree, files_el)
 
     # List to hold the data from each .rds file
     data_list = []
+    params_tree_list = []
 
-    # Loop through the files for the specified prefix
-    for i in range(1, count + 1):
-        # Construct the file path using the specified prefix
-        file_path = os.path.join(path, 'GNN', 'tree', f"tree_{i}.rds")
-
-        # Read the .rds file
+    # Loop through the files with the prefix 'tree_'
+    for filename in files_tree:
+        file_path = os.path.join(path, 'GNN', 'tree', filename)
         result = pyreadr.read_r(file_path)
-
-        # The result is a dictionary where keys are the name of objects and the values python dataframes
-        # Since RDS can only contain one object, it will be the first item in the dictionary
         data = result[None]
-
-        # Append the data to data_list
         data_list.append(data)
+        params_tree_list.append(get_params_string(filename))
 
     length_list = []
+    params_el_list = []
 
-    for i in range(1, count + 1):
-        length_file_path = os.path.join(path, 'GNN', 'tree', "EL", f"EL_{i}.rds")
+    # Loop through the files with the prefix 'EL_'
+    for filename in files_el:
+        length_file_path = os.path.join(path, 'GNN', 'tree', 'EL', filename)
         length_result = pyreadr.read_r(length_file_path)
         length_data = length_result[None]
         length_list.append(length_data)
+        params_el_list.append(get_params_string(filename))
+
+    check_params_consistency(params_tree_list, params_el_list)
+
+    params_list = []
+
+    for filename in files_tree:
+        params = get_params(filename)
+        params_list.append(params)
+
+    # Normalize carrying capacity by dividing by 1000
+    for vector in params_list:
+        vector[2] = vector[2] / 1000
+
+    check_list_count(count, data_list, length_list, params_list)
 
     # List to hold the Data objects
     pytorch_geometric_data_list = []
@@ -173,11 +200,15 @@ def read_rds_to_pytorch(path, model, count):
 
         edge_length_tensor = torch.tensor(length_list[i].values, dtype=torch.float)
 
+        params_current = params_list[i]
+
+        params_current_tensor = torch.tensor(params_current[0:3], dtype=torch.float)
+
         # Create a Data object with the edge index, number of nodes, and category value
         data = Data(x=edge_length_tensor,
                     edge_index=edge_index_tensor,
                     num_nodes=num_nodes,
-                    y=category_value)
+                    y=params_current_tensor)
 
         # Append the Data object to the list
         pytorch_geometric_data_list.append(data)
@@ -201,73 +232,44 @@ def get_testing_data(data_list):
     return testing_data
 
 
-def per_class_accuracy(y_true, y_pred, classes):
-    cm = confusion_matrix(y_true, y_pred)
-    class_accuracies = {}
-    for i, class_label in enumerate(classes):
-        true_positive = cm[i][i]
-        total_in_class = np.sum(cm[i, :])
-        accuracy = 0 if total_in_class == 0 else true_positive / total_in_class
-        class_accuracies[class_label] = accuracy
-    return class_accuracies
-
-
-def export_to_rds(embeddings, labels, epoch, name, task_type, set_i, which_set):
+def export_to_rds(embeddings, epoch, name, task_type, which_set):
     # Convert to DataFrame
     df = pd.DataFrame(embeddings, columns=[f"dim_{i}" for i in range(embeddings.shape[1])])
-    df['label'] = labels
 
     # Export to RDS
     rds_path = os.path.join(name, task_type, "umap")
     if not os.path.exists(rds_path):
         os.makedirs(rds_path)
-    rds_filename = os.path.join(rds_path, f'{set_i}_{which_set}_umap_epoch_{epoch}.rds')
+    rds_filename = os.path.join(rds_path, f'{which_set}_umap_epoch_{epoch}.rds')
     pyreadr.write_rds(rds_filename, df)
 
 
 def main():
-    if len(sys.argv) != 4:
-        print(f"Usage: {sys.argv[0]} <name> <set_i> <task_type>")
+    if len(sys.argv) != 3:
+        print(f"Usage: {sys.argv[0]} <name> <task_type>")
         sys.exit(1)
 
     name = sys.argv[1]
-    set_i = sys.argv[2]
-    task_type = sys.argv[3]
+    task_type = sys.argv[2]
 
     # Now you can use the variables name and set_i in your code
-    print(f'Name: {name}, Set: {set_i}, Task Type: {task_type}')
-
-    bd_tree_path = os.path.join(name, "BD_TES/set_1")
+    print(f'Name: {name}, Task Type: {task_type}')
 
     training_dataset_list = []
     testing_dataset_list = []
 
-    os.path.join(bd_tree_path, 'GNN', 'tree')
-    os.path.join(bd_tree_path, 'GNN', 'tree', 'EL')
-    rds_count = check_rds_files_count(os.path.join(bd_tree_path, 'GNN', 'tree'), os.path.join(bd_tree_path, 'GNN', 'tree', 'EL'))
-    print(f'There are: {rds_count} trees in the {set_i} folder.')
-    print(f"Now reading BD trees...")
-    bd_dataset = read_rds_to_pytorch(bd_tree_path, "BD_TES", rds_count)
-    bd_training_data = get_training_data(bd_dataset)
-    bd_testing_data = get_testing_data(bd_dataset)
-    training_dataset_list.append(bd_training_data)
-    testing_dataset_list.append(bd_testing_data)
-
     # Concatenate the base directory path with the set_i folder name
-    full_dir = os.path.join(name, task_type, set_i)
+    full_dir = os.path.join(name, task_type)
     full_dir_tree = os.path.join(full_dir, 'GNN', 'tree')
     full_dir_el = os.path.join(full_dir, 'GNN', 'tree', 'EL')
     # Call read_rds_to_pytorch with the full directory path
-    print(full_dir)  # The set_i folder names are passed as the remaining arguments
-    params_current = get_params(name, task_type, set_i)
-    print(params_current)
-
+    print(full_dir)
     # Check if the number of .rds files in the tree and el paths are equal
     rds_count = check_rds_files_count(full_dir_tree, full_dir_el)
-    print(f'There are: {rds_count} trees in the {set_i} folder.')
-    print(f"Now reading {task_type}:{set_i}...")
+    print(f'There are: {rds_count} trees in the {task_type} folder.')
+    print(f"Now reading {task_type}...")
     # Read the .rds files into a list of PyTorch Geometric Data objects
-    current_dataset = read_rds_to_pytorch(full_dir, task_type, rds_count)
+    current_dataset = read_rds_to_pytorch(full_dir, rds_count)
     current_training_data = get_training_data(current_dataset)
     current_testing_data = get_testing_data(current_dataset)
     training_dataset_list.append(current_training_data)
@@ -287,16 +289,18 @@ def main():
         def _process(self):
             pass  # No processing required
 
-    training_dataset = TreeData(root=None, data_list=sum_training_data)
-    testing_dataset = TreeData(root=None, data_list=sum_testing_data)
+    max_nodes = max([data.num_nodes for data in sum_training_data])
+
+    training_dataset = TreeData(root=None, data_list=sum_training_data, transform=T.ToDense())
+    testing_dataset = TreeData(root=None, data_list=sum_testing_data, transform=T.ToDense())
 
     class GCN(torch.nn.Module):
-        def __init__(self, hidden_size=32):
+        def __init__(self, hidden_size=32, num_params=3):
             super(GCN, self).__init__()
             self.conv1 = GCNConv(training_dataset.num_node_features, hidden_size)
             self.conv2 = GCNConv(hidden_size, hidden_size)
             self.conv3 = GCNConv(hidden_size, hidden_size)
-            self.linear = Linear(hidden_size, training_dataset.num_classes)
+            self.linear = Linear(hidden_size, num_params)
 
         def forward(self, x, edge_index, batch, return_embeddings=False):
             # 1. Obtain node embeddings
@@ -348,8 +352,8 @@ def main():
             super(DiffPool, self).__init__()
 
             num_nodes = ceil(0.25 * max_nodes)
-            self.gnn1_pool = GNN(dataset.num_features, 64, num_nodes)
-            self.gnn1_embed = GNN(dataset.num_features, 64, 64)
+            self.gnn1_pool = GNN(training_dataset.num_features, 64, num_nodes)
+            self.gnn1_embed = GNN(training_dataset.num_features, 64, 64)
 
             num_nodes = ceil(0.25 * num_nodes)
             self.gnn2_pool = GNN(64, 64, num_nodes)
@@ -358,7 +362,7 @@ def main():
             self.gnn3_embed = GNN(64, 64, 64, lin=False)
 
             self.lin1 = torch.nn.Linear(64, 64)
-            self.lin2 = torch.nn.Linear(64, dataset.num_classes)
+            self.lin2 = torch.nn.Linear(64, 3)
 
         def forward(self, x, adj, mask=None):
             s = self.gnn1_pool(x, adj, mask)
@@ -376,75 +380,74 @@ def main():
             x = x.mean(dim=1)
             x = F.relu(self.lin1(x))
             x = self.lin2(x)
-            return F.log_softmax(x, dim=-1), l1 + l2, e1 + e2
-
+            return x, l1 + l2, e1 + e2
 
     def train():
         model.train()
 
         loss_all = 0  # Keep track of the loss
-        all_embeddings = []  # Collect embeddings
-        all_labels = []  # Collect labels
         for data in train_loader:
             data.to(device)
             optimizer.zero_grad()
-            out, embeddings = model(data.x, data.edge_index, data.batch, return_embeddings=True)
-            loss = criterion(out, data.y)
+            out = model(data.x, data.adj, data.mask)
+            loss = criterion(out, data.y.view(data.num_graphs, 3))
             loss.backward()
             loss_all += loss.item() * data.num_graphs
             optimizer.step()
 
-            all_embeddings.append(embeddings.cpu().detach().numpy())
-            all_labels.append(data.y.cpu().numpy())  # Save the labels
-
-        all_embeddings = np.vstack(all_embeddings)  # Stack the embeddings into one array
-        all_labels = np.concatenate(all_labels)  # Convert list of arrays to one array
-        return loss_all / len(train_loader.dataset), all_embeddings, all_labels
+        return loss_all / len(train_loader.dataset)
 
     def test(loader):
         model.eval()
 
-        correct = 0
+        loss_all = 0
         all_embeddings = []
-        all_preds = []  # Collect predictions
-        all_labels = []  # Collect labels
-        all_labels_out = []  # Collect labels
+
         for data in loader:
             data.to(device)
             out, embeddings = model(data.x, data.edge_index, data.batch, return_embeddings=True)
-            preds = out.argmax(dim=1).cpu().numpy()
-            labels = data.y.cpu().numpy()
             all_embeddings.append(embeddings.cpu().detach().numpy())  # Save the embeddings
-            all_labels_out.append(labels)  # Save the labels for returning
-            all_preds.extend(preds)  # Save the predictions
-            all_labels.extend(labels)  # Save the labels for accuracy calculation
+            loss = criterion(out, data.y.view(data.num_graphs, 3))
+            loss_all += loss.item() * data.num_graphs
 
         all_embeddings = np.vstack(all_embeddings)  # Stack the embeddings into one array
-        overall_accuracy = np.mean(np.array(all_preds) == np.array(all_labels))
-        class_accuracies = per_class_accuracy(all_labels, all_preds, unique_class_labels)
-        all_labels_out = np.concatenate(all_labels_out)  # Convert list of arrays to one array
 
-        return overall_accuracy, class_accuracies, all_embeddings, all_labels_out
+        return loss_all / len(loader.dataset), all_embeddings
+
+    @torch.no_grad()
+    def test_diff(loader):
+        model.eval()
+
+        diffs_all = torch.tensor([], dtype=torch.float)
+
+        for data in loader:
+            data.to(device)
+            out = model(data.x, data.adj, data.mask)
+            diffs = torch.abs(out - data.y.view(data.num_graphs, 3))
+            diffs_all = torch.cat((diffs_all, diffs), dim=0)
+
+        mean_diffs = torch.sum(diffs_all, dim=0) / len(test_loader.dataset)
+        return mean_diffs.cpu().detach().numpy(), diffs_all.cpu().detach().numpy()
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Training using {device}")
 
-    model = GCN(hidden_size=64)
+    model = DiffPool()
     model = model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-    criterion = torch.nn.CrossEntropyLoss().to(device)
-    train_loader = DataLoader(training_dataset, batch_size=64, shuffle=True)
-    test_loader = DataLoader(testing_dataset, batch_size=64, shuffle=False)
+    criterion = torch.nn.MSELoss().to(device)
+
+    train_loader = DenseDataLoader(training_dataset, batch_size=64, shuffle=False)
+    test_loader = DenseDataLoader(testing_dataset, batch_size=64, shuffle=False)
 
     print(model)
 
-    test_acc_history = []
-    loss_history = []
-    unique_class_labels = sorted(list(set(training_dataset.y.numpy())))  # Get the unique class labels
-    test_per_class_accuracies = {label: [] for label in unique_class_labels}
+    test_mean_diffs_history = []
+    train_loss_history = []
+    final_test_diffs = []
 
-    train_dir = os.path.join(name, task_type, set_i, "training")
-    test_dir = os.path.join(name, task_type, set_i, "testing")
+    train_dir = os.path.join(name, task_type, "training")
+    test_dir = os.path.join(name, task_type, "testing")
 
     # Check and create directories if not exist
     if not os.path.exists(train_dir):
@@ -453,34 +456,32 @@ def main():
         os.makedirs(test_dir)
 
     for epoch in range(1, 200):
-        loss, train_embeddings, train_labels = train()
-        test_acc_all, test_acc_per_class, test_embeddings, test_labels = test(test_loader)
-        print(f'Epoch: {epoch:03d}, Test Acc: {test_acc_all:.4f}, Loss: {loss:.4f}')
+        train_loss_all = train()
+        test_mean_diffs, test_diffs_all = test_diff(test_loader)
+        print(f'Epoch: {epoch:03d}, Par 1 Mean Diff: {test_mean_diffs[0]:.4f}, Par 2 Mean Diff: {test_mean_diffs[1]:.4f}, Par 3 Mean Diff: {test_mean_diffs[2]:.4f}, Train Loss: {train_loss_all:.4f}')
 
         # Record the values
-        test_acc_history.append(test_acc_all)
-        loss_history.append(loss)
-        for label in unique_class_labels:
-            test_per_class_accuracies[label].append(test_acc_per_class[label])
-
-        export_to_rds(train_embeddings, train_labels, epoch, name, task_type, set_i, 'train')
-        export_to_rds(test_embeddings, test_labels, epoch, name, task_type, set_i, 'test')
+        test_mean_diffs_history.append(test_mean_diffs)
+        train_loss_history.append(train_loss_all)
+        final_test_diffs = test_diffs_all
 
     # After the loop, create a dictionary to hold the data
-    data_dict = {
-        'Epoch': list(range(1, 200)),
-        'Test_Accuracy_Overall': test_acc_history,
-        'Loss': loss_history
-    }
-
-    for label in unique_class_labels:
-        data_dict[f'Test_{label}_Accuracy'] = test_per_class_accuracies[label]
+    data_dict = {"lambda_diff": [], "mu_diff": [], "cap_diff": []}
+    # Iterate through test_mean_diffs_history
+    for array in test_mean_diffs_history:
+        # It's assumed that the order of elements in the array corresponds to the keys in data_dict
+        data_dict["lambda_diff"].append(array[0])
+        data_dict["mu_diff"].append(array[1])
+        data_dict["cap_diff"].append(array[2])
+    data_dict["Epoch"] = list(range(1, 200))
+    data_dict["Train_Loss"] = train_loss_history
 
     # Convert the dictionary to a pandas DataFrame
     model_performance = pd.DataFrame(data_dict)
-    write_data_name = '_'.join(params_current.astype(str))
+    final_differences = pd.DataFrame(final_test_diffs, columns=["lambda_diff", "mu_diff", "cap_diff"])
     # Save the data to a file using pyreadr
-    pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_{set_i}_{write_data_name}.rds"), model_performance)
+    pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}.rds"), model_performance)
+    pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_diffs.rds"), final_differences)
 
 
 if __name__ == '__main__':
