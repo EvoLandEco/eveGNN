@@ -409,8 +409,10 @@ def main():
             transformed_training_dataset.append(transformed_data)
         except AssertionError:
             print(f"AssertionError encountered at index {index} in training_dataset")
-            print(f"Shape of data.edge_index: {data.edge_index}")
-            print(f"Shape of data.x: {data.x}")
+            print("Shape of data.edge_index:")
+            print(data.edge_index)
+            print("Shape of data.x:")
+            print(data.x)
 
     transformed_testing_dataset = []
     for index in range(len(testing_dataset)):
