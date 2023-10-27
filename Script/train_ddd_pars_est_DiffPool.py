@@ -364,6 +364,7 @@ def main():
 
         loss_all = 0  # Keep track of the loss
         for data in train_loader:
+            print(data)
             data.to(device)
             optimizer.zero_grad()
             out, _, _ = model(data.x, data.adj, data.mask)
@@ -399,6 +400,8 @@ def main():
 
     train_loader = DenseDataLoader(training_dataset, batch_size=64, shuffle=False)
     test_loader = DenseDataLoader(testing_dataset, batch_size=64, shuffle=False)
+    print(train_loader.dataset.transform)
+    print(test_loader.dataset.transform)
 
     print(model)
 
