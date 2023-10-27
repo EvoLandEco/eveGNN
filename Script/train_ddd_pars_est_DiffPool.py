@@ -407,6 +407,7 @@ def main():
             data = dataset[i]
             # Check the shapes of data.x, data.adj, and data.mask
             if data.x.shape != torch.Size([max_nodes, 3]) or \
+                    data.y.shape != torch.Size([3]) or \
                     data.adj.shape != torch.Size([max_nodes, max_nodes]) or \
                     data.mask.shape != torch.Size([max_nodes]):
                 incorrect_shapes.append(i)  # Add index to the list if any shape is incorrect
