@@ -398,6 +398,22 @@ def main():
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     criterion = torch.nn.MSELoss().to(device)
 
+    transformed_training_dataset = []
+    for data in training_dataset:
+        transformed_training_dataset.append(T.ToDense(max_nodes)(data))
+
+    transformed_testing_dataset = []
+    for data in testing_dataset:
+        transformed_testing_dataset.append(T.ToDense(max_nodes)(data))
+
+    for i, data in enumerate(transformed_training_dataset):
+        if data.x.shape != torch.Size([max_nodes, 3]):
+            print(f"In training dataset: element {i} does not have x.shape of {torch.Size([max_nodes, 3])}. Actual shape: {data.x.shape}")
+
+    for i, data in enumerate(transformed_testing_dataset):
+        if data.x.shape != torch.Size([max_nodes, 3]):
+            print(f"In testing dataset: element {i} does not have x.shape of {torch.Size([max_nodes, 3])}. Actual shape: {data.x.shape}")
+
     train_loader = DenseDataLoader(training_dataset, batch_size=64, shuffle=False)
     test_loader = DenseDataLoader(testing_dataset, batch_size=64, shuffle=False)
     print(train_loader.dataset.transform)
