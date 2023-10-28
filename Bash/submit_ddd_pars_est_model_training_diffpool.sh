@@ -1,11 +1,12 @@
 #!/bin/bash
-#SBATCH --time=6:00:00
+#SBATCH --time=24:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
+#SBATCH --gpus-per-node=1
 #SBATCH --job-name=gnn_ddd_pars_est_diffpool
 #SBATCH --output=logs/gnn_ddd_pars_est_diffpool-%j.log
 #SBATCH --mem=32GB
-#SBATCH --partition=regular
+#SBATCH --partition=gpu
 
 ml Python/3.8.16-GCCcore-11.2.0
 source $HOME/venvs/eve/bin/activate

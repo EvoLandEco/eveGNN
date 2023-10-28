@@ -367,7 +367,6 @@ def main():
 
         loss_all = 0  # Keep track of the loss
         for data in train_loader:
-            print(data)
             data.to(device)
             optimizer.zero_grad()
             out, _, _ = model(data.x, data.adj, data.mask)
