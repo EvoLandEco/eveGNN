@@ -387,6 +387,7 @@ def main():
             data.to(device)
             out, _, _ = model(data.x, data.adj, data.mask)
             diffs = torch.abs(out - data.y.view(data.num_nodes.__len__(), 3))
+            diffs_all = torch.tensor([], dtype=torch.float, device=device)
             diffs_all = torch.cat((diffs_all, diffs), dim=0)
 
         mean_diffs = torch.sum(diffs_all, dim=0) / len(test_loader.dataset)
