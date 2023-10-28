@@ -420,7 +420,7 @@ def main():
 
     # Check the shapes of the training and testing datasets
     # Be aware that ToDense will pad the data with zeros to the max_nodes value
-    # However, ToDense may create malformed data.y when the number of nodes is 2
+    # However, ToDense may create malformed data.y when the number of nodes is 3 (2 tips)
     shape_check(training_dataset, max_nodes)
     shape_check(testing_dataset, max_nodes)
 
