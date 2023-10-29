@@ -390,6 +390,7 @@ def main():
             diffs_all = torch.tensor([], dtype=torch.float, device=device)
             diffs_all = torch.cat((diffs_all, diffs), dim=0)
 
+        print(f"diffs_all length: {len(diffs_all)}; test_loader.dataset length: {len(test_loader.dataset)}; Equal: {len(diffs_all) == len(test_loader.dataset)}")
         mean_diffs = torch.sum(diffs_all, dim=0) / len(test_loader.dataset)
         return mean_diffs.cpu().detach().numpy(), diffs_all.cpu().detach().numpy()
 
@@ -426,6 +427,8 @@ def main():
 
     train_loader = DenseDataLoader(training_dataset, batch_size=64, shuffle=False)
     test_loader = DenseDataLoader(testing_dataset, batch_size=64, shuffle=False)
+    print(f"Training dataset length: {len(train_loader.dataset)}")
+    print(f"Testing dataset length: {len(test_loader.dataset)}")
     print(train_loader.dataset.transform)
     print(test_loader.dataset.transform)
 
@@ -453,6 +456,7 @@ def main():
         test_mean_diffs_history.append(test_mean_diffs)
         train_loss_history.append(train_loss_all)
         final_test_diffs = test_diffs_all
+        print(f"Final test diffs length: {len(final_test_diffs)}")
 
     # After the loop, create a dictionary to hold the data
     data_dict = {"lambda_diff": [], "mu_diff": [], "cap_diff": []}
@@ -469,10 +473,11 @@ def main():
     model_performance = pd.DataFrame(data_dict)
     final_differences = pd.DataFrame(final_test_diffs, columns=["lambda_diff", "mu_diff", "cap_diff"])
     # Save the data to a file using pyreadr
-    pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}.rds"), model_performance)
+    pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_diffpool.rds"), model_performance)
     pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_diffs_diffpool.rds"), final_differences)
 
     torch.save(model.state_dict(), os.path.join(name, task_type, f"{task_type}_model_diffpool.pt"))
+
 
 if __name__ == '__main__':
     main()
