@@ -381,13 +381,12 @@ def main():
     def test_diff(loader):
         model.eval()
 
-        diffs_all = torch.tensor([], dtype=torch.float)
+        diffs_all = torch.tensor([], dtype=torch.float, device=device)
 
         for data in loader:
             data.to(device)
             out, _, _ = model(data.x, data.adj, data.mask)
             diffs = torch.abs(out - data.y.view(data.num_nodes.__len__(), 3))
-            diffs_all = torch.tensor([], dtype=torch.float, device=device)
             diffs_all = torch.cat((diffs_all, diffs), dim=0)
 
         print(f"diffs_all length: {len(diffs_all)}; test_loader.dataset length: {len(test_loader.dataset)}; Equal: {len(diffs_all) == len(test_loader.dataset)}")
