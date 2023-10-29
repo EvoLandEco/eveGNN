@@ -472,6 +472,7 @@ def main():
     pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}.rds"), model_performance)
     pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_diffs_diffpool.rds"), final_differences)
 
+    torch.save(model.state_dict(), os.path.join(name, task_type, f"{task_type}_model_diffpool.pt"))
 
 if __name__ == '__main__':
     main()
