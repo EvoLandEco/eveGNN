@@ -411,10 +411,6 @@ def main():
             return xre, F.log_softmax(xcl, dim=-1)
 
     def combined_loss(output_regression, target_regression, output_classification, target_classification):
-        print(f"output_regression shape: {output_regression.shape}")
-        print(f"target_regression shape: {target_regression.shape}")
-        print(f"output_classification shape: {output_classification.shape}")
-        print(f"target_classification shape: {target_classification.shape}")
         loss_regression = F.mse_loss(output_regression, target_regression)
         loss_classification = F.cross_entropy(output_classification, target_classification)
         return loss_regression + loss_classification
@@ -427,8 +423,6 @@ def main():
             data.to(device)
             optimizer.zero_grad()
             out_re, out_cl = model(data.x, data.adj, data.mask)
-            print(f"out_re shape: {out_re.shape}")
-            print(f"out_cl shape: {out_cl.shape}")
             loss = combined_loss(out_re, data.y_re.view(data.num_nodes.__len__(), 4), out_cl, data.y_cl.argmax(dim=1))
             loss.backward()
             loss_all += loss.item() * data.num_nodes.__len__()
