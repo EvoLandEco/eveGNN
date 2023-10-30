@@ -32,6 +32,27 @@ randomized_ddd_fixed_age <- function(dists, cap_range, age, model) {
 }
 
 
+#' @export randomized_eve_fixed_age
+randomized_eve_fixed_age <- function(dists, age, model, metric, offset) {
+  params <- generate_params(dists)
+
+  ntip <- 0
+  result <- list()
+  while (ntip < 10) {
+    result <- edd_sim(unlist(params), age = age, model = model, metric = metric, offset = offset, history = FALSE)
+    ntip <- result$tes$Nnode + 1
+  }
+
+  result[["pars"]] <- unlist(params)
+  result[["age"]] <- age
+  result[["model"]] <- model
+  result[["metric"]] <- metric
+  result[["offset"]] <- offset
+
+  return(result)
+}
+
+
 #' @export batch_sim_ddd
 batch_sim_ddd <- function(dists, cap, age, model, nrep = 10) {
   batch <- list()
