@@ -39,7 +39,7 @@ randomized_eve_fixed_age <- function(dists, age, model, metric, offset) {
   ntip <- 0
   result <- list()
   while (ntip < 10) {
-    result <- edd_sim(unlist(params), age = age, model = model, metric = metric, offset = offset, history = FALSE)
+    result <- eve::edd_sim(unlist(params), age = age, model = model, metric = metric, offset = offset, history = FALSE)
     ntip <- result$tes$Nnode + 1
   }
 
