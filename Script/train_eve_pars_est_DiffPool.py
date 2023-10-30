@@ -329,7 +329,9 @@ def main():
 
     sum_training_data = functools.reduce(lambda x, y: x + y, training_dataset_list)
     sum_testing_data = functools.reduce(lambda x, y: x + y, testing_dataset_list)
-    # Filtering out elements with None in edge_index
+
+    # Filtering out trees with only 3 nodes
+    # They might cause problems with ToDense
     filtered_training_data = [data for data in sum_training_data if data.edge_index.shape != torch.Size([2, 2])]
     filtered_testing_data = [data for data in sum_testing_data if data.edge_index.shape != torch.Size([2, 2])]
 
@@ -519,6 +521,7 @@ def main():
     test_accuracy_history = []
     final_test_diffs = []
 
+    # Paths for saving embeddings
     train_dir = os.path.join(name, task_type, "training")
     test_dir = os.path.join(name, task_type, "testing")
 
@@ -528,6 +531,7 @@ def main():
     if not os.path.exists(test_dir):
         os.makedirs(test_dir)
 
+    # Training loop
     for epoch in range(1, epoch_number):
         train_loss_all = train()
         test_mean_diffs, test_diffs_all = test_diff(test_loader)
