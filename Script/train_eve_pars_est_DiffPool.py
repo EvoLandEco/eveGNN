@@ -1,7 +1,6 @@
 import sys
 import os
 import pandas as pd
-import numpy as np
 import pyreadr
 import torch
 import glob
@@ -9,7 +8,6 @@ import functools
 import torch_geometric.transforms as T
 import torch.nn.functional as F
 from math import ceil
-from torch.nn import Linear
 from torch_geometric.data import InMemoryDataset, Data
 from torch_geometric.loader import DenseDataLoader
 from torch_geometric.nn import DenseGCNConv as GCNConv, dense_diff_pool
@@ -371,8 +369,6 @@ def main():
             self.bns.append(torch.nn.BatchNorm1d(out_channels))
 
         def forward(self, x, adj, mask=None):
-            batch_size, num_nodes, in_channels = x.size()
-
             for step in range(len(self.convs)):
                 x = F.relu(self.convs[step](x, adj, mask))
                 x = torch.permute(x, (0, 2, 1))
@@ -567,7 +563,7 @@ def main():
     data_dict["Train_Loss"] = train_loss_history
     data_dict["Cl_Accuracy"] = test_accuracy_history
 
-    def check_col_lengths(input_dict):
+    def check_col_lengths(data_dict):
         # Get the lengths of all columns
         lengths = [len(v) for v in data_dict.values()]
 
