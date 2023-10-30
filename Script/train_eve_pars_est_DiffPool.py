@@ -14,6 +14,11 @@ from torch_geometric.data import InMemoryDataset, Data
 from torch_geometric.loader import DenseDataLoader
 from torch_geometric.nn import DenseGCNConv as GCNConv, dense_diff_pool
 
+# Defining a mapping from metric names to category values
+metric_to_category = {'pd': 0, 'ed': 1, 'nnd': 2}
+beta_n_norm_factor = 100
+beta_phi_norm_factor = 1000
+
 
 def read_table(path):
     return pd.read_csv(path, sep="\s+", header=0)  # assuming the tables are tab-delimited
@@ -69,15 +74,33 @@ def get_params_string(filename):
 
 
 def get_params(filename):
-    params = filename.split('_')[1:-1]
-    params = list(map(float, params))  # Convert string to float
+    parts = filename.split('_')[1:-1]
+    params = []
+    for part in parts:
+        try:
+            # Try to convert to float
+            params.append(float(part))
+        except ValueError:
+            # If it's not a float, convert using the metric_to_category mapping
+            params.append(metric_to_category.get(part, part))  # default to the string itself if not found
+
     return params
 
 
 def get_sort_key(filename):
-    # Split the filename by underscores, convert the parameter values to floats, and return them as a tuple
-    params = tuple(map(float, filename.split('_')[1:-1]))
-    return params
+    # Split the filename by underscores
+    parts = filename.split('_')[1:-1]
+
+    params = []
+    for part in parts:
+        try:
+            # Try to convert to float
+            params.append(float(part))
+        except ValueError:
+            # If it's not a float, convert using the metric_to_category mapping
+            params.append(metric_to_category.get(part, part))  # default to the string itself if not found
+
+    return tuple(params)
 
 
 def sort_files(files):
@@ -92,7 +115,16 @@ def check_file_consistency(files_tree, files_el):
 
     # Define a function to extract parameters from filename
     def get_params_tuple(filename):
-        return tuple(map(float, filename.split('_')[1:-1]))
+        parts = filename.split('_')[1:-1]  # Exclude first one and last three elements in split strings
+        params = []
+        for part in parts:
+            try:
+                # Try to convert to float
+                params.append(float(part))
+            except ValueError:
+                # If it's not a float, convert using the metric_to_category mapping
+                params.append(metric_to_category.get(part, part))  # default to the string itself if not found
+        return tuple(params)
 
     # Check each pair of files for matching parameters
     for tree_file, el_file in zip(files_tree, files_el):
@@ -179,9 +211,10 @@ def read_rds_to_pytorch(path, count):
         params = get_params(filename)
         params_list.append(params)
 
-    # Normalize carrying capacity by dividing by 1000
+    # Normalize beta_n and beta_phi
     for vector in params_list:
-        vector[2] = vector[2] / 1000
+        vector[2] = vector[2] * beta_n_norm_factor
+        vector[3] = vector[3] * beta_phi_norm_factor
 
     check_list_count(count, data_list, length_list, params_list)
 
@@ -202,16 +235,21 @@ def read_rds_to_pytorch(path, count):
 
         params_current = params_list[i]
 
-        params_current_tensor = torch.tensor(params_current[0:3], dtype=torch.float)
+        params_current_tensor = torch.tensor(params_current[0:4], dtype=torch.float)
+
+        class_current_tensor = torch.tensor(params_current[5], dtype=torch.long)
 
         # Create a Data object with the edge index, number of nodes, and category value
         data = Data(x=edge_length_tensor,
                     edge_index=edge_index_tensor,
                     num_nodes=num_nodes,
-                    y=params_current_tensor)
+                    y_re=params_current_tensor,
+                    y_cl=class_current_tensor)
 
         # Append the Data object to the list
         pytorch_geometric_data_list.append(data)
+
+    print("Finished reading data")
 
     return pytorch_geometric_data_list
 
@@ -341,8 +379,13 @@ def main():
 
             self.gnn3_embed = GNN(64, 64, 64, lin=False)
 
-            self.lin1 = torch.nn.Linear(64, 64)
-            self.lin2 = torch.nn.Linear(64, 3)
+            # Layers for regression
+            self.lin1re = torch.nn.Linear(64, 64)
+            self.lin2re = torch.nn.Linear(64, 4)
+
+            # Layers for classification
+            self.lin1cl = torch.nn.Linear(64, 64)
+            self.lin2cl = torch.nn.Linear(64, 3)
 
         def forward(self, x, adj, mask=None):
             s = self.gnn1_pool(x, adj, mask)
@@ -358,9 +401,23 @@ def main():
             x = self.gnn3_embed(x, adj)
 
             x = x.mean(dim=1)
-            x = F.relu(self.lin1(x))
-            x = self.lin2(x)
-            return x, l1 + l2, e1 + e2
+
+            xre = F.relu(self.lin1re(x))
+            xre = self.lin2re(xre)
+
+            xcl = F.relu(self.lin1cl(x))
+            xcl = self.lin2cl(xcl)
+
+            return xre, F.log_softmax(xcl, dim=-1)
+
+    def combined_loss(output_regression, target_regression, output_classification, target_classification):
+        print(f"output_regression shape: {output_regression.shape}")
+        print(f"target_regression shape: {target_regression.shape}")
+        print(f"output_classification shape: {output_classification.shape}")
+        print(f"target_classification shape: {target_classification.shape}")
+        loss_regression = F.mse_loss(output_regression, target_regression)
+        loss_classification = F.cross_entropy(output_classification, target_classification)
+        return loss_regression + loss_classification
 
     def train():
         model.train()
@@ -369,8 +426,10 @@ def main():
         for data in train_loader:
             data.to(device)
             optimizer.zero_grad()
-            out, _, _ = model(data.x, data.adj, data.mask)
-            loss = criterion(out, data.y.view(data.num_nodes.__len__(), 3))
+            out_re, out_cl = model(data.x, data.adj, data.mask)
+            print(f"out_re shape: {out_re.shape}")
+            print(f"out_cl shape: {out_cl.shape}")
+            loss = combined_loss(out_re, data.y_re.view(data.num_nodes.__len__(), 4), out_cl, data.y_cl.argmax(dim=1))
             loss.backward()
             loss_all += loss.item() * data.num_nodes.__len__()
             optimizer.step()
@@ -385,13 +444,27 @@ def main():
 
         for data in loader:
             data.to(device)
-            out, _, _ = model(data.x, data.adj, data.mask)
-            diffs = torch.abs(out - data.y.view(data.num_nodes.__len__(), 3))
+            out_re, _ = model(data.x, data.adj, data.mask)
+            diffs = torch.abs(out_re - data.y_re.view(data.num_nodes.__len__(), 4))
             diffs_all = torch.cat((diffs_all, diffs), dim=0)
 
         print(f"diffs_all length: {len(diffs_all)}; test_loader.dataset length: {len(test_loader.dataset)}; Equal: {len(diffs_all) == len(test_loader.dataset)}")
         mean_diffs = torch.sum(diffs_all, dim=0) / len(test_loader.dataset)
         return mean_diffs.cpu().detach().numpy(), diffs_all.cpu().detach().numpy()
+
+    @torch.no_grad()
+    def test_accu(loader):
+        model.eval()
+        correct = 0
+
+        for data in loader:
+            data = data.to(device)
+            _, out_cl = model(data.x, data.adj, data.mask)
+            pred = out_cl.max(dim=1)[1]
+            correct += pred.eq(data.y_cl.view(-1)).sum().item()
+
+        accuracy = correct / len(loader.dataset)
+        return accuracy
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Training using {device}")
@@ -399,7 +472,6 @@ def main():
     model = DiffPool()
     model = model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-    criterion = torch.nn.MSELoss().to(device)
 
     def shape_check(dataset, max_nodes):
         incorrect_shapes = []  # List to store indices of data elements with incorrect shapes
@@ -407,7 +479,8 @@ def main():
             data = dataset[i]
             # Check the shapes of data.x, data.adj, and data.mask
             if data.x.shape != torch.Size([max_nodes, 3]) or \
-                    data.y.shape != torch.Size([3]) or \
+                    data.y_re.shape != torch.Size([4]) or \
+                    data.y_cl.shape != torch.Size([1]) or \
                     data.adj.shape != torch.Size([max_nodes, max_nodes]) or \
                     data.mask.shape != torch.Size([max_nodes]):
                 incorrect_shapes.append(i)  # Add index to the list if any shape is incorrect
@@ -435,6 +508,7 @@ def main():
 
     test_mean_diffs_history = []
     train_loss_history = []
+    test_accuracy_history = []
     final_test_diffs = []
 
     train_dir = os.path.join(name, task_type, "training")
@@ -449,28 +523,35 @@ def main():
     for epoch in range(1, 100):
         train_loss_all = train()
         test_mean_diffs, test_diffs_all = test_diff(test_loader)
-        print(f'Epoch: {epoch:03d}, Par 1 Mean Diff: {test_mean_diffs[0]:.4f}, Par 2 Mean Diff: {test_mean_diffs[1]:.4f}, Par 3 Mean Diff: {test_mean_diffs[2]:.4f}, Train Loss: {train_loss_all:.4f}')
+        test_accuracy = test_accu(test_loader)
+        test_mean_diffs[2] = test_mean_diffs[2] / beta_n_norm_factor
+        test_mean_diffs[3] = test_mean_diffs[3] / beta_phi_norm_factor
+        print(f'Epoch: {epoch:03d}, Par 1 Mean Diff: {test_mean_diffs[0]:.4f}, Par 2 Mean Diff: {test_mean_diffs[1]:.4f}, Par 3 Mean Diff: {test_mean_diffs[2]:.4f}, Par 4 Mean Diff: {test_mean_diffs[3]:.4f}, Train Loss: {train_loss_all:.4f}')
+        print(f'Epoch: {epoch:03d}, Classification Accuracy: {test_accuracy:.4f}')
 
         # Record the values
         test_mean_diffs_history.append(test_mean_diffs)
         train_loss_history.append(train_loss_all)
+        test_accuracy_history.append(test_accuracy)
         final_test_diffs = test_diffs_all
         print(f"Final test diffs length: {len(final_test_diffs)}")
 
     # After the loop, create a dictionary to hold the data
-    data_dict = {"lambda_diff": [], "mu_diff": [], "cap_diff": []}
+    data_dict = {"lambda_diff": [], "mu_diff": [], "beta_n_diff": [], "beta_phi_diff": []}
     # Iterate through test_mean_diffs_history
     for array in test_mean_diffs_history:
         # It's assumed that the order of elements in the array corresponds to the keys in data_dict
         data_dict["lambda_diff"].append(array[0])
         data_dict["mu_diff"].append(array[1])
-        data_dict["cap_diff"].append(array[2])
+        data_dict["beta_n_diff"].append(array[2])
+        data_dict["beta_phi_diff"].append(array[3])
     data_dict["Epoch"] = list(range(1, 100))
     data_dict["Train_Loss"] = train_loss_history
+    data_dict["Cl_Accuracy"] = test_accuracy_history
 
     # Convert the dictionary to a pandas DataFrame
     model_performance = pd.DataFrame(data_dict)
-    final_differences = pd.DataFrame(final_test_diffs, columns=["lambda_diff", "mu_diff", "cap_diff"])
+    final_differences = pd.DataFrame(final_test_diffs, columns=["lambda_diff", "mu_diff", "beta_n_diff", "beta_phi_diff"])
     # Save the data to a file using pyreadr
     pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_diffpool.rds"), model_performance)
     pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_diffs_diffpool.rds"), final_differences)
