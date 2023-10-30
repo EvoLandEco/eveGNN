@@ -14,10 +14,24 @@ from torch_geometric.data import InMemoryDataset, Data
 from torch_geometric.loader import DenseDataLoader
 from torch_geometric.nn import DenseGCNConv as GCNConv, dense_diff_pool
 
-# Defining a mapping from metric names to category values
+# Global variables
 metric_to_category = {'pd': 0, 'ed': 1, 'nnd': 2}
 beta_n_norm_factor = 100
 beta_phi_norm_factor = 1000
+epoch_number = 100
+
+# Check if metric_to_category is a dictionary with string keys and integer values
+assert isinstance(metric_to_category, dict), "metric_to_category should be a dictionary"
+for key, value in metric_to_category.items():
+    assert isinstance(key, str), "All keys in metric_to_category should be strings"
+    assert isinstance(value, int), "All values in metric_to_category should be integers"
+
+# Check if beta_n_norm_factor and beta_phi_norm_factor are positive integers
+assert isinstance(beta_n_norm_factor, int) and beta_n_norm_factor > 0, "beta_n_norm_factor should be a positive integer"
+assert isinstance(beta_phi_norm_factor, int) and beta_phi_norm_factor > 0, "beta_phi_norm_factor should be a positive integer"
+
+# Check if epoch_number is a positive integer
+assert isinstance(epoch_number, int) and epoch_number > 0, "epoch_number should be a positive integer"
 
 
 def read_table(path):
@@ -514,7 +528,7 @@ def main():
     if not os.path.exists(test_dir):
         os.makedirs(test_dir)
 
-    for epoch in range(1, 100):
+    for epoch in range(1, epoch_number):
         train_loss_all = train()
         test_mean_diffs, test_diffs_all = test_diff(test_loader)
         test_accuracy = test_accu(test_loader)
@@ -530,6 +544,12 @@ def main():
         final_test_diffs = test_diffs_all
         print(f"Final test diffs length: {len(final_test_diffs)}")
 
+    print("Finished training, saving model...")
+    torch.save(model.state_dict(), os.path.join(name, task_type, f"{task_type}_model_diffpool.pt"))
+    print("Model successfully saved to:")
+    print(f"{task_type}_model_diffpool.pt")
+
+    print("Saving training and testing performance...")
     # After the loop, create a dictionary to hold the data
     data_dict = {"lambda_diff": [], "mu_diff": [], "beta_n_diff": [], "beta_phi_diff": []}
     # Iterate through test_mean_diffs_history
@@ -539,18 +559,55 @@ def main():
         data_dict["mu_diff"].append(array[1])
         data_dict["beta_n_diff"].append(array[2])
         data_dict["beta_phi_diff"].append(array[3])
-    data_dict["Epoch"] = list(range(1, 100))
+    data_dict["Epoch"] = list(range(1, epoch_number))
     data_dict["Train_Loss"] = train_loss_history
     data_dict["Cl_Accuracy"] = test_accuracy_history
 
-    # Convert the dictionary to a pandas DataFrame
-    model_performance = pd.DataFrame(data_dict)
-    final_differences = pd.DataFrame(final_test_diffs, columns=["lambda_diff", "mu_diff", "beta_n_diff", "beta_phi_diff"])
-    # Save the data to a file using pyreadr
-    pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_diffpool.rds"), model_performance)
-    pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_diffs_diffpool.rds"), final_differences)
+    def check_col_lengths(input_dict):
+        # Get the lengths of all columns
+        lengths = [len(v) for v in data_dict.values()]
 
-    torch.save(model.state_dict(), os.path.join(name, task_type, f"{task_type}_model_diffpool.pt"))
+        # Check if all lengths are the same
+        if len(set(lengths)) != 1:
+            inconsistent_cols = [key for key, value in data_dict.items() if len(value) != lengths[0]]
+            return False, inconsistent_cols
+        return True, []
+
+    # Convert the dictionary to a pandas DataFrame
+    try:
+        model_performance = pd.DataFrame(data_dict)
+    except Exception as e:
+        consistent, cols = check_col_lengths(data_dict)
+        if not consistent:
+            print("Error due to inconsistent lengths in columns:", ", ".join(cols))
+        else:
+            print("An unknown error occurred:", str(e))
+
+    try:
+        final_differences = pd.DataFrame(final_test_diffs, columns=["lambda_diff", "mu_diff", "beta_n_diff", "beta_phi_diff"])
+    except Exception as e:
+        print("Error occurred while creating the final_differences DataFrame:", str(e))
+
+    # Check if variables exist before saving
+    if 'model_performance' in locals():
+        try:
+            pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_diffpool.rds"), model_performance)
+        except Exception as e:
+            print(f"Error occurred while saving model_performance: {str(e)}")
+    else:
+        print("model_performance has not been assigned!")
+
+    if 'final_differences' in locals():
+        try:
+            pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_diffs_diffpool.rds"), final_differences)
+        except Exception as e:
+            print(f"Error occurred while saving final_differences: {str(e)}")
+    else:
+        print("final_differences has not been assigned!")
+
+    print(f"Successfully saved training and testing performance to files:")
+    print(f"{task_type}_diffpool.rds")
+    print(f"{task_type}_final_diffs_diffpool.rds")
 
 
 if __name__ == '__main__':
