@@ -16,7 +16,9 @@ from torch_geometric.nn import DenseGCNConv as GCNConv, dense_diff_pool
 metric_to_category = {'pd': 0, 'ed': 1, 'nnd': 2}
 beta_n_norm_factor = 100
 beta_phi_norm_factor = 1000
-epoch_number = 100
+epoch_number = 200
+alpha = 0.25  # weight for the regression loss
+beta = 0.75  # weight for the classification loss
 
 # Check if metric_to_category is a dictionary with string keys and integer values
 assert isinstance(metric_to_category, dict), "metric_to_category should be a dictionary"
@@ -30,6 +32,13 @@ assert isinstance(beta_phi_norm_factor, int) and beta_phi_norm_factor > 0, "beta
 
 # Check if epoch_number is a positive integer
 assert isinstance(epoch_number, int) and epoch_number > 0, "epoch_number should be a positive integer"
+
+# Check if alpha and beta are positive floats
+assert isinstance(alpha, float) and alpha > 0, "alpha should be a positive float"
+assert isinstance(beta, float) and beta > 0, "beta should be a positive float"
+
+# Check if alpha + beta = 1
+assert alpha + beta == 1, "alpha + beta should equal 1"
 
 
 def read_table(path):
@@ -420,27 +429,34 @@ def main():
             xcl = F.relu(self.lin1cl(x))
             xcl = self.lin2cl(xcl)
 
-            return xre, F.log_softmax(xcl, dim=-1)
+            return xre, xcl
 
     def combined_loss(output_regression, target_regression, output_classification, target_classification):
         loss_regression = F.mse_loss(output_regression, target_regression)
         loss_classification = F.cross_entropy(output_classification, target_classification)
-        return loss_regression + loss_classification
+        loss_all = alpha * loss_regression + beta * loss_classification
+
+        return loss_all, loss_regression, loss_classification
 
     def train():
         model.train()
 
         loss_all = 0  # Keep track of the loss
+        loss_reg = 0  # Keep track of the regression loss
+        loss_cls = 0  # Keep track of the classification loss
+
         for data in train_loader:
             data.to(device)
             optimizer.zero_grad()
             out_re, out_cl = model(data.x, data.adj, data.mask)
-            loss = combined_loss(out_re, data.y_re.view(data.num_nodes.__len__(), 4), out_cl, data.y_cl.argmax(dim=1))
+            loss, loss_reg, loss_cls = combined_loss(out_re, data.y_re.view(data.num_nodes.__len__(), 4), out_cl, data.y_cl.argmax(dim=1))
             loss.backward()
             loss_all += loss.item() * data.num_nodes.__len__()
+            loss_reg += loss_reg.item() * data.num_nodes.__len__()
+            loss_cls += loss_cls.item() * data.num_nodes.__len__()
             optimizer.step()
 
-        return loss_all / len(train_loader.dataset)
+        return loss_all / len(train_loader.dataset), loss_reg / len(train_loader.dataset), loss_cls / len(train_loader.dataset)
 
     @torch.no_grad()
     def test_diff(loader):
@@ -513,7 +529,9 @@ def main():
     print(model)
 
     test_mean_diffs_history = []
-    train_loss_history = []
+    train_loss_all_history = []
+    train_loss_regression_history = []
+    train_loss_classification_history = []
     test_accuracy_history = []
     final_test_diffs = []
 
@@ -529,17 +547,20 @@ def main():
 
     # Training loop
     for epoch in range(1, epoch_number):
-        train_loss_all = train()
+        train_loss_all, train_loss_reg, train_loss_cls = train()
         test_mean_diffs, test_diffs_all = test_diff(test_loader)
         test_accuracy = test_accu(test_loader)
         test_mean_diffs[2] = test_mean_diffs[2] / beta_n_norm_factor
         test_mean_diffs[3] = test_mean_diffs[3] / beta_phi_norm_factor
-        print(f'Epoch: {epoch:03d}, Par 1 Mean Diff: {test_mean_diffs[0]:.4f}, Par 2 Mean Diff: {test_mean_diffs[1]:.4f}, Par 3 Mean Diff: {test_mean_diffs[2]:.4f}, Par 4 Mean Diff: {test_mean_diffs[3]:.4f}, Train Loss: {train_loss_all:.4f}')
+        print(f'Epoch: {epoch:03d}, Par 1 Mean Diff: {test_mean_diffs[0]:.4f}, Par 2 Mean Diff: {test_mean_diffs[1]:.4f}, Par 3 Mean Diff: {test_mean_diffs[2]:.4f}, Par 4 Mean Diff: {test_mean_diffs[3]:.4f}')
+        print(f'Epoch: {epoch:03d}, Regression Loss: {train_loss_reg:.4f}, Classification Loss: {train_loss_cls:.4f}, Combined Loss: {train_loss_all:.4f}')
         print(f'Epoch: {epoch:03d}, Classification Accuracy: {test_accuracy:.4f}')
 
         # Record the values
         test_mean_diffs_history.append(test_mean_diffs)
-        train_loss_history.append(train_loss_all)
+        train_loss_all_history.append(train_loss_all)
+        train_loss_regression_history.append(train_loss_reg)
+        train_loss_classification_history.append(train_loss_cls)
         test_accuracy_history.append(test_accuracy)
         final_test_diffs = test_diffs_all
         print(f"Final test diffs length: {len(final_test_diffs)}")
@@ -560,7 +581,9 @@ def main():
         data_dict["beta_n_diff"].append(array[2])
         data_dict["beta_phi_diff"].append(array[3])
     data_dict["Epoch"] = list(range(1, epoch_number))
-    data_dict["Train_Loss"] = train_loss_history
+    data_dict["Train_Loss_All"] = train_loss_all_history
+    data_dict["Train_Loss_Regression"] = train_loss_regression_history
+    data_dict["Train_Loss_Classification"] = train_loss_classification_history
     data_dict["Cl_Accuracy"] = test_accuracy_history
 
     def check_col_lengths(data_dict):
