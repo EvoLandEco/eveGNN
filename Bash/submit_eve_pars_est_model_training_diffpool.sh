@@ -5,7 +5,7 @@
 #SBATCH --gpus-per-node=1
 #SBATCH --job-name=gnn_eve_pars_est_diffpool
 #SBATCH --output=logs/gnn_eve_pars_est_diffpool-%j.log
-#SBATCH --mem=32GB
+#SBATCH --mem=64GB
 #SBATCH --partition=gpu
 
 ml Python/3.8.16-GCCcore-11.2.0
