@@ -503,8 +503,8 @@ def main():
     shape_check(training_dataset, max_nodes)
     shape_check(testing_dataset, max_nodes)
 
-    train_loader = DenseDataLoader(training_dataset, batch_size=64, shuffle=False)
-    test_loader = DenseDataLoader(testing_dataset, batch_size=64, shuffle=False)
+    train_loader = DenseDataLoader(training_dataset, batch_size=32, shuffle=False)
+    test_loader = DenseDataLoader(testing_dataset, batch_size=32, shuffle=False)
     print(f"Training dataset length: {len(train_loader.dataset)}")
     print(f"Testing dataset length: {len(test_loader.dataset)}")
     print(train_loader.dataset.transform)
