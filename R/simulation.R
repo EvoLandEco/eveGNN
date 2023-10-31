@@ -18,12 +18,14 @@ randomized_ddd_fixed_la_mu_age <- function(cap_range, la, mu, age, model) {
 
 #' @export randomized_ddd_fixed_age
 randomized_ddd_fixed_age <- function(dists, cap_range, age, model) {
-  params <- generate_params(dists)
-  cap <- sample(cap_range[1]:cap_range[2], 1)
-
+  params <- list()
+  cap <- c()
   ntip <- 0
   result <- list()
+
   while (ntip < 10) {
+    params <- generate_params(dists)
+    cap <- sample(cap_range[1]:cap_range[2], 1)
     result <- dd_sim(c(unlist(params), cap), age = age, ddmodel = model)
     ntip <- result$tes$Nnode + 1
   }
@@ -34,11 +36,12 @@ randomized_ddd_fixed_age <- function(dists, cap_range, age, model) {
 
 #' @export randomized_eve_fixed_age
 randomized_eve_fixed_age <- function(dists, age, model, metric, offset) {
-  params <- generate_params(dists)
-
   ntip <- 0
+  params <- list()
   result <- list()
+
   while (ntip < 10) {
+    params <- generate_params(dists)
     result <- eve::edd_sim(unlist(params), age = age, model = model, metric = metric, offset = offset, history = FALSE)
     ntip <- result$tes$Nnode + 1
   }
