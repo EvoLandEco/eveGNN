@@ -565,14 +565,12 @@ def main():
         print(f'Epoch: {epoch:03d}, Classification Accuracy: {test_accuracy:.4f}')
 
         # Record the values
-        test_mean_diffs = test_mean_diffs.cpu().detach().numpy()
         test_mean_diffs_history.append(test_mean_diffs)
         train_loss_all_history.append(train_loss_all)
         train_loss_regression_history.append(train_loss_reg)
         train_loss_classification_history.append(train_loss_cls)
         test_accuracy_history.append(test_accuracy)
         final_test_diffs = test_diffs_all
-        final_test_diffs = final_test_diffs.cpu().detach().numpy()
         print(f"Final test diffs length: {len(final_test_diffs)}")
 
     print("Finished training, saving model...")
@@ -595,6 +593,12 @@ def main():
     data_dict["Train_Loss_Regression"] = train_loss_regression_history
     data_dict["Train_Loss_Classification"] = train_loss_classification_history
     data_dict["Cl_Accuracy"] = test_accuracy_history
+
+    for key, value in data_dict.items():
+        if torch.is_tensor(value) and value.device.type == 'cuda':
+            data_dict[key] = value.cpu().numpy()
+        elif torch.is_tensor(value):  # if it's on CPU but still a tensor
+            data_dict[key] = value.numpy()
 
     def check_col_lengths(data_dict):
         # Get the lengths of all columns
