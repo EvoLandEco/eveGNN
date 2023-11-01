@@ -591,7 +591,6 @@ def main():
     printed_vars = set()
 
     def move_to_cpu(data, var_name="unknown"):
-        global printed_vars
         if isinstance(data, torch.Tensor) and data.device.type == "cuda":
             if var_name not in printed_vars:
                 print(f"Moving tensor in {var_name} to CPU from:", data.device)
