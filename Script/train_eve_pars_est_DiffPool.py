@@ -588,10 +588,15 @@ def main():
     # After the loop, create a dictionary to hold the data
     data_dict = {"lambda_diff": [], "mu_diff": [], "beta_n_diff": [], "beta_phi_diff": []}
 
+    printed_vars = set()
+
     def move_to_cpu(data, var_name="unknown"):
+        global printed_vars
         if isinstance(data, torch.Tensor) and data.device.type == "cuda":
-            print(f"Moving tensor {var_name} to CPU from:", data.device)
-            return data.cpu()
+            if var_name not in printed_vars:
+                print(f"Moving tensor in {var_name} to CPU from:", data.device)
+                printed_vars.add(var_name)
+            return data.cpu().detach()
         return data
 
     for array in test_mean_diffs_history:
