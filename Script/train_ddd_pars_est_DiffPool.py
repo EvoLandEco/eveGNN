@@ -358,7 +358,11 @@ def main():
             x = self.gnn3_embed(x, adj)
 
             x = x.mean(dim=1)
-            x = F.relu(self.lin1(x))
+
+            x = F.dropout(x, p=0.5, training=self.training)
+            x = self.lin1(x)
+            x = F.relu(x)
+            x = F.dropout(x, p=0.5, training=self.training)
             x = self.lin2(x)
             return x, l1 + l2, e1 + e2
 
