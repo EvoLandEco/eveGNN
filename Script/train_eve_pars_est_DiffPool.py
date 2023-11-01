@@ -610,8 +610,8 @@ def main():
             return False, inconsistent_cols
         return True, []
 
-    #model_performance = pd.DataFrame()
-    #final_differences = pd.DataFrame()
+    model_performance = None
+    final_differences = None
 
     # Convert the dictionary to a pandas DataFrame
     try:
