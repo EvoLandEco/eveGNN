@@ -16,7 +16,7 @@ from torch_geometric.nn import DenseGCNConv as GCNConv, dense_diff_pool
 metric_to_category = {'pd': 0, 'ed': 1, 'nnd': 2}
 beta_n_norm_factor = 100
 beta_phi_norm_factor = 1000
-epoch_number = 10
+epoch_number = 3
 alpha = 0.25  # weight for the regression loss
 beta = 0.75  # weight for the classification loss
 
@@ -423,10 +423,16 @@ def main():
 
             x = x.mean(dim=1)
 
-            xre = F.relu(self.lin1re(x))
+            xre = F.dropout(x, p=0.5, training=self.training)
+            xre = self.lin1re(xre)
+            xre = F.relu(xre)
+            xre = F.dropout(xre, p=0.5, training=self.training)
             xre = self.lin2re(xre)
 
-            xcl = F.relu(self.lin1cl(x))
+            xcl = F.dropout(x, p=0.5, training=self.training)
+            xcl = self.lin1cl(xcl)
+            xcl = F.relu(xcl)
+            xcl = F.dropout(xcl, p=0.5, training=self.training)
             xcl = self.lin2cl(xcl)
 
             return xre, xcl
@@ -581,24 +587,29 @@ def main():
     print("Saving training and testing performance...")
     # After the loop, create a dictionary to hold the data
     data_dict = {"lambda_diff": [], "mu_diff": [], "beta_n_diff": [], "beta_phi_diff": []}
-    # Iterate through test_mean_diffs_history
+
+    def move_to_cpu(data, var_name="unknown"):
+        if isinstance(data, torch.Tensor) and data.device.type == "cuda":
+            print(f"Moving tensor {var_name} to CPU from:", data.device)
+            return data.cpu()
+        return data
+
     for array in test_mean_diffs_history:
+        # Use the helper function to ensure data is on the CPU
+        array = [move_to_cpu(item, var_name=name) for item, name in zip(array, ["lambda_diff", "mu_diff", "beta_n_diff", "beta_phi_diff"])]
+
         # It's assumed that the order of elements in the array corresponds to the keys in data_dict
         data_dict["lambda_diff"].append(array[0])
         data_dict["mu_diff"].append(array[1])
         data_dict["beta_n_diff"].append(array[2])
         data_dict["beta_phi_diff"].append(array[3])
-    data_dict["Epoch"] = list(range(1, epoch_number))
-    data_dict["Train_Loss_All"] = train_loss_all_history
-    data_dict["Train_Loss_Regression"] = train_loss_regression_history
-    data_dict["Train_Loss_Classification"] = train_loss_classification_history
-    data_dict["Cl_Accuracy"] = test_accuracy_history
 
-    for key, value in data_dict.items():
-        if torch.is_tensor(value) and value.device.type == 'cuda':
-            data_dict[key] = value.cpu().numpy()
-        elif torch.is_tensor(value):  # if it's on CPU but still a tensor
-            data_dict[key] = value.numpy()
+    # Similarly, ensure that the other lists are on the CPU before assigning to the dictionary
+    data_dict["Epoch"] = list(range(1, epoch_number))
+    data_dict["Train_Loss_All"] = [move_to_cpu(item, var_name="Train_Loss_All") for item in train_loss_all_history]
+    data_dict["Train_Loss_Regression"] = [move_to_cpu(item, var_name="Train_Loss_Regression") for item in train_loss_regression_history]
+    data_dict["Train_Loss_Classification"] = [move_to_cpu(item, var_name="Train_Loss_Classification") for item in train_loss_classification_history]
+    data_dict["Cl_Accuracy"] = [move_to_cpu(item, var_name="Cl_Accuracy") for item in test_accuracy_history]
 
     def check_col_lengths(data_dict):
         # Get the lengths of all columns
