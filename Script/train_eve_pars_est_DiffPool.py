@@ -16,7 +16,7 @@ from torch_geometric.nn import DenseGCNConv as GCNConv, dense_diff_pool
 metric_to_category = {'pd': 0, 'ed': 1, 'nnd': 2}
 beta_n_norm_factor = 100
 beta_phi_norm_factor = 1000
-epoch_number = 10
+epoch_number = 3
 alpha = 0.25  # weight for the regression loss
 beta = 0.75  # weight for the classification loss
 
@@ -609,6 +609,9 @@ def main():
             inconsistent_cols = [key for key, value in data_dict.items() if len(value) != lengths[0]]
             return False, inconsistent_cols
         return True, []
+
+    model_performance = pd.DataFrame()
+    final_differences = pd.DataFrame()
 
     # Convert the dictionary to a pandas DataFrame
     try:
