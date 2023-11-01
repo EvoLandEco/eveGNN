@@ -16,7 +16,7 @@ from torch_geometric.nn import DenseGCNConv as GCNConv, dense_diff_pool
 metric_to_category = {'pd': 0, 'ed': 1, 'nnd': 2}
 beta_n_norm_factor = 100
 beta_phi_norm_factor = 1000
-epoch_number = 200
+epoch_number = 50
 alpha = 0.25  # weight for the regression loss
 beta = 0.75  # weight for the classification loss
 
@@ -449,14 +449,22 @@ def main():
             data.to(device)
             optimizer.zero_grad()
             out_re, out_cl = model(data.x, data.adj, data.mask)
-            loss, loss_reg, loss_cls = combined_loss(out_re, data.y_re.view(data.num_nodes.__len__(), 4), out_cl, data.y_cl.argmax(dim=1))
+            target_re = data.y_re.view(data.num_nodes.__len__(), 4).to(device)
+            target_cl = data.y_cl.view(-1).to(device)
+            assert out_re.device == target_re.device == out_cl.device == target_cl.device, \
+                "Error: Device mismatch between output and target tensors."
+            loss, loss_reg, loss_cls = combined_loss(out_re, target_re, out_cl, target_cl)
             loss.backward()
             loss_all += loss.item() * data.num_nodes.__len__()
             loss_reg += loss_reg.item() * data.num_nodes.__len__()
             loss_cls += loss_cls.item() * data.num_nodes.__len__()
             optimizer.step()
 
-        return loss_all / len(train_loader.dataset), loss_reg / len(train_loader.dataset), loss_cls / len(train_loader.dataset)
+        out_loss_all = loss_all / len(train_loader.dataset)
+        out_loss_reg = loss_reg / len(train_loader.dataset)
+        out_loss_cls = loss_cls / len(train_loader.dataset)
+
+        return out_loss_all, out_loss_reg, out_loss_cls
 
     @torch.no_grad()
     def test_diff(loader):
@@ -557,12 +565,14 @@ def main():
         print(f'Epoch: {epoch:03d}, Classification Accuracy: {test_accuracy:.4f}')
 
         # Record the values
+        test_mean_diffs = test_mean_diffs.cpu().detach().numpy()
         test_mean_diffs_history.append(test_mean_diffs)
         train_loss_all_history.append(train_loss_all)
         train_loss_regression_history.append(train_loss_reg)
         train_loss_classification_history.append(train_loss_cls)
         test_accuracy_history.append(test_accuracy)
         final_test_diffs = test_diffs_all
+        final_test_diffs = final_test_diffs.cpu().detach().numpy()
         print(f"Final test diffs length: {len(final_test_diffs)}")
 
     print("Finished training, saving model...")
