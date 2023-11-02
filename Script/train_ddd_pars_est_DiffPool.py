@@ -402,7 +402,7 @@ def main():
 
     model = DiffPool()
     model = model.to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.002)
     criterion = torch.nn.MSELoss().to(device)
 
     def shape_check(dataset, max_nodes):
@@ -450,7 +450,7 @@ def main():
     if not os.path.exists(test_dir):
         os.makedirs(test_dir)
 
-    for epoch in range(1, 100):
+    for epoch in range(1, 300):
         train_loss_all = train()
         test_mean_diffs, test_diffs_all = test_diff(test_loader)
         print(f'Epoch: {epoch:03d}, Par 1 Mean Diff: {test_mean_diffs[0]:.4f}, Par 2 Mean Diff: {test_mean_diffs[1]:.4f}, Par 3 Mean Diff: {test_mean_diffs[2]:.4f}, Train Loss: {train_loss_all:.4f}')
@@ -469,7 +469,7 @@ def main():
         data_dict["lambda_diff"].append(array[0])
         data_dict["mu_diff"].append(array[1])
         data_dict["cap_diff"].append(array[2])
-    data_dict["Epoch"] = list(range(1, 100))
+    data_dict["Epoch"] = list(range(1, 300))
     data_dict["Train_Loss"] = train_loss_history
 
     # Convert the dictionary to a pandas DataFrame

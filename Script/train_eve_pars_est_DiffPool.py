@@ -16,7 +16,7 @@ from torch_geometric.nn import DenseGCNConv as GCNConv, dense_diff_pool
 metric_to_category = {'pd': 0, 'ed': 1, 'nnd': 2}
 beta_n_norm_factor = 100
 beta_phi_norm_factor = 1000
-epoch_number = 200
+epoch_number = 300
 alpha = 0.25  # weight for the regression loss
 beta = 0.75  # weight for the classification loss
 
@@ -507,7 +507,7 @@ def main():
 
     model = DiffPool()
     model = model.to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.003)
 
     def shape_check(dataset, max_nodes):
         incorrect_shapes = []  # List to store indices of data elements with incorrect shapes
