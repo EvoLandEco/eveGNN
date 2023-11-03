@@ -17,8 +17,6 @@ metric_to_category = {'pd': 0, 'ed': 1, 'nnd': 2}
 beta_n_norm_factor = 100
 beta_phi_norm_factor = 1000
 epoch_number = 100
-alpha = 0.25  # weight for the regression loss
-beta = 0.75  # weight for the classification loss
 
 # Check if metric_to_category is a dictionary with string keys and integer values
 assert isinstance(metric_to_category, dict), "metric_to_category should be a dictionary"
@@ -32,13 +30,6 @@ assert isinstance(beta_phi_norm_factor, int) and beta_phi_norm_factor > 0, "beta
 
 # Check if epoch_number is a positive integer
 assert isinstance(epoch_number, int) and epoch_number > 0, "epoch_number should be a positive integer"
-
-# Check if alpha and beta are positive floats
-assert isinstance(alpha, float) and alpha > 0, "alpha should be a positive float"
-assert isinstance(beta, float) and beta > 0, "beta should be a positive float"
-
-# Check if alpha + beta = 1
-assert alpha + beta == 1, "alpha + beta should equal 1"
 
 
 def read_table(path):
@@ -256,16 +247,13 @@ def read_rds_to_pytorch(path, count):
 
         params_current = params_list[i]
 
-        params_current_tensor = torch.tensor(params_current[0:4], dtype=torch.float)
-
         class_current_tensor = torch.tensor(params_current[5], dtype=torch.long)
 
         # Create a Data object with the edge index, number of nodes, and category value
         data = Data(x=edge_length_tensor,
                     edge_index=edge_index_tensor,
                     num_nodes=num_nodes,
-                    y_re=params_current_tensor,
-                    y_cl=class_current_tensor)
+                    y=class_current_tensor)
 
         # Append the Data object to the list
         pytorch_geometric_data_list.append(data)
@@ -399,11 +387,6 @@ def main():
             self.gnn2_embed = GNN(64, 64, 64, lin=False)
 
             self.gnn3_embed = GNN(64, 64, 64, lin=False)
-
-            # Layers for regression
-            self.lin1re = torch.nn.Linear(64, 64)
-            self.lin2re = torch.nn.Linear(64, 4)
-
             # Layers for classification
             self.lin1cl = torch.nn.Linear(64, 64)
             self.lin2cl = torch.nn.Linear(64, 3)
@@ -423,54 +406,34 @@ def main():
 
             x = x.mean(dim=1)
 
-            xre = F.dropout(x, p=0.5, training=self.training)
-            xre = self.lin1re(xre)
-            xre = F.relu(xre)
-            xre = F.dropout(xre, p=0.5, training=self.training)
-            xre = self.lin2re(xre)
-
             xcl = F.dropout(x, p=0.5, training=self.training)
             xcl = self.lin1cl(xcl)
             xcl = F.relu(xcl)
             xcl = F.dropout(xcl, p=0.5, training=self.training)
             xcl = self.lin2cl(xcl)
 
-            return xre, xcl
-
-    def combined_loss(output_regression, target_regression, output_classification, target_classification):
-        loss_regression = F.mse_loss(output_regression, target_regression)
-        loss_classification = F.cross_entropy(output_classification, target_classification)
-        loss_all = alpha * loss_regression + beta * loss_classification
-
-        return loss_all, loss_regression, loss_classification
+            return xcl
 
     def train():
         model.train()
 
         loss_all = 0  # Keep track of the loss
-        loss_reg = 0  # Keep track of the regression loss
-        loss_cls = 0  # Keep track of the classification loss
 
         for data in train_loader:
             data.to(device)
             optimizer.zero_grad()
-            out_re, out_cl = model(data.x, data.adj, data.mask)
-            target_re = data.y_re.view(data.num_nodes.__len__(), 4).to(device)
-            target_cl = data.y_cl.view(-1).to(device)
-            assert out_re.device == target_re.device == out_cl.device == target_cl.device, \
+            out_cl = model(data.x, data.adj, data.mask)
+            target_cl = data.y.view(-1).to(device)
+            assert out_cl.device == target_cl.device, \
                 "Error: Device mismatch between output and target tensors."
-            loss, loss_reg, loss_cls = combined_loss(out_re, target_re, out_cl, target_cl)
+            loss = F.cross_entropy(out_cl, target_cl)
             loss.backward()
             loss_all += loss.item() * data.num_nodes.__len__()
-            loss_reg += loss_reg.item() * data.num_nodes.__len__()
-            loss_cls += loss_cls.item() * data.num_nodes.__len__()
             optimizer.step()
 
         out_loss_all = loss_all / len(train_loader.dataset)
-        out_loss_reg = loss_reg / len(train_loader.dataset)
-        out_loss_cls = loss_cls / len(train_loader.dataset)
 
-        return out_loss_all, out_loss_reg, out_loss_cls
+        return out_loss_all
 
     @torch.no_grad()
     def test_diff(loader):
@@ -497,7 +460,7 @@ def main():
             data = data.to(device)
             _, out_cl = model(data.x, data.adj, data.mask)
             pred = out_cl.max(dim=1)[1]
-            correct += pred.eq(data.y_cl.view(-1)).sum().item()
+            correct += pred.eq(data.y.view(-1)).sum().item()
 
         accuracy = correct / len(loader.dataset)
         return accuracy
@@ -507,7 +470,7 @@ def main():
 
     model = DiffPool()
     model = model.to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.003)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
     def shape_check(dataset, max_nodes):
         incorrect_shapes = []  # List to store indices of data elements with incorrect shapes
@@ -515,8 +478,7 @@ def main():
             data = dataset[i]
             # Check the shapes of data.x, data.adj, and data.mask
             if data.x.shape != torch.Size([max_nodes, 3]) or \
-                    data.y_re.shape != torch.Size([4]) or \
-                    data.y_cl.shape != torch.Size([1]) or \
+                    data.y.shape != torch.Size([1]) or \
                     data.adj.shape != torch.Size([max_nodes, max_nodes]) or \
                     data.mask.shape != torch.Size([max_nodes]):
                 incorrect_shapes.append(i)  # Add index to the list if any shape is incorrect
@@ -544,8 +506,6 @@ def main():
 
     test_mean_diffs_history = []
     train_loss_all_history = []
-    train_loss_regression_history = []
-    train_loss_classification_history = []
     test_accuracy_history = []
     final_test_diffs = []
 
@@ -561,26 +521,18 @@ def main():
 
     # Training loop
     for epoch in range(1, epoch_number):
-        train_loss_all, train_loss_reg, train_loss_cls = train()
-        test_mean_diffs, test_diffs_all = test_diff(test_loader)
+        train_loss_all = train()
         test_accuracy = test_accu(test_loader)
-        test_mean_diffs[2] = test_mean_diffs[2] / beta_n_norm_factor
-        test_mean_diffs[3] = test_mean_diffs[3] / beta_phi_norm_factor
-        print(f'Epoch: {epoch:03d}, Par 1 Mean Diff: {test_mean_diffs[0]:.4f}, Par 2 Mean Diff: {test_mean_diffs[1]:.4f}, Par 3 Mean Diff: {test_mean_diffs[2]:.4f}, Par 4 Mean Diff: {test_mean_diffs[3]:.4f}')
-        print(f'Epoch: {epoch:03d}, Regression Loss: {train_loss_reg:.4f}, Classification Loss: {train_loss_cls:.4f}, Combined Loss: {train_loss_all:.4f}')
+        print(f'Epoch: {epoch:03d}, Training Loss: {train_loss_all:.4f}')
         print(f'Epoch: {epoch:03d}, Classification Accuracy: {test_accuracy:.4f}')
 
         # Record the values
-        test_mean_diffs_history.append(test_mean_diffs)
         train_loss_all_history.append(train_loss_all)
-        train_loss_regression_history.append(train_loss_reg)
-        train_loss_classification_history.append(train_loss_cls)
         test_accuracy_history.append(test_accuracy)
-        final_test_diffs = test_diffs_all
         print(f"Final test diffs length: {len(final_test_diffs)}")
 
     print("Finished training, saving model...")
-    torch.save(model.state_dict(), os.path.join(name, task_type, f"{task_type}_model_diffpool.pt"))
+    torch.save(model.state_dict(), os.path.join(name, task_type, f"{task_type}_model_diffpool_cls.pt"))
     print("Model successfully saved to:")
     print(f"{task_type}_model_diffpool.pt")
 
@@ -611,8 +563,6 @@ def main():
     # Similarly, ensure that the other lists are on the CPU before assigning to the dictionary
     data_dict["Epoch"] = list(range(1, epoch_number))
     data_dict["Train_Loss_All"] = [move_to_cpu(item, var_name="Train_Loss_All") for item in train_loss_all_history]
-    data_dict["Train_Loss_Regression"] = [move_to_cpu(item, var_name="Train_Loss_Regression") for item in train_loss_regression_history]
-    data_dict["Train_Loss_Classification"] = [move_to_cpu(item, var_name="Train_Loss_Classification") for item in train_loss_classification_history]
     data_dict["Cl_Accuracy"] = [move_to_cpu(item, var_name="Cl_Accuracy") for item in test_accuracy_history]
 
     def check_col_lengths(data_dict):
@@ -646,7 +596,7 @@ def main():
     # Check if variables exist before saving
     if 'model_performance' in locals():
         try:
-            pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_diffpool.rds"), model_performance)
+            pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_diffpool_cls.rds"), model_performance)
             print(f"Successfully saved training and testing performance to files:")
             print(f"{task_type}_diffpool.rds")
         except Exception as e:
@@ -656,7 +606,7 @@ def main():
 
     if 'final_differences' in locals():
         try:
-            pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_diffs_diffpool.rds"), final_differences)
+            pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_diffs_diffpool_cls.rds"), final_differences)
             print(f"Successfully saved final mean differences to files:")
             print(f"{task_type}_final_diffs_diffpool.rds")
         except Exception as e:
