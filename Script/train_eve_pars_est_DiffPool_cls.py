@@ -442,7 +442,7 @@ def main():
 
         for data in loader:
             data = data.to(device)
-            _, out_cl = model(data.x, data.adj, data.mask)
+            out_cl = model(data.x, data.adj, data.mask)
             pred = out_cl.max(dim=1)[1]
             correct += pred.eq(data.y.view(-1)).sum().item()
 
