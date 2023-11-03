@@ -436,22 +436,6 @@ def main():
         return out_loss_all
 
     @torch.no_grad()
-    def test_diff(loader):
-        model.eval()
-
-        diffs_all = torch.tensor([], dtype=torch.float, device=device)
-
-        for data in loader:
-            data.to(device)
-            out_re, _ = model(data.x, data.adj, data.mask)
-            diffs = torch.abs(out_re - data.y_re.view(data.num_nodes.__len__(), 4))
-            diffs_all = torch.cat((diffs_all, diffs), dim=0)
-
-        print(f"diffs_all length: {len(diffs_all)}; test_loader.dataset length: {len(test_loader.dataset)}; Equal: {len(diffs_all) == len(test_loader.dataset)}")
-        mean_diffs = torch.sum(diffs_all, dim=0) / len(test_loader.dataset)
-        return mean_diffs.cpu().detach().numpy(), diffs_all.cpu().detach().numpy()
-
-    @torch.no_grad()
     def test_accu(loader):
         model.eval()
         correct = 0
@@ -504,10 +488,8 @@ def main():
 
     print(model)
 
-    test_mean_diffs_history = []
     train_loss_all_history = []
     test_accuracy_history = []
-    final_test_diffs = []
 
     # Paths for saving embeddings
     train_dir = os.path.join(name, task_type, "training")
@@ -529,16 +511,15 @@ def main():
         # Record the values
         train_loss_all_history.append(train_loss_all)
         test_accuracy_history.append(test_accuracy)
-        print(f"Final test diffs length: {len(final_test_diffs)}")
 
     print("Finished training, saving model...")
     torch.save(model.state_dict(), os.path.join(name, task_type, f"{task_type}_model_diffpool_cls.pt"))
     print("Model successfully saved to:")
-    print(f"{task_type}_model_diffpool.pt")
+    print(f"{task_type}_model_diffpool_cls.pt")
 
     print("Saving training and testing performance...")
     # After the loop, create a dictionary to hold the data
-    data_dict = {"lambda_diff": [], "mu_diff": [], "beta_n_diff": [], "beta_phi_diff": []}
+    data_dict = {}
 
     printed_vars = set()
 
@@ -549,16 +530,6 @@ def main():
                 printed_vars.add(var_name)
             return data.cpu().detach()
         return data
-
-    for array in test_mean_diffs_history:
-        # Use the helper function to ensure data is on the CPU
-        array = [move_to_cpu(item, var_name=name) for item, name in zip(array, ["lambda_diff", "mu_diff", "beta_n_diff", "beta_phi_diff"])]
-
-        # It's assumed that the order of elements in the array corresponds to the keys in data_dict
-        data_dict["lambda_diff"].append(array[0])
-        data_dict["mu_diff"].append(array[1])
-        data_dict["beta_n_diff"].append(array[2])
-        data_dict["beta_phi_diff"].append(array[3])
 
     # Similarly, ensure that the other lists are on the CPU before assigning to the dictionary
     data_dict["Epoch"] = list(range(1, epoch_number))
@@ -576,7 +547,6 @@ def main():
         return True, []
 
     model_performance = None
-    final_differences = None
 
     # Convert the dictionary to a pandas DataFrame
     try:
@@ -588,31 +558,16 @@ def main():
         else:
             print("An unknown error occurred:", str(e))
 
-    try:
-        final_differences = pd.DataFrame(final_test_diffs, columns=["lambda_diff", "mu_diff", "beta_n_diff", "beta_phi_diff"])
-    except Exception as e:
-        print("Error occurred while creating the final_differences DataFrame:", str(e))
-
     # Check if variables exist before saving
     if 'model_performance' in locals():
         try:
             pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_diffpool_cls.rds"), model_performance)
             print(f"Successfully saved training and testing performance to files:")
-            print(f"{task_type}_diffpool.rds")
+            print(f"{task_type}_diffpool_cls.rds")
         except Exception as e:
             print(f"Error occurred while saving model_performance: {str(e)}")
     else:
         print("model_performance has not been assigned!")
-
-    if 'final_differences' in locals():
-        try:
-            pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_diffs_diffpool_cls.rds"), final_differences)
-            print(f"Successfully saved final mean differences to files:")
-            print(f"{task_type}_final_diffs_diffpool.rds")
-        except Exception as e:
-            print(f"Error occurred while saving final_differences: {str(e)}")
-    else:
-        print("final_differences has not been assigned!")
 
 
 if __name__ == '__main__':
