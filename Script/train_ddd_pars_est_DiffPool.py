@@ -336,12 +336,12 @@ def main():
             self.gnn1_embed = GNN(training_dataset.num_node_features, 128, 128)
 
             num_nodes = ceil(0.25 * num_nodes)
-            self.gnn2_pool = GNN(64, 64, num_nodes)
-            self.gnn2_embed = GNN(64, 64, 64, lin=False)
+            self.gnn2_pool = GNN(128, 128, num_nodes)
+            self.gnn2_embed = GNN(128, 128, 64, lin=False)
 
             self.gnn3_embed = GNN(64, 64, 64, lin=False)
 
-            self.lin1 = torch.nn.Linear(64, 64)
+            self.lin1 = torch.nn.Linear(64, 32)
             self.lin2 = torch.nn.Linear(32, 3)
 
         def forward(self, x, adj, mask=None):
