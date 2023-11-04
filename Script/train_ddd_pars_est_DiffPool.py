@@ -332,8 +332,8 @@ def main():
             super(DiffPool, self).__init__()
 
             num_nodes = ceil(0.25 * max_nodes)
-            self.gnn1_pool = GNN(training_dataset.num_node_features, 64, num_nodes)
-            self.gnn1_embed = GNN(training_dataset.num_node_features, 64, 64)
+            self.gnn1_pool = GNN(training_dataset.num_node_features, 128, num_nodes)
+            self.gnn1_embed = GNN(training_dataset.num_node_features, 128, 128)
 
             num_nodes = ceil(0.25 * num_nodes)
             self.gnn2_pool = GNN(64, 64, num_nodes)
@@ -342,7 +342,7 @@ def main():
             self.gnn3_embed = GNN(64, 64, 64, lin=False)
 
             self.lin1 = torch.nn.Linear(64, 64)
-            self.lin2 = torch.nn.Linear(64, 3)
+            self.lin2 = torch.nn.Linear(32, 3)
 
         def forward(self, x, adj, mask=None):
             s = self.gnn1_pool(x, adj, mask)
@@ -402,7 +402,7 @@ def main():
 
     model = DiffPool()
     model = model.to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     criterion = torch.nn.MSELoss().to(device)
 
     def shape_check(dataset, max_nodes):
@@ -450,7 +450,7 @@ def main():
     if not os.path.exists(test_dir):
         os.makedirs(test_dir)
 
-    for epoch in range(1, 300):
+    for epoch in range(1, 100):
         train_loss_all = train()
         test_mean_diffs, test_diffs_all = test_diff(test_loader)
         print(f'Epoch: {epoch:03d}, Par 1 Mean Diff: {test_mean_diffs[0]:.4f}, Par 2 Mean Diff: {test_mean_diffs[1]:.4f}, Par 3 Mean Diff: {test_mean_diffs[2]:.4f}, Train Loss: {train_loss_all:.4f}')
@@ -469,7 +469,7 @@ def main():
         data_dict["lambda_diff"].append(array[0])
         data_dict["mu_diff"].append(array[1])
         data_dict["cap_diff"].append(array[2])
-    data_dict["Epoch"] = list(range(1, 300))
+    data_dict["Epoch"] = list(range(1, 100))
     data_dict["Train_Loss"] = train_loss_history
 
     # Convert the dictionary to a pandas DataFrame
