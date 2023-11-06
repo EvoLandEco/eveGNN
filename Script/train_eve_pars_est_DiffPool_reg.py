@@ -379,18 +379,18 @@ def main():
             super(DiffPool, self).__init__()
 
             num_nodes = ceil(0.25 * max_nodes)
-            self.gnn1_pool = GNN(training_dataset.num_node_features, 64, num_nodes)
-            self.gnn1_embed = GNN(training_dataset.num_node_features, 64, 64)
+            self.gnn1_pool = GNN(training_dataset.num_node_features, 256, num_nodes)
+            self.gnn1_embed = GNN(training_dataset.num_node_features, 256, 256)
 
             num_nodes = ceil(0.25 * num_nodes)
-            self.gnn2_pool = GNN(64, 64, num_nodes)
-            self.gnn2_embed = GNN(64, 64, 64, lin=False)
+            self.gnn2_pool = GNN(256, 256, num_nodes)
+            self.gnn2_embed = GNN(256, 128, 128, lin=False)
 
-            self.gnn3_embed = GNN(64, 64, 64, lin=False)
+            self.gnn3_embed = GNN(128, 64, 64, lin=False)
 
             # Layers for regression
-            self.lin1re = torch.nn.Linear(64, 64)
-            self.lin2re = torch.nn.Linear(64, 4)
+            self.lin1 = torch.nn.Linear(64, 32)
+            self.lin2 = torch.nn.Linear(32, 4)
 
         def forward(self, x, adj, mask=None):
             s = self.gnn1_pool(x, adj, mask)
@@ -408,10 +408,10 @@ def main():
             x = x.mean(dim=1)
 
             xre = F.dropout(x, p=0.5, training=self.training)
-            xre = self.lin1re(xre)
+            xre = self.lin1(xre)
             xre = F.relu(xre)
             xre = F.dropout(xre, p=0.5, training=self.training)
-            xre = self.lin2re(xre)
+            xre = self.lin2(xre)
 
             return xre
 
