@@ -84,24 +84,29 @@ compute_accuracy_dd_ml_free <- function(dist_info, cap_range, data, strategy = "
   diffs <- furrr::future_map(.x = seq_along(data$brts),
                              .f = function(i) {
                                ml <- DDD::dd_ML(
-                                   brts = data$brts[[i]],
-                                   initparsopt = c(mean_pars, mean_cap),
-                                   idparsopt = c(1, 2, 3),
-                                   btorph = 0,
-                                   soc = 2,
-                                   cond = 0,
-                                   ddmodel = 1,
-                                   num_cycles = 1
-                                 )
+                                 brts = data$brts[[i]],
+                                 initparsopt = c(mean_pars, mean_cap),
+                                 idparsopt = c(1, 2, 3),
+                                 btorph = 0,
+                                 soc = 2,
+                                 cond = 0,
+                                 ddmodel = 1,
+                                 num_cycles = 1
+                               )
                                # If an error occurred, ml will be NA and we return NA right away.
-                               if (length(ml) == 1) {
-                                 if (is.na(ml)) {
-                                   return(NA)
-                                 }
+                               if (length(ml) == 1 && is.na(ml)) {
+                                 return(NA)
                                }
                                # If no error occurred, proceed as before.
                                names(ml) <- NULL
-                               eveGNN::all_differences(as.numeric(ml[1:3]), data$pars[[i]])
+                               differences <- eveGNN::all_differences(as.numeric(ml[1:3]), data$pars[[i]])
+
+                               # Save the differences to an RDS file with a timestamp-based filename
+                               timestamp <- format(Sys.time(), "%Y%m%d%H%M%S")
+                               filename <- paste0("differences_", i, "_", timestamp, ".rds")
+                               saveRDS(differences, file = filename)
+
+                               return(differences)
                              })
   return(diffs)
 }
