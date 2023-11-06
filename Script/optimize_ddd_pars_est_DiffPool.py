@@ -330,8 +330,8 @@ def main():
         def __init__(self, trial):
             super(DiffPool, self).__init__()
 
-            diff_ratio = trial.suggest_uniform("diff_ratio", 0.1, 0.5)
-            drop_ratio = trial.suggest_uniform("drop_ratio", 0.1, 0.5)
+            diff_ratio = trial.suggest_float("diff_ratio", 0.1, 0.5)
+            drop_ratio = trial.suggest_float("drop_ratio", 0.1, 0.5)
 
             num_nodes = ceil(diff_ratio * max_nodes)
             self.gnn1_pool = GNN(training_dataset.num_node_features, 256, num_nodes)
@@ -371,11 +371,11 @@ def main():
             x = self.lin2(x)
             return x, l1 + l2, e1 + e2
 
-    def train():
+    def train(model, optimizer, criterion, loader):
         model.train()
 
         loss_all = 0  # Keep track of the loss
-        for data in train_loader:
+        for data in loader:
             data.to(device)
             optimizer.zero_grad()
             out, _, _ = model(data.x, data.adj, data.mask)
@@ -384,10 +384,10 @@ def main():
             loss_all += loss.item() * data.num_nodes.__len__()
             optimizer.step()
 
-        return loss_all / len(train_loader.dataset)
+        return loss_all / len(loader.dataset)
 
     @torch.no_grad()
-    def test_diff(loader):
+    def test_diff(model, loader):
         model.eval()
 
         diffs_all = torch.tensor([], dtype=torch.float, device=device)
@@ -404,8 +404,6 @@ def main():
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Training using {device}")
-
-    criterion = torch.nn.MSELoss().to(device)
 
     def shape_check(dataset, max_nodes):
         incorrect_shapes = []  # List to store indices of data elements with incorrect shapes
@@ -438,20 +436,17 @@ def main():
     print(test_loader.dataset.transform)
 
     def objective(trial):
-        tr_dataset = training_dataset
         tr_loader = train_loader
-
-        vl_dataset = testing_dataset
         vl_loader = test_loader
         model = DiffPool(trial).to(device)
-
         optimizer = torch.optim.Adam(
             model.parameters(), trial.suggest_float("lr", 1e-5, 1e-1, log=True)
         )
+        criterion = torch.nn.MSELoss().to(device)
 
         for epoch in range(20):
-            train()
-            diffs, _ = test_diff()
+            train(model, optimizer, criterion, tr_loader)
+            diffs, _ = test_diff(model, vl_loader)
             lambda_diff = diffs[0]
             mu_diff = diffs[1]
             cap_diff = diffs[2]
