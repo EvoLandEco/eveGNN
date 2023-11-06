@@ -424,7 +424,7 @@ def main():
             data.to(device)
             optimizer.zero_grad()
             out_re = model(data.x, data.adj, data.mask)
-            target_re = data.y_re.view(data.num_nodes.__len__(), 4).to(device)
+            target_re = data.y.view(data.num_nodes.__len__(), 4).to(device)
             assert out_re.device == target_re.device, \
                 "Error: Device mismatch between output and target tensors."
             loss = F.mse_loss(out_re, target_re)
