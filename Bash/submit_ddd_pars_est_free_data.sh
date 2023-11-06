@@ -5,7 +5,7 @@
 #SBATCH --cpus-per-task=16
 #SBATCH --job-name=gnn_ddd_pars_free
 #SBATCH --output=logs/gnn_ddd_pars_free-%j.log
-#SBATCH --mem=32GB
+#SBATCH --mem=64GB
 #SBATCH --partition=regular
 
 name=${1}
