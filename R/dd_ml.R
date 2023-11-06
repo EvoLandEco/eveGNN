@@ -103,7 +103,7 @@ compute_accuracy_dd_ml_free <- function(dist_info, cap_range, data, strategy = "
 
                                # Save the differences to an RDS file with a timestamp-based filename
                                timestamp <- format(Sys.time(), "%Y%m%d%H%M%S")
-                               filename <- paste0("differences_", i, "_", timestamp, ".rds")
+                               filename <- paste0("differences_", timestamp, ".rds")
                                saveRDS(differences, file = filename)
 
                                return(differences)
