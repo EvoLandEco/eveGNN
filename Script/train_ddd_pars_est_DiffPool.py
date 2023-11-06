@@ -402,7 +402,7 @@ def main():
 
     model = DiffPool()
     model = model.to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
     criterion = torch.nn.MSELoss().to(device)
 
     def shape_check(dataset, max_nodes):
