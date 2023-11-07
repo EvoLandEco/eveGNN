@@ -592,6 +592,16 @@ def main():
     else:
         print("model_performance has not been assigned!")
 
+    if 'final_differences' in locals():
+        try:
+            pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_diffs_diffpool_reg.rds"), final_differences)
+            print(f"Successfully saved final mean differences to files:")
+            print(f"{task_type}_final_diffs_diffpool_reg.rds")
+        except Exception as e:
+            print(f"Error occurred while saving final_differences: {str(e)}")
+    else:
+        print("final_differences has not been assigned!")
+
 
 if __name__ == '__main__':
     main()
