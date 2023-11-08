@@ -8,6 +8,8 @@ import functools
 import torch_geometric.transforms as T
 import torch.nn.functional as F
 import optuna
+from optuna.study import Study
+from optuna.trial import FrozenTrial
 from math import ceil
 from torch_geometric.data import InMemoryDataset, Data
 from torch_geometric.loader import DenseDataLoader
@@ -456,11 +458,8 @@ def main():
     study = optuna.create_study(directions=["minimize", "minimize", "minimize"])
     study.optimize(objective, timeout=86400, gc_after_trial=True)
     print("Number of finished trials: ", len(study.trials))
-    print("Best params: ", study.best_params)
-    print("Best value: ", study.best_value)
-    print("Best Trial: ", study.best_trial)
-    print("Trials: ", study.trials)
     trials_df = study.trials_dataframe()
+    print("Saving trials dataframe to RDS...")
     pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_diffpool_trials.rds"), trials_df)
 
 
