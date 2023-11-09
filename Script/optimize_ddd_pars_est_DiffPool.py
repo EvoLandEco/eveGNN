@@ -456,11 +456,13 @@ def main():
             return lambda_diff, mu_diff, cap_diff
 
     study = optuna.create_study(directions=["minimize", "minimize", "minimize"])
-    study.optimize(objective, timeout=86400, gc_after_trial=True)
+    study.optimize(objective, timeout=172800, gc_after_trial=True)
     print("Number of finished trials: ", len(study.trials))
     trials_df = study.trials_dataframe()
-    print("Saving trials dataframe to RDS...")
-    pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_diffpool_trials.rds"), trials_df)
+    print("Saving trials dataframe to CSV...")
+    trials_df.to_csv(os.path.join(name, task_type, f"{task_type}_diffpool_trials.rds"), index=False)
+    print("Successfully saved trials dataframe to CSV at the following path:")
+    print(os.path.join(name, task_type, f"{task_type}_diffpool_trials.rds"))
 
 
 if __name__ == '__main__':
