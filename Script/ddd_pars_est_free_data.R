@@ -31,7 +31,7 @@ ddd_free_tes_list <- purrr::transpose(ddd_free_tes_list)
 
 eveGNN::export_to_gnn_with_params(ddd_free_tes_list, "tes", undirected = TRUE)
 
-ddd_free_tes_list_test <- eveGNN::get_test_data(ddd_free_tes_list, 0.0025)
+ddd_free_tes_list_test <- eveGNN::get_test_data(ddd_free_tes_list, 0.005)
 
 if (!dir.exists("MLE")) {
   dir.create("MLE")
