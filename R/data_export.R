@@ -1,5 +1,5 @@
 #' @export export_to_gnn
-export_to_gnn <- function(data, name, which = "tas") {
+export_to_gnn <- function(data, name, which = "tas", undirected = FALSE) {
   path <- file.path(paste0("set_", name), "GNN/tree/")
   path_EL <- file.path(paste0("set_", name), "GNN/tree/EL/")
   eve:::check_path(path)
@@ -8,7 +8,7 @@ export_to_gnn <- function(data, name, which = "tas") {
   if (which == "tas") {
     for (i in seq_along(data$tas)) {
       file_name <- paste0(path, "/tree_", i, ".rds")
-      saveRDS(data$tas[[i]]$edge - 1, file = file_name)
+      saveRDS(tree_to_connectivity(data$tas[[i]], undirected = undirected), file = file_name)
     }
     for (i in seq_along(data$tas)) {
       file_name <- paste0(path_EL, "/EL_", i, ".rds")
@@ -17,7 +17,7 @@ export_to_gnn <- function(data, name, which = "tas") {
   } else if (which == "tes") {
     for (i in seq_along(data$tes)) {
       file_name <- paste0(path, "/tree_", i, ".rds")
-      saveRDS(data$tes[[i]]$edge - 1, file = file_name)
+      saveRDS(tree_to_connectivity(data$tes[[i]], undirected = undirected), file = file_name)
     }
     for (i in seq_along(data$tes)) {
       file_name <- paste0(path_EL, "/EL_", i, ".rds")
@@ -28,7 +28,7 @@ export_to_gnn <- function(data, name, which = "tas") {
 
 
 #' @export export_to_gnn_with_params
-export_to_gnn_with_params <- function(data, which = "tas") {
+export_to_gnn_with_params <- function(data, which = "tas", undirected = FALSE) {
   path <- file.path("GNN/tree/")
   path_EL <- file.path("GNN/tree/EL/")
   eve:::check_path(path)
@@ -41,7 +41,7 @@ export_to_gnn_with_params <- function(data, which = "tas") {
       cap <- data$pars[[i]][3]
       age <- data$age[[i]]
       file_name <- paste0(path, "/tree_", la, "_", mu, "_", cap, "_", age, "_", i, ".rds")
-      saveRDS(data$tas[[i]]$edge - 1, file = file_name)
+      saveRDS(tree_to_connectivity(data$tas[[i]], undirected = undirected), file = file_name)
     }
     for (i in seq_along(data$tas)) {
       la <- data$pars[[i]][1]
@@ -58,7 +58,7 @@ export_to_gnn_with_params <- function(data, which = "tas") {
       cap <- data$pars[[i]][3]
       age <- data$age[[i]]
       file_name <- paste0(path, "/tree_", la, "_", mu, "_", cap, "_", age, "_", i, ".rds")
-      saveRDS(data$tes[[i]]$edge - 1, file = file_name)
+      saveRDS(tree_to_connectivity(data$tes[[i]], undirected = undirected), file = file_name)
     }
     for (i in seq_along(data$tes)) {
       la <- data$pars[[i]][1]
@@ -73,7 +73,7 @@ export_to_gnn_with_params <- function(data, which = "tas") {
 
 
 #' @export export_to_gnn_with_params_eve
-export_to_gnn_with_params_eve <- function(data, which = "tas") {
+export_to_gnn_with_params_eve <- function(data, which = "tas", undirected = FALSE) {
   path <- file.path("GNN/tree/")
   path_EL <- file.path("GNN/tree/EL/")
   eve:::check_path(path)
@@ -88,7 +88,7 @@ export_to_gnn_with_params_eve <- function(data, which = "tas") {
       age <- data$age[[i]]
       metric <- data$metric[[i]]
       file_name <- paste0(path, "/tree_", la, "_", mu, "_", beta_n, "_", beta_phi, "_", age, "_", metric, "_", i, ".rds")
-      saveRDS(data$tas[[i]]$edge - 1, file = file_name)
+      saveRDS(tree_to_connectivity(data$tas[[i]], undirected = undirected), file = file_name)
     }
     for (i in seq_along(data$tas)) {
       la <- data$pars[[i]][1]
@@ -109,7 +109,7 @@ export_to_gnn_with_params_eve <- function(data, which = "tas") {
       age <- data$age[[i]]
       metric <- data$metric[[i]]
       file_name <- paste0(path, "/tree_", la, "_", mu, "_", beta_n, "_", beta_phi, "_", age, "_", metric, "_", i, ".rds")
-      saveRDS(data$tes[[i]]$edge - 1, file = file_name)
+      saveRDS(tree_to_connectivity(data$tes[[i]], undirected = undirected), file = file_name)
     }
     for (i in seq_along(data$tes)) {
       la <- data$pars[[i]][1]
@@ -126,7 +126,7 @@ export_to_gnn_with_params_eve <- function(data, which = "tas") {
 
 
 #' @export export_to_gnn_batch
-export_to_gnn_batch <- function(data, name, batch, batch_size, which = "tas") {
+export_to_gnn_batch <- function(data, name, batch, batch_size, which = "tas", undirected = FALSE) {
   path <- file.path(paste0("set_", name), "GNN/tree/")
   path_EL <- file.path(paste0("set_", name), "GNN/tree/EL/")
   eve:::check_path(path)
@@ -135,7 +135,7 @@ export_to_gnn_batch <- function(data, name, batch, batch_size, which = "tas") {
   if (which == "tas") {
     for (i in seq_along(data$tas)) {
       file_name <- paste0(path, "/tree_", (batch - 1) * batch_size + i, ".rds")
-      saveRDS(data$tas[[i]]$edge - 1, file = file_name)
+      saveRDS(tree_to_connectivity(data$tas[[i]], undirected = undirected), file = file_name)
     }
     for (i in seq_along(data$tas)) {
       file_name <- paste0(path_EL, "/EL_", (batch - 1) * batch_size + i, ".rds")
@@ -144,7 +144,7 @@ export_to_gnn_batch <- function(data, name, batch, batch_size, which = "tas") {
   } else if (which == "tes") {
     for (i in seq_along(data$tes)) {
       file_name <- paste0(path, "/tree_", (batch - 1) * batch_size + i, ".rds")
-      saveRDS(data$tes[[i]]$edge - 1, file = file_name)
+      saveRDS(tree_to_connectivity(data$tes[[i]], undirected = undirected), file = file_name)
     }
     for (i in seq_along(data$tes)) {
       file_name <- paste0(path_EL, "/EL_", (batch - 1) * batch_size + i, ".rds")
@@ -240,3 +240,15 @@ tree_to_adj_mat <- function(tree) {
   return(neighbor_matrix)
 }
 
+
+#' @export tree_to_connectivity
+tree_to_connectivity <- function(tree, undirected = FALSE) {
+  if (undirected) {
+    part_a <- tree$edge - 1
+    part_b <- cbind(part_a[, 2], part_a[, 1])
+    part_ab <- rbind(part_a, part_b)
+    return(part_ab)
+  } else {
+    return(tree$edge - 1)
+  }
+}
