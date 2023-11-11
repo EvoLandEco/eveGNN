@@ -41,5 +41,3 @@ setwd("MLE")
 
 mean_diffs <- eveGNN::compute_accuracy_dd_ml_free(dists, cap_range, ddd_free_tes_list_test, strategy = "multicore", workers = 16)
 saveRDS(mean_diffs, "mean_diffs_DDD_FREE_TES.rds")
-
-identical(ddd_free_tes_list$tes[[1]]$edge - 1, tree_to_connectivity(ddd_free_tes_list$tes[[1]]))
