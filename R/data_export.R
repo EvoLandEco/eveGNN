@@ -226,10 +226,10 @@ tree_to_adj_mat <- function(tree) {
 
   padded_dists <- lapply(neighbor_dists, function(x) {
     if (length(x) == 1) {
-      x <- c(x, 0, 0)  # Add two zeros if length is 1
+      x <- c(x, 0, 0)  # Add two zeros after if length is 1
     }
     if (length(x) == 2) {
-      x <- c(x, 0)  # Add one zeros if length is 2
+      x <- c(0, x)  # Add one zero before if length is 2
     }
     return(x)
   })
