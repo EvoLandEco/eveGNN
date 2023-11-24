@@ -325,12 +325,12 @@ def main():
 
             num_nodes = ceil(0.25 * num_nodes)
             self.gnn2_pool = GNN(256, 256, num_nodes)
-            self.gnn2_embed = GNN(256, 256, 256, lin=False)
+            self.gnn2_embed = GNN(256, 128, 128, lin=False)
 
-            self.gnn3_embed = GNN(256, 128, 128, lin=False)
+            self.gnn3_embed = GNN(128, 64, 64, lin=False)
 
-            self.lin1 = torch.nn.Linear(128, 64)
-            self.lin2 = torch.nn.Linear(64, 3)
+            self.lin1 = torch.nn.Linear(64, 32)
+            self.lin2 = torch.nn.Linear(32, 3)
 
         def forward(self, x, adj, mask=None):
             s = self.gnn1_pool(x, adj, mask)
