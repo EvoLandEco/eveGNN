@@ -379,28 +379,6 @@ def main():
 
     model = model.to(device)
 
-    def shape_check(dataset, max_nodes):
-        incorrect_shapes = []  # List to store indices of data elements with incorrect shapes
-        for i in range(len(dataset)):
-            data = dataset[i]
-            # Check the shapes of data.x, data.adj, and data.mask
-            if data.x.shape != torch.Size([max_nodes, 3]) or \
-                    data.y.shape != torch.Size([3]) or \
-                    data.adj.shape != torch.Size([max_nodes, max_nodes]) or \
-                    data.mask.shape != torch.Size([max_nodes]):
-                incorrect_shapes.append(i)  # Add index to the list if any shape is incorrect
-
-        # Print the indices of incorrect data elements or a message if all shapes are correct
-        if incorrect_shapes:
-            print(f"Incorrect shapes found at indices: {incorrect_shapes}")
-        else:
-            print("No incorrect shapes found.")
-
-    # Check the shapes of the training and testing datasets
-    # Be aware that ToDense will pad the data with zeros to the max_nodes value
-    # However, ToDense may create malformed data.y when the number of nodes is 3 (2 tips)
-    shape_check(validation_dataset, max_nodes)
-
     val_loader = DenseDataLoader(validation_dataset, batch_size=64, shuffle=False)
     print(f"Validation dataset length: {len(val_loader.dataset)}")
     print(val_loader.dataset.transform)
