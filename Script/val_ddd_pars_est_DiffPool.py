@@ -284,7 +284,7 @@ def main():
         def _process(self):
             pass  # No processing required
 
-    max_nodes = max([data.num_nodes for data in filtered_validation_data])
+    max_nodes = 1992
     validation_dataset = TreeData(root=None, data_list=filtered_validation_data, transform=T.ToDense(max_nodes))
 
     class GNN(torch.nn.Module):
