@@ -13,6 +13,7 @@ from torch.nn import Linear
 from torch_geometric.data import InMemoryDataset, Data
 from torch_geometric.loader import DenseDataLoader
 from torch_geometric.nn import DenseGCNConv as GCNConv, dense_diff_pool
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 
 def read_table(path):
@@ -337,12 +338,12 @@ def main():
 
             num_nodes = ceil(0.25 * num_nodes)
             self.gnn2_pool = GNN(256, 256, num_nodes)
-            self.gnn2_embed = GNN(256, 128, 128, lin=False)
+            self.gnn2_embed = GNN(256, 256, 256, lin=False)
 
-            self.gnn3_embed = GNN(128, 64, 64, lin=False)
+            self.gnn3_embed = GNN(256, 128, 128, lin=False)
 
-            self.lin1 = torch.nn.Linear(64, 32)
-            self.lin2 = torch.nn.Linear(32, 3)
+            self.lin1 = torch.nn.Linear(128, 64)
+            self.lin2 = torch.nn.Linear(64, 3)
 
         def forward(self, x, adj, mask=None):
             s = self.gnn1_pool(x, adj, mask)
@@ -397,13 +398,27 @@ def main():
         mean_diffs = torch.sum(diffs_all, dim=0) / len(test_loader.dataset)
         return mean_diffs.cpu().detach().numpy(), diffs_all.cpu().detach().numpy()
 
+    @torch.no_grad()
+    def compute_validation_loss():
+        model.eval()  # Set the model to evaluation mode
+        loss_all = 0  # Keep track of the loss
+        for data in test_loader:
+            data.to(device)
+            out, _, _ = model(data.x, data.adj, data.mask)
+            loss = criterion(out, data.y.view(data.num_nodes.__len__(), 3))
+            loss_all += loss.item() * data.num_nodes.__len__()
+
+        return loss_all / len(train_loader.dataset)
+
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Training using {device}")
 
     model = DiffPool()
     model = model.to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=0.001)
     criterion = torch.nn.MSELoss().to(device)
+    # ReduceLROnPlateau scheduler
+    scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=10, verbose=True)
 
     def shape_check(dataset, max_nodes):
         incorrect_shapes = []  # List to store indices of data elements with incorrect shapes
@@ -439,6 +454,7 @@ def main():
 
     test_mean_diffs_history = []
     train_loss_history = []
+    test_loss_history = []
     final_test_diffs = []
 
     train_dir = os.path.join(name, task_type, "training")
@@ -452,12 +468,15 @@ def main():
 
     for epoch in range(1, 100):
         train_loss_all = train()
+        test_loss_all = compute_validation_loss()
+        scheduler.step(test_loss_all)
         test_mean_diffs, test_diffs_all = test_diff(test_loader)
-        print(f'Epoch: {epoch:03d}, Par 1 Mean Diff: {test_mean_diffs[0]:.4f}, Par 2 Mean Diff: {test_mean_diffs[1]:.4f}, Par 3 Mean Diff: {test_mean_diffs[2]:.4f}, Train Loss: {train_loss_all:.4f}')
+        print(f'Epoch: {epoch:03d}, Par 1 Mean Diff: {test_mean_diffs[0]:.4f}, Par 2 Mean Diff: {test_mean_diffs[1]:.4f}, Par 3 Mean Diff: {test_mean_diffs[2]:.4f}, Train Loss: {train_loss_all:.4f}, Test Loss: {test_loss_all:.4f}')
 
         # Record the values
         test_mean_diffs_history.append(test_mean_diffs)
         train_loss_history.append(train_loss_all)
+        test_loss_history.append(test_loss_all)
         final_test_diffs = test_diffs_all
         print(f"Final test diffs length: {len(final_test_diffs)}")
 
@@ -471,6 +490,7 @@ def main():
         data_dict["cap_diff"].append(array[2])
     data_dict["Epoch"] = list(range(1, 100))
     data_dict["Train_Loss"] = train_loss_history
+    data_dict["Test_Loss"] = test_loss_history
 
     # Convert the dictionary to a pandas DataFrame
     model_performance = pd.DataFrame(data_dict)
