@@ -296,7 +296,6 @@ def main():
     max_nodes_train = max([data.num_nodes for data in filtered_training_data])
     max_nodes_test = max([data.num_nodes for data in filtered_testing_data])
     max_nodes = max(max_nodes_train, max_nodes_test)
-    max_nodes = 2012
 
     training_dataset = TreeData(root=None, data_list=filtered_training_data, transform=T.ToDense(max_nodes))
     testing_dataset = TreeData(root=None, data_list=filtered_testing_data, transform=T.ToDense(max_nodes))
