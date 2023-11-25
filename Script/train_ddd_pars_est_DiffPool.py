@@ -14,6 +14,9 @@ from torch_geometric.data import InMemoryDataset, Data
 from torch_geometric.loader import DenseDataLoader
 from torch_geometric.nn import DenseGCNConv as GCNConv, dense_diff_pool
 
+# Global variables
+epoch_number = 21
+
 
 def read_table(path):
     return pd.read_csv(path, sep="\s+", header=0)  # assuming the tables are tab-delimited
@@ -466,7 +469,7 @@ def main():
     if not os.path.exists(test_dir):
         os.makedirs(test_dir)
 
-    for epoch in range(1, 20):
+    for epoch in range(1, epoch_number):
         train_loss_all = train()
         test_loss_all = compute_validation_loss()
         test_mean_diffs, test_diffs_all = test_diff(test_loader)
@@ -479,6 +482,10 @@ def main():
         final_test_diffs = test_diffs_all
         print(f"Final test diffs length: {len(final_test_diffs)}")
 
+    # Save the model
+    print(f"Saving model to {os.path.join(name, task_type, f'{task_type}_model_diffpool.pt')}")
+    torch.save(model.state_dict(), os.path.join(name, task_type, f"{task_type}_model_diffpool.pt"))
+
     # After the loop, create a dictionary to hold the data
     data_dict = {"lambda_diff": [], "mu_diff": [], "cap_diff": []}
     # Iterate through test_mean_diffs_history
@@ -487,7 +494,7 @@ def main():
         data_dict["lambda_diff"].append(array[0])
         data_dict["mu_diff"].append(array[1])
         data_dict["cap_diff"].append(array[2])
-    data_dict["Epoch"] = list(range(1, 100))
+    data_dict["Epoch"] = list(range(1, epoch_number))
     data_dict["Train_Loss"] = train_loss_history
     data_dict["Test_Loss"] = test_loss_history
 
@@ -497,8 +504,6 @@ def main():
     # Save the data to a file using pyreadr
     pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_diffpool.rds"), model_performance)
     pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_diffs_diffpool.rds"), final_differences)
-
-    torch.save(model.state_dict(), os.path.join(name, task_type, f"{task_type}_model_diffpool.pt"))
 
 
 if __name__ == '__main__':
