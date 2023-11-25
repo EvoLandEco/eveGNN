@@ -549,7 +549,7 @@ def main():
         final_test_diffs = test_diffs_all
         final_test_predictions = test_predictions
         print(f"Final test diffs length: {len(final_test_diffs)}")
-        print(f"Final predictions length: {len(final_predictions)}")
+        print(f"Final predictions length: {len(final_test_predictions)}")
 
     print("Finished training, saving model...")
     torch.save(model.state_dict(), os.path.join(name, task_type, f"{task_type}_{metric}_model_diffpool_reg.pt"))
