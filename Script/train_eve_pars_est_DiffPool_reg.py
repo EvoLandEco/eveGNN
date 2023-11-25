@@ -16,7 +16,7 @@ from torch_geometric.nn import DenseGCNConv as GCNConv, dense_diff_pool
 metric_to_category = {'pd': 0, 'ed': 1, 'nnd': 2}
 beta_n_norm_factor = 100
 beta_phi_norm_factor = 1000
-epoch_number = 30
+epoch_number = 60
 
 # Check if metric_to_category is a dictionary with string keys and integer values
 assert isinstance(metric_to_category, dict), "metric_to_category should be a dictionary"
