@@ -464,7 +464,7 @@ def main():
     if not os.path.exists(test_dir):
         os.makedirs(test_dir)
 
-    for epoch in range(1, 100):
+    for epoch in range(1, 20):
         train_loss_all = train()
         test_loss_all = compute_validation_loss()
         test_mean_diffs, test_diffs_all = test_diff(test_loader)
