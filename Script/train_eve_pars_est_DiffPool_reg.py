@@ -522,7 +522,7 @@ def main():
     train_loss_all_history = []
     test_mean_diffs_history = []
     final_test_diffs = []
-    final_predictions = []
+    final_test_predictions = []
 
     # Paths for saving embeddings
     train_dir = os.path.join(name, task_type, "training")
@@ -547,7 +547,7 @@ def main():
         train_loss_all_history.append(train_loss_all)
         test_mean_diffs_history.append(test_mean_diffs)
         final_test_diffs = test_diffs_all
-        final_predictions = test_predictions
+        final_test_predictions = test_predictions
         print(f"Final test diffs length: {len(final_test_diffs)}")
         print(f"Final predictions length: {len(final_predictions)}")
 
@@ -596,6 +596,7 @@ def main():
 
     model_performance = None
     final_differences = None
+    final_predictions = None
 
     # Convert the dictionary to a pandas DataFrame
     try:
@@ -611,6 +612,11 @@ def main():
         final_differences = pd.DataFrame(final_test_diffs, columns=["lambda_diff", "mu_diff", "beta_n_diff", "beta_phi_diff"])
     except Exception as e:
         print("Error occurred while creating the final_differences DataFrame:", str(e))
+
+    try:
+        final_predictions = pd.DataFrame(final_test_predictions, columns=["lambda_pred", "mu_pred", "beta_n_pred", "beta_phi_pred"])
+    except Exception as e:
+        print("Error occurred while creating the final_predictions DataFrame:", str(e))
 
     # Check if variables exist before saving
     if 'model_performance' in locals():
