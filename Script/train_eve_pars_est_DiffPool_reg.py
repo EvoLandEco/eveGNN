@@ -348,7 +348,7 @@ def main():
     # Iterate over each element in the filtered_testing_data list
     for item in filtered_testing_data:
         # Ensure the data is on the CPU, then convert the y_re tensor to a numpy array and to a list
-        y_re_values = item.y_re.cpu().numpy().tolist()
+        y_re_values = item.y.cpu().numpy().tolist()
         # Append the list to y_re_data
         y_re_data.append(y_re_values)
 
