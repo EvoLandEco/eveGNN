@@ -417,8 +417,6 @@ def main():
     model = model.to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=0.001)
     criterion = torch.nn.MSELoss().to(device)
-    # ReduceLROnPlateau scheduler
-    scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=10, verbose=True)
 
     def shape_check(dataset, max_nodes):
         incorrect_shapes = []  # List to store indices of data elements with incorrect shapes
@@ -469,7 +467,6 @@ def main():
     for epoch in range(1, 100):
         train_loss_all = train()
         test_loss_all = compute_validation_loss()
-        scheduler.step(test_loss_all)
         test_mean_diffs, test_diffs_all = test_diff(test_loader)
         print(f'Epoch: {epoch:03d}, Par 1 Mean Diff: {test_mean_diffs[0]:.4f}, Par 2 Mean Diff: {test_mean_diffs[1]:.4f}, Par 3 Mean Diff: {test_mean_diffs[2]:.4f}, Train Loss: {train_loss_all:.4f}, Test Loss: {test_loss_all:.4f}')
 
