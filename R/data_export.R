@@ -222,6 +222,11 @@ get_all_neighbors_distances <- function(tree) {
 
 #' @export tree_to_adj_mat
 tree_to_adj_mat <- function(tree) {
+  # Check if the tree is of class 'phylo'
+  if(!inherits(tree, "phylo")) {
+    stop("The provided tree is not a valid phylo object.")
+  }
+
   neighbor_dists <- get_all_neighbors_distances(tree)
 
   padded_dists <- lapply(neighbor_dists, function(x) {
@@ -243,6 +248,11 @@ tree_to_adj_mat <- function(tree) {
 
 #' @export tree_to_connectivity
 tree_to_connectivity <- function(tree, undirected = FALSE) {
+  # Check if the tree is of class 'phylo'
+  if(!inherits(tree, "phylo")) {
+    stop("The provided tree is not a valid phylo object.")
+  }
+
   if (undirected) {
     part_a <- tree$edge - 1
     part_b <- cbind(part_a[, 2], part_a[, 1])
@@ -251,4 +261,25 @@ tree_to_connectivity <- function(tree, undirected = FALSE) {
   } else {
     return(tree$edge - 1)
   }
+}
+
+
+#' @export rescale_crown_age
+rescale_crown_age <- function(tree, target_crown_age) {
+  # Check if the tree is of class 'phylo'
+  if(!inherits(tree, "phylo")) {
+    stop("The provided tree is not a valid phylo object.")
+  }
+
+  # Calculate the current crown age of the tree
+  current_crown_age <- max(ape::node.depth.edgelength(tree))
+
+  # Calculate the scaling factor
+  scale_factor <- target_crown_age / current_crown_age
+
+  # Scale the tree
+  scaled_tree <- tree
+  scaled_tree$edge.length <- scaled_tree$edge.length * scale_factor
+
+  return(scaled_tree)
 }

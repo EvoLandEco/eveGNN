@@ -342,6 +342,19 @@ def main():
     filtered_training_data = [data for data in sum_training_data if data.edge_index.shape != torch.Size([2, 2])]
     filtered_testing_data = [data for data in sum_testing_data if data.edge_index.shape != torch.Size([2, 2])]
 
+    # Create an empty list to store the y_re data
+    y_re_data = []
+
+    # Iterate over each element in the filtered_testing_data list
+    for item in filtered_testing_data:
+        # Ensure the data is on the CPU, then convert the y_re tensor to a numpy array and to a list
+        y_re_values = item.y_re.cpu().numpy().tolist()
+        # Append the list to y_re_data
+        y_re_data.append(y_re_values)
+
+    # Convert the list of y_re values to a DataFrame
+    df_y_re = pd.DataFrame(y_re_data, columns=['lambda', 'mu', 'beta_n', 'beta_phi'])
+
     class TreeData(InMemoryDataset):
         def __init__(self, root, data_list, transform=None, pre_transform=None):
             super(TreeData, self).__init__(root, transform, pre_transform)
@@ -613,6 +626,14 @@ def main():
             print(f"Error occurred while saving final_differences: {str(e)}")
     else:
         print("final_differences has not been assigned!")
+
+    if 'df_y_re' in locals():
+        try:
+            pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_{metric}_y_re.rds"), df_y_re)
+            print(f"Successfully saved y_re of testing dataset to files:")
+            print(f"{task_type}_y_re.rds")
+        except Exception as e:
+            print(f"Error occurred while saving df_y_re: {str(e)}")
 
 
 if __name__ == '__main__':
