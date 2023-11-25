@@ -466,16 +466,19 @@ def main():
         model.eval()
 
         diffs_all = torch.tensor([], dtype=torch.float, device=device)
+        outputs_all = torch.tensor([], dtype=torch.float, device=device)  # To store all outputs
 
         for data in loader:
             data.to(device)
             out_re = model(data.x, data.adj, data.mask)
             diffs = torch.abs(out_re - data.y.view(data.num_nodes.__len__(), 4))
             diffs_all = torch.cat((diffs_all, diffs), dim=0)
+            outputs_all = torch.cat((outputs_all, out_re), dim=0)  # Concatenate the outputs
 
         print(f"diffs_all length: {len(diffs_all)}; test_loader.dataset length: {len(test_loader.dataset)}; Equal: {len(diffs_all) == len(test_loader.dataset)}")
         mean_diffs = torch.sum(diffs_all, dim=0) / len(test_loader.dataset)
-        return mean_diffs.cpu().detach().numpy(), diffs_all.cpu().detach().numpy()
+
+        return mean_diffs.cpu().detach().numpy(), diffs_all.cpu().detach().numpy(), outputs_all.cpu().detach().numpy()
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Training using {device}")
@@ -519,6 +522,7 @@ def main():
     train_loss_all_history = []
     test_mean_diffs_history = []
     final_test_diffs = []
+    final_predictions = []
 
     # Paths for saving embeddings
     train_dir = os.path.join(name, task_type, "training")
@@ -533,7 +537,7 @@ def main():
     # Training loop
     for epoch in range(1, epoch_number):
         train_loss_all = train()
-        test_mean_diffs, test_diffs_all = test_diff(test_loader)
+        test_mean_diffs, test_diffs_all, test_predictions = test_diff(test_loader)
         test_mean_diffs[2] = test_mean_diffs[2] / beta_n_norm_factor
         test_mean_diffs[3] = test_mean_diffs[3] / beta_phi_norm_factor
         print(f'Epoch: {epoch:03d}, Par 1 Mean Diff: {test_mean_diffs[0]:.4f}, Par 2 Mean Diff: {test_mean_diffs[1]:.4f}, Par 3 Mean Diff: {test_mean_diffs[2]:.4f}, Par 4 Mean Diff: {test_mean_diffs[3]:.4f}')
@@ -543,7 +547,9 @@ def main():
         train_loss_all_history.append(train_loss_all)
         test_mean_diffs_history.append(test_mean_diffs)
         final_test_diffs = test_diffs_all
+        final_predictions = test_predictions
         print(f"Final test diffs length: {len(final_test_diffs)}")
+        print(f"Final predictions length: {len(final_predictions)}")
 
     print("Finished training, saving model...")
     torch.save(model.state_dict(), os.path.join(name, task_type, f"{task_type}_{metric}_model_diffpool_reg.pt"))
@@ -611,7 +617,7 @@ def main():
         try:
             pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_{metric}_diffpool_reg.rds"), model_performance)
             print(f"Successfully saved training and testing performance to files:")
-            print(f"{task_type}_diffpool_reg.rds")
+            print(f"{task_type}_{metric}_diffpool_reg.rds")
         except Exception as e:
             print(f"Error occurred while saving model_performance: {str(e)}")
     else:
@@ -621,7 +627,7 @@ def main():
         try:
             pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_{metric}_final_diffs_diffpool_reg.rds"), final_differences)
             print(f"Successfully saved final mean differences to files:")
-            print(f"{task_type}_final_diffs_diffpool_reg.rds")
+            print(f"{task_type}_{metric}_final_diffs_diffpool_reg.rds")
         except Exception as e:
             print(f"Error occurred while saving final_differences: {str(e)}")
     else:
@@ -631,9 +637,17 @@ def main():
         try:
             pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_{metric}_y_re.rds"), df_y_re)
             print(f"Successfully saved y_re of testing dataset to files:")
-            print(f"{task_type}_y_re.rds")
+            print(f"{task_type}_{metric}_y_re.rds")
         except Exception as e:
             print(f"Error occurred while saving df_y_re: {str(e)}")
+
+    if 'final_predictions' in locals():
+        try:
+            pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_{metric}_final_predictions_diffpool_reg.rds"), final_predictions)
+            print(f"Successfully saved final predictions to files:")
+            print(f"{task_type}_{metric}_final_predictions_diffpool_reg.rds")
+        except Exception as e:
+            print(f"Error occurred while saving final_predictions: {str(e)}")
 
 
 if __name__ == '__main__':
