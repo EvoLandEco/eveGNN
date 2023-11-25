@@ -533,9 +533,9 @@ def main():
         print(f"Final test diffs length: {len(final_test_diffs)}")
 
     print("Finished training, saving model...")
-    torch.save(model.state_dict(), os.path.join(name, task_type, f"{task_type}_model_diffpool_reg.pt"))
+    torch.save(model.state_dict(), os.path.join(name, task_type, f"{task_type}_{metric}_model_diffpool_reg.pt"))
     print("Model successfully saved to:")
-    print(f"{task_type}_model_diffpool_reg.pt")
+    print(f"{task_type}_{metric}_model_diffpool_reg.pt")
 
     print("Saving training and testing performance...")
     # After the loop, create a dictionary to hold the data
@@ -613,11 +613,6 @@ def main():
             print(f"Error occurred while saving final_differences: {str(e)}")
     else:
         print("final_differences has not been assigned!")
-
-    # Save the model
-    print("Saving model...")
-    torch.save(model.state_dict(), os.path.join(name, task_type, f"{task_type}_{metric}_model_diffpool_reg.pt"))
-    print(f"Model successfully saved to: {task_type}_{metric}_model_diffpool.pt")
 
 
 if __name__ == '__main__':
