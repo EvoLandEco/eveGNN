@@ -13,7 +13,6 @@ from torch.nn import Linear
 from torch_geometric.data import InMemoryDataset, Data
 from torch_geometric.loader import DenseDataLoader
 from torch_geometric.nn import DenseGCNConv as GCNConv, dense_diff_pool
-from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 
 def read_table(path):
@@ -296,7 +295,9 @@ def main():
     max_nodes_train = max([data.num_nodes for data in filtered_training_data])
     max_nodes_test = max([data.num_nodes for data in filtered_testing_data])
     max_nodes = max(max_nodes_train, max_nodes_test)
-    max_nodes = 2012
+    # Hacking max_nodes is needed to match out-of-sample validation dataset
+    # max_nodes should actually be max(max_nodes_train, max_nodes_test, max_nodes_val)
+    # max_nodes = 2012
 
     training_dataset = TreeData(root=None, data_list=filtered_training_data, transform=T.ToDense(max_nodes))
     testing_dataset = TreeData(root=None, data_list=filtered_testing_data, transform=T.ToDense(max_nodes))
