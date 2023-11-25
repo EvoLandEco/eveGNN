@@ -342,19 +342,6 @@ def main():
     filtered_training_data = [data for data in sum_training_data if data.edge_index.shape != torch.Size([2, 2])]
     filtered_testing_data = [data for data in sum_testing_data if data.edge_index.shape != torch.Size([2, 2])]
 
-    # Create an empty list to store the y_re data
-    y_re_data = []
-
-    # Iterate over each element in the filtered_testing_data list
-    for item in filtered_testing_data:
-        # Ensure the data is on the CPU, then convert the y_re tensor to a numpy array and to a list
-        y_re_values = item.y.cpu().numpy().tolist()
-        # Append the list to y_re_data
-        y_re_data.append(y_re_values)
-
-    # Convert the list of y_re values to a DataFrame
-    df_y_re = pd.DataFrame(y_re_data, columns=['lambda', 'mu', 'beta_n', 'beta_phi'])
-
     class TreeData(InMemoryDataset):
         def __init__(self, root, data_list, transform=None, pre_transform=None):
             super(TreeData, self).__init__(root, transform, pre_transform)
@@ -467,6 +454,7 @@ def main():
 
         diffs_all = torch.tensor([], dtype=torch.float, device=device)
         outputs_all = torch.tensor([], dtype=torch.float, device=device)  # To store all outputs
+        y_all = torch.tensor([], dtype=torch.float, device=device)  # To store all y
 
         for data in loader:
             data.to(device)
@@ -474,11 +462,12 @@ def main():
             diffs = torch.abs(out_re - data.y.view(data.num_nodes.__len__(), 4))
             diffs_all = torch.cat((diffs_all, diffs), dim=0)
             outputs_all = torch.cat((outputs_all, out_re), dim=0)  # Concatenate the outputs
+            y_all = torch.cat((y_all, data.y.view(data.num_nodes.__len__(), 4)), dim=0)  # Concatenate the y
 
         print(f"diffs_all length: {len(diffs_all)}; test_loader.dataset length: {len(test_loader.dataset)}; Equal: {len(diffs_all) == len(test_loader.dataset)}")
         mean_diffs = torch.sum(diffs_all, dim=0) / len(test_loader.dataset)
 
-        return mean_diffs.cpu().detach().numpy(), diffs_all.cpu().detach().numpy(), outputs_all.cpu().detach().numpy()
+        return mean_diffs.cpu().detach().numpy(), diffs_all.cpu().detach().numpy(), outputs_all.cpu().detach().numpy(), y_all.cpu().detach().numpy()
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Training using {device}")
@@ -523,6 +512,7 @@ def main():
     test_mean_diffs_history = []
     final_test_diffs = []
     final_test_predictions = []
+    final_test_y = []
 
     # Paths for saving embeddings
     train_dir = os.path.join(name, task_type, "training")
@@ -537,7 +527,7 @@ def main():
     # Training loop
     for epoch in range(1, epoch_number):
         train_loss_all = train()
-        test_mean_diffs, test_diffs_all, test_predictions = test_diff(test_loader)
+        test_mean_diffs, test_diffs_all, test_predictions, test_y = test_diff(test_loader)
         test_mean_diffs[2] = test_mean_diffs[2] / beta_n_norm_factor
         test_mean_diffs[3] = test_mean_diffs[3] / beta_phi_norm_factor
         print(f'Epoch: {epoch:03d}, Par 1 Mean Diff: {test_mean_diffs[0]:.4f}, Par 2 Mean Diff: {test_mean_diffs[1]:.4f}, Par 3 Mean Diff: {test_mean_diffs[2]:.4f}, Par 4 Mean Diff: {test_mean_diffs[3]:.4f}')
@@ -548,8 +538,10 @@ def main():
         test_mean_diffs_history.append(test_mean_diffs)
         final_test_diffs = test_diffs_all
         final_test_predictions = test_predictions
+        final_test_y = test_y
         print(f"Final test diffs length: {len(final_test_diffs)}")
         print(f"Final predictions length: {len(final_test_predictions)}")
+        print(f"Final y length: {len(final_test_y)}")
 
     print("Finished training, saving model...")
     torch.save(model.state_dict(), os.path.join(name, task_type, f"{task_type}_{metric}_model_diffpool_reg.pt"))
@@ -597,6 +589,7 @@ def main():
     model_performance = None
     final_differences = None
     final_predictions = None
+    final_y = None
 
     # Convert the dictionary to a pandas DataFrame
     try:
@@ -617,6 +610,11 @@ def main():
         final_predictions = pd.DataFrame(final_test_predictions, columns=["lambda_pred", "mu_pred", "beta_n_pred", "beta_phi_pred"])
     except Exception as e:
         print("Error occurred while creating the final_predictions DataFrame:", str(e))
+
+    try:
+        final_y = pd.DataFrame(final_test_y, columns=["lambda", "mu", "beta_n", "beta_phi"])
+    except Exception as e:
+        print("Error occurred while creating the final_y DataFrame:", str(e))
 
     # Check if variables exist before saving
     if 'model_performance' in locals():
@@ -639,14 +637,6 @@ def main():
     else:
         print("final_differences has not been assigned!")
 
-    if 'df_y_re' in locals():
-        try:
-            pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_{metric}_y_re.rds"), df_y_re)
-            print(f"Successfully saved y_re of testing dataset to files:")
-            print(f"{task_type}_{metric}_y_re.rds")
-        except Exception as e:
-            print(f"Error occurred while saving df_y_re: {str(e)}")
-
     if 'final_predictions' in locals():
         try:
             pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_{metric}_final_predictions_diffpool_reg.rds"), final_predictions)
@@ -654,6 +644,14 @@ def main():
             print(f"{task_type}_{metric}_final_predictions_diffpool_reg.rds")
         except Exception as e:
             print(f"Error occurred while saving final_predictions: {str(e)}")
+
+    if 'final_y' in locals():
+        try:
+            pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_{metric}_final_y_diffpool_reg.rds"), final_y)
+            print(f"Successfully saved final y to files:")
+            print(f"{task_type}_{metric}_final_y_diffpool_reg.rds")
+        except Exception as e:
+            print(f"Error occurred while saving final_y: {str(e)}")
 
 
 if __name__ == '__main__':
