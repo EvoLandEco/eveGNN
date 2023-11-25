@@ -16,7 +16,7 @@ from torch_geometric.nn import DenseGCNConv as GCNConv, dense_diff_pool
 metric_to_category = {'pd': 0, 'ed': 1, 'nnd': 2}
 beta_n_norm_factor = 100
 beta_phi_norm_factor = 1000
-epoch_number = 100
+epoch_number = 30
 
 # Check if metric_to_category is a dictionary with string keys and integer values
 assert isinstance(metric_to_category, dict), "metric_to_category should be a dictionary"
@@ -40,16 +40,21 @@ def check_same_across_rows(df):
     return df.apply(lambda x: x.nunique() == 1)
 
 
-def count_rds_files(path):
-    # Get the list of .rds files in the specified path
-    rds_files = glob.glob(os.path.join(path, '*.rds'))
+def count_rds_files(path, metric):
+    # Define a function to check if the file name matches the desired metric
+    def is_metric_in_filename(filename):
+        parts = filename.split('_')
+        return parts[6] == metric
+
+    # Get the list of .rds files that match the metric
+    rds_files = [f for f in glob.glob(os.path.join(path, '*.rds')) if is_metric_in_filename(os.path.basename(f))]
     return len(rds_files)
 
 
-def check_rds_files_count(tree_path, el_path):
-    # Count the number of .rds files in both paths
-    tree_count = count_rds_files(tree_path)
-    el_count = count_rds_files(el_path)
+def check_rds_files_count(tree_path, el_path, metric):
+    # Count the number of .rds files in both paths that match the metric
+    tree_count = count_rds_files(tree_path, metric)
+    el_count = count_rds_files(el_path, metric)
 
     # Check if the counts are equal
     if tree_count == el_count:
@@ -178,12 +183,18 @@ def check_list_count(count, data_list, length_list, params_list):
     print("Count check passed")
 
 
-def read_rds_to_pytorch(path, count):
-    # List all files in the directory
+def read_rds_to_pytorch(path, count, metric):
+    # Function to check if the filename contains the metric at the correct position
+    def is_metric_in_filename(filename):
+        parts = filename.split('_')
+        # Check if the metric is at the expected position (index 6, 0-based indexing)
+        return parts[6] == metric
+
+    # Adjust the file selection logic
     files_tree = [f for f in os.listdir(os.path.join(path, 'GNN', 'tree'))
-                  if f.startswith('tree_') and f.endswith('.rds')]
+                  if f.startswith('tree_') and is_metric_in_filename(f) and f.endswith('.rds')]
     files_el = [f for f in os.listdir(os.path.join(path, 'GNN', 'tree', 'EL'))
-                if f.startswith('EL_') and f.endswith('.rds')]
+                if f.startswith('EL_') and is_metric_in_filename(f) and f.endswith('.rds')]
 
     # Sort the files based on the parameters
     files_tree = sort_files(files_tree)
@@ -292,15 +303,16 @@ def export_to_rds(embeddings, epoch, name, task_type, which_set):
 
 
 def main():
-    if len(sys.argv) != 3:
-        print(f"Usage: {sys.argv[0]} <name> <task_type>")
+    if len(sys.argv) != 4:
+        print(f"Usage: {sys.argv[0]} <name> <task_type> <metric>")
         sys.exit(1)
 
     name = sys.argv[1]
     task_type = sys.argv[2]
+    metric = sys.argv[3]
 
     # Now you can use the variables name and set_i in your code
-    print(f'Name: {name}, Task Type: {task_type}')
+    print(f'Name: {name}, Task Type: {task_type}, Metric: {metric}')
 
     training_dataset_list = []
     testing_dataset_list = []
@@ -312,11 +324,11 @@ def main():
     # Call read_rds_to_pytorch with the full directory path
     print(full_dir)
     # Check if the number of .rds files in the tree and el paths are equal
-    rds_count = check_rds_files_count(full_dir_tree, full_dir_el)
+    rds_count = check_rds_files_count(full_dir_tree, full_dir_el, metric)
     print(f'There are: {rds_count} trees in the {task_type} folder.')
     print(f"Now reading {task_type}...")
     # Read the .rds files into a list of PyTorch Geometric Data objects
-    current_dataset = read_rds_to_pytorch(full_dir, rds_count)
+    current_dataset = read_rds_to_pytorch(full_dir, rds_count, metric)
     current_training_data = get_training_data(current_dataset)
     current_testing_data = get_testing_data(current_dataset)
     training_dataset_list.append(current_training_data)
@@ -384,13 +396,13 @@ def main():
 
             num_nodes = ceil(0.25 * num_nodes)
             self.gnn2_pool = GNN(256, 256, num_nodes)
-            self.gnn2_embed = GNN(256, 128, 128, lin=False)
+            self.gnn2_embed = GNN(256, 256, 256, lin=False)
 
-            self.gnn3_embed = GNN(128, 64, 64, lin=False)
+            self.gnn3_embed = GNN(256, 128, 128, lin=False)
 
             # Layers for regression
-            self.lin1 = torch.nn.Linear(64, 32)
-            self.lin2 = torch.nn.Linear(32, 4)
+            self.lin1 = torch.nn.Linear(128, 64)
+            self.lin2 = torch.nn.Linear(64, 4)
 
         def forward(self, x, adj, mask=None):
             s = self.gnn1_pool(x, adj, mask)
@@ -584,7 +596,7 @@ def main():
     # Check if variables exist before saving
     if 'model_performance' in locals():
         try:
-            pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_diffpool_reg.rds"), model_performance)
+            pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_{metric}_diffpool_reg.rds"), model_performance)
             print(f"Successfully saved training and testing performance to files:")
             print(f"{task_type}_diffpool_reg.rds")
         except Exception as e:
@@ -594,13 +606,18 @@ def main():
 
     if 'final_differences' in locals():
         try:
-            pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_diffs_diffpool_reg.rds"), final_differences)
+            pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_{metric}_final_diffs_diffpool_reg.rds"), final_differences)
             print(f"Successfully saved final mean differences to files:")
             print(f"{task_type}_final_diffs_diffpool_reg.rds")
         except Exception as e:
             print(f"Error occurred while saving final_differences: {str(e)}")
     else:
         print("final_differences has not been assigned!")
+
+    # Save the model
+    print("Saving model...")
+    torch.save(model.state_dict(), os.path.join(name, task_type, f"{task_type}_{metric}_model_diffpool_reg.pt"))
+    print(f"Model successfully saved to: {task_type}_{metric}_model_diffpool.pt")
 
 
 if __name__ == '__main__':
