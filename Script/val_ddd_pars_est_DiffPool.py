@@ -367,7 +367,7 @@ def main():
             diffs_all = torch.cat((diffs_all, diffs), dim=0)
 
         print(f"diffs_all length: {len(diffs_all)}; test_loader.dataset length: {len(val_loader.dataset)}; Equal: {len(diffs_all) == len(val_loader.dataset)}")
-        mean_diffs = torch.sum(diffs_all, dim=0) / len(val_loader.dataset)
+        mean_diffs = torch.sum(diffs_all, dim=0) / len(loader.dataset)
         return mean_diffs.cpu().detach().numpy(), diffs_all.cpu().detach().numpy()
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
