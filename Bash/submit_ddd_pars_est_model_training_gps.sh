@@ -5,7 +5,7 @@
 #SBATCH --gpus-per-node=1
 #SBATCH --job-name=gnn_ddd_pars_est_gps
 #SBATCH --output=logs/gnn_ddd_pars_est_gps-%j.log
-#SBATCH --mem=32GB
+#SBATCH --mem=128GB
 #SBATCH --partition=gpu
 
 ml Python/3.8.16-GCCcore-11.2.0
