@@ -438,9 +438,6 @@ def main():
             model.redraw_projection.redraw_projections()
             out = model(data.x, data.pe, data.edge_index, data.edge_attr,
                         data.batch)
-            print(out.shape)
-            print(data.y.shape)
-            print(data.num_graphs)
             loss = criterion(out, data.y.view(data.num_graphs, 3))
             loss.backward()
             total_loss += loss.item() * data.num_graphs
@@ -457,7 +454,7 @@ def main():
             data = data.to(device)
             out = model(data.x, data.pe, data.edge_index, data.edge_attr,
                         data.batch)
-            diffs = torch.abs(out - data.y.view(data.num_nodes.__len__(), 3))
+            diffs = torch.abs(out - data.y.view(data.num_graphs, 3))
             diffs_all = torch.cat((diffs_all, diffs), dim=0)
 
         print(f"diffs_all length: {len(diffs_all)}; test_loader.dataset length: {len(loader.dataset)}; Equal: {len(diffs_all) == len(loader.dataset)}")
