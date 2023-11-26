@@ -362,10 +362,10 @@ def main():
                      attn_type: str, attn_kwargs: Dict[str, Any]):
             super().__init__()
 
-            self.node_emb = Embedding(28, channels - pe_dim)
+            self.node_emb = Embedding(3, channels - pe_dim)
             self.pe_lin = Linear(20, pe_dim)
             self.pe_norm = BatchNorm1d(20)
-            self.edge_emb = Embedding(4, channels)
+            self.edge_lin = Linear(1, channels)
 
             self.convs = ModuleList()
             for _ in range(num_layers):
@@ -392,7 +392,7 @@ def main():
         def forward(self, x, pe, edge_index, edge_attr, batch):
             x_pe = self.pe_norm(pe)
             x = torch.cat((self.node_emb(x.squeeze(-1)), self.pe_lin(x_pe)), 1)
-            edge_attr = self.edge_emb(edge_attr)
+            edge_attr = self.edge_lin(edge_attr)
 
             for conv in self.convs:
                 x = conv(x, edge_index, batch, edge_attr=edge_attr)
