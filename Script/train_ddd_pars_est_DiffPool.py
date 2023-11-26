@@ -1,15 +1,14 @@
 import sys
 import os
 import pandas as pd
-import numpy as np
 import pyreadr
 import torch
 import glob
 import functools
+import random
 import torch_geometric.transforms as T
 import torch.nn.functional as F
 from math import ceil
-from torch.nn import Linear
 from torch_geometric.data import InMemoryDataset, Data
 from torch_geometric.loader import DenseDataLoader
 from torch_geometric.nn import DenseGCNConv as GCNConv, dense_diff_pool
@@ -235,6 +234,14 @@ def get_testing_data(data_list):
     return testing_data
 
 
+def shuffle_data(data_list):
+    # Create a copy of the data list to shuffle
+    shuffled_list = data_list.copy()
+    # Shuffle the copied list in place
+    random.shuffle(shuffled_list)
+    return shuffled_list
+
+
 def export_to_rds(embeddings, epoch, name, task_type, which_set):
     # Convert to DataFrame
     df = pd.DataFrame(embeddings, columns=[f"dim_{i}" for i in range(embeddings.shape[1])])
@@ -273,6 +280,8 @@ def main():
     print(f"Now reading {task_type}...")
     # Read the .rds files into a list of PyTorch Geometric Data objects
     current_dataset = read_rds_to_pytorch(full_dir, rds_count)
+    # Shuffle the data
+    current_dataset = shuffle_data(current_dataset)
     current_training_data = get_training_data(current_dataset)
     current_testing_data = get_testing_data(current_dataset)
     training_dataset_list.append(current_training_data)
@@ -323,8 +332,6 @@ def main():
             self.bns.append(torch.nn.BatchNorm1d(out_channels))
 
         def forward(self, x, adj, mask=None):
-            batch_size, num_nodes, in_channels = x.size()
-
             for step in range(len(self.convs)):
                 x = F.relu(self.convs[step](x, adj, mask))
                 x = torch.permute(x, (0, 2, 1))
