@@ -425,6 +425,7 @@ def main():
     model = GPS(channels=64, pe_dim=8, num_layers=10, attn_type=attn_type,
                 attn_kwargs=attn_kwargs).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-5)
+    criterion = torch.nn.MSELoss().to(device)
     # scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=20, min_lr=0.00001)
 
     def train():
@@ -439,7 +440,7 @@ def main():
                         data.batch)
             print(out.shape)
             print(data.y.shape)
-            loss = (out.squeeze() - data.y).abs().mean()
+            loss = criterion(out, data.y.view(data.num_nodes.__len__(), 3))
             loss.backward()
             total_loss += loss.item() * data.num_graphs
             optimizer.step()
