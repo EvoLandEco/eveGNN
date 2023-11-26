@@ -283,3 +283,97 @@ rescale_crown_age <- function(tree, target_crown_age) {
 
   return(scaled_tree)
 }
+
+
+#' @export tree_to_node_feature
+tree_to_node_feature <- function(tree) {
+  # Check if the tree is of class 'phylo'
+  if(!inherits(tree, "phylo")) {
+    stop("The provided tree is not a valid phylo object.")
+  }
+
+  ntips <- tree$Nnode + 1
+
+  # Assign 0 to root node, 1 to internal nodes, and 2 to tips
+  node_feature <- c(rep(2, ntips), 0, rep(1, tree$Nnode - 1))
+
+  return(node_feature)
+}
+
+
+#' @export tree_to_edge_feature
+tree_to_edge_feature <- function(tree, undirected = FALSE) {
+  # Check if the tree is of class 'phylo'
+  if(!inherits(tree, "phylo")) {
+    stop("The provided tree is not a valid phylo object.")
+  }
+
+  if (undirected) {
+    return(rbind(tree$edge.length, tree$edge.length))
+  } else {
+    return(tree$edge.length)
+  }
+}
+
+
+#' @export export_to_gps_with_params
+export_to_gps_with_params <- function(data, which = "tas", undirected = FALSE) {
+  path <- file.path("GPS/tree/")
+  path_node <- file.path("GPS/tree/node/")
+  path_edge <- file.path("GPS/tree/edge/")
+  eve:::check_path(path)
+  eve:::check_path(path_node)
+  eve:::check_path(path_edge)
+
+  if (which == "tas") {
+    for (i in seq_along(data$tas)) {
+      la <- data$pars[[i]][1]
+      mu <- data$pars[[i]][2]
+      cap <- data$pars[[i]][3]
+      age <- data$age[[i]]
+      file_name <- paste0(path, "/tree_", la, "_", mu, "_", cap, "_", age, "_", i, ".rds")
+      saveRDS(tree_to_connectivity(data$tas[[i]], undirected = undirected), file = file_name)
+    }
+    for (i in seq_along(data$tas)) {
+      la <- data$pars[[i]][1]
+      mu <- data$pars[[i]][2]
+      cap <- data$pars[[i]][3]
+      age <- data$age[[i]]
+      file_name <- paste0(path_node, "/node_", la, "_", mu, "_", cap, "_", age, "_", i, ".rds")
+      saveRDS(tree_to_node_feature(data$tas[[i]]), file = file_name)
+    }
+    for (i in seq_along(data$tas)) {
+      la <- data$pars[[i]][1]
+      mu <- data$pars[[i]][2]
+      cap <- data$pars[[i]][3]
+      age <- data$age[[i]]
+      file_name <- paste0(path_edge, "/edge_", la, "_", mu, "_", cap, "_", age, "_", i, ".rds")
+      saveRDS(tree_to_edge_feature(data$tas[[i]], undirected = undirected), file = file_name)
+    }
+  } else if (which == "tes") {
+    for (i in seq_along(data$tes)) {
+      la <- data$pars[[i]][1]
+      mu <- data$pars[[i]][2]
+      cap <- data$pars[[i]][3]
+      age <- data$age[[i]]
+      file_name <- paste0(path, "/tree_", la, "_", mu, "_", cap, "_", age, "_", i, ".rds")
+      saveRDS(tree_to_connectivity(data$tes[[i]], undirected = undirected), file = file_name)
+    }
+    for (i in seq_along(data$tes)) {
+      la <- data$pars[[i]][1]
+      mu <- data$pars[[i]][2]
+      cap <- data$pars[[i]][3]
+      age <- data$age[[i]]
+      file_name <- paste0(path_node, "/node_", la, "_", mu, "_", cap, "_", age, "_", i, ".rds")
+      saveRDS(tree_to_node_feature(data$tes[[i]]), file = file_name)
+    }
+    for (i in seq_along(data$tes)) {
+      la <- data$pars[[i]][1]
+      mu <- data$pars[[i]][2]
+      cap <- data$pars[[i]][3]
+      age <- data$age[[i]]
+      file_name <- paste0(path_edge, "/edge_", la, "_", mu, "_", cap, "_", age, "_", i, ".rds")
+      saveRDS(tree_to_edge_feature(data$tes[[i]]), file = file_name)
+    }
+  }
+}
