@@ -285,15 +285,15 @@ def main():
     filtered_testing_data = [data for data in sum_testing_data if data.edge_index.shape != torch.Size([2, 2])]
 
     class TreeData(InMemoryDataset):
-            def __init__(self, root, data_list, transform=None, pre_transform=None):
-                super(TreeData, self).__init__(root, transform, pre_transform)
-                self.data, self.slices = self.collate(data_list)
+        def __init__(self, root, data_list, transform=None, pre_transform=None):
+            super(TreeData, self).__init__(root, transform, pre_transform)
+            self.data, self.slices = self.collate(data_list)
 
-            def _download(self):
-                pass  # No download required
+        def _download(self):
+            pass  # No download required
 
-            def _process(self):
-                pass  # No processing required
+        def _process(self):
+            pass  # No processing required
 
     max_nodes_train = max([data.num_nodes for data in filtered_training_data])
     max_nodes_test = max([data.num_nodes for data in filtered_testing_data])
