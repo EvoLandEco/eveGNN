@@ -440,7 +440,9 @@ def main():
                         data.batch)
             print(out.shape)
             print(data.y.shape)
-            loss = criterion(out, data.y.view(data.num_nodes.__len__(), 3))
+            num_graphs = data.batch.max().item() + 1
+            print(num_graphs)
+            loss = criterion(out, data.y.view(num_graphs, 3))
             loss.backward()
             total_loss += loss.item() * data.num_graphs
             optimizer.step()
