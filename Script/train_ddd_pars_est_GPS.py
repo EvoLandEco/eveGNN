@@ -437,6 +437,8 @@ def main():
             model.redraw_projection.redraw_projections()
             out = model(data.x, data.pe, data.edge_index, data.edge_attr,
                         data.batch)
+            print(out.shape)
+            print(data.y.shape)
             loss = (out.squeeze() - data.y).abs().mean()
             loss.backward()
             total_loss += loss.item() * data.num_graphs
