@@ -28,6 +28,8 @@ epoch_number = 21
 cap_norm_factor = 1000
 attn_kwargs = {'dropout': 0.5}
 attn_type = 'performer'
+training_batch_size = 16
+testing_batch_size = 16
 
 
 def read_table(path):
@@ -353,9 +355,9 @@ def main():
     # validation_dataset = TreeData(root=None, data_list=filtered_validation_data, transform=transform)
     testing_dataset = TreeData(root=None, data_list=filtered_testing_data, transform=transform)
 
-    train_loader = DataLoader(training_dataset, batch_size=32, shuffle=True)
+    train_loader = DataLoader(training_dataset, batch_size=training_batch_size, shuffle=True)
     # val_loader = DataLoader(validation_dataset, batch_size=64)
-    test_loader = DataLoader(testing_dataset, batch_size=64)
+    test_loader = DataLoader(testing_dataset, batch_size=testing_batch_size)
 
     class GPS(torch.nn.Module):
         def __init__(self, channels: int, pe_dim: int, num_layers: int,
@@ -422,7 +424,7 @@ def main():
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f'Using device: {device}')
-    model = GPS(channels=64, pe_dim=8, num_layers=5, attn_type=attn_type,
+    model = GPS(channels=64, pe_dim=8, num_layers=10, attn_type=attn_type,
                 attn_kwargs=attn_kwargs).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-5)
     criterion = torch.nn.MSELoss().to(device)
