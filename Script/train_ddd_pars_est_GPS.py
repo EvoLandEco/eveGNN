@@ -422,7 +422,7 @@ def main():
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f'Using device: {device}')
-    model = GPS(channels=64, pe_dim=8, num_layers=10, attn_type=attn_type,
+    model = GPS(channels=64, pe_dim=8, num_layers=5, attn_type=attn_type,
                 attn_kwargs=attn_kwargs).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-5)
     criterion = torch.nn.MSELoss().to(device)
