@@ -28,7 +28,7 @@ epoch_number = 21
 cap_norm_factor = 1000
 attn_kwargs = {'dropout': 0.5}
 attn_type = 'performer'
-training_batch_size = 16
+training_batch_size = 1
 testing_batch_size = 16
 
 
