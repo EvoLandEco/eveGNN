@@ -5,6 +5,7 @@ import pyreadr
 import torch
 import glob
 import functools
+import random
 import torch_geometric.transforms as T
 import torch.nn.functional as F
 from math import ceil
@@ -290,6 +291,14 @@ def get_testing_data(data_list):
     return testing_data
 
 
+def shuffle_data(data_list):
+    # Create a copy of the data list to shuffle
+    shuffled_list = data_list.copy()
+    # Shuffle the copied list in place
+    random.shuffle(shuffled_list)
+    return shuffled_list
+
+
 def export_to_rds(embeddings, epoch, name, task_type, which_set):
     # Convert to DataFrame
     df = pd.DataFrame(embeddings, columns=[f"dim_{i}" for i in range(embeddings.shape[1])])
@@ -329,6 +338,8 @@ def main():
     print(f"Now reading {task_type}...")
     # Read the .rds files into a list of PyTorch Geometric Data objects
     current_dataset = read_rds_to_pytorch(full_dir, rds_count, metric)
+    # Shuffle the data
+    current_dataset = shuffle_data(current_dataset)
     current_training_data = get_training_data(current_dataset)
     current_testing_data = get_testing_data(current_dataset)
     training_dataset_list.append(current_training_data)
@@ -455,6 +466,7 @@ def main():
         diffs_all = torch.tensor([], dtype=torch.float, device=device)
         outputs_all = torch.tensor([], dtype=torch.float, device=device)  # To store all outputs
         y_all = torch.tensor([], dtype=torch.float, device=device)  # To store all y
+        nodes_all = torch.tensor([], dtype=torch.long, device=device)  # To store all node numbers
 
         for data in loader:
             data.to(device)
@@ -463,11 +475,12 @@ def main():
             diffs_all = torch.cat((diffs_all, diffs), dim=0)
             outputs_all = torch.cat((outputs_all, out_re), dim=0)  # Concatenate the outputs
             y_all = torch.cat((y_all, data.y.view(data.num_nodes.__len__(), 4)), dim=0)  # Concatenate the y
+            nodes_all = torch.cat((nodes_all, data.num_nodes), dim=0)  # Concatenate the node numbers
 
         print(f"diffs_all length: {len(diffs_all)}; test_loader.dataset length: {len(test_loader.dataset)}; Equal: {len(diffs_all) == len(test_loader.dataset)}")
         mean_diffs = torch.sum(diffs_all, dim=0) / len(test_loader.dataset)
 
-        return mean_diffs.cpu().detach().numpy(), diffs_all.cpu().detach().numpy(), outputs_all.cpu().detach().numpy(), y_all.cpu().detach().numpy()
+        return mean_diffs.cpu().detach().numpy(), diffs_all.cpu().detach().numpy(), outputs_all.cpu().detach().numpy(), y_all.cpu().detach().numpy(), nodes_all.cpu().detach().numpy()
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Training using {device}")
@@ -513,6 +526,7 @@ def main():
     final_test_diffs = []
     final_test_predictions = []
     final_test_y = []
+    final_test_nodes = []
 
     # Paths for saving embeddings
     train_dir = os.path.join(name, task_type, "training")
@@ -527,7 +541,7 @@ def main():
     # Training loop
     for epoch in range(1, epoch_number):
         train_loss_all = train()
-        test_mean_diffs, test_diffs_all, test_predictions, test_y = test_diff(test_loader)
+        test_mean_diffs, test_diffs_all, test_predictions, test_y, test_nodes_all = test_diff(test_loader)
         test_mean_diffs[2] = test_mean_diffs[2] / beta_n_norm_factor
         test_mean_diffs[3] = test_mean_diffs[3] / beta_phi_norm_factor
         print(f'Epoch: {epoch:03d}, Par 1 Mean Diff: {test_mean_diffs[0]:.4f}, Par 2 Mean Diff: {test_mean_diffs[1]:.4f}, Par 3 Mean Diff: {test_mean_diffs[2]:.4f}, Par 4 Mean Diff: {test_mean_diffs[3]:.4f}')
@@ -539,9 +553,11 @@ def main():
         final_test_diffs = test_diffs_all
         final_test_predictions = test_predictions
         final_test_y = test_y
+        final_test_nodes = test_nodes_all
         print(f"Final test diffs length: {len(final_test_diffs)}")
         print(f"Final predictions length: {len(final_test_predictions)}")
         print(f"Final y length: {len(final_test_y)}")
+        print(f"Final nodes length: {len(final_test_nodes)}")
 
     print("Finished training, saving model...")
     torch.save(model.state_dict(), os.path.join(name, task_type, f"{task_type}_{metric}_model_diffpool_reg.pt"))
@@ -603,6 +619,7 @@ def main():
 
     try:
         final_differences = pd.DataFrame(final_test_diffs, columns=["lambda_diff", "mu_diff", "beta_n_diff", "beta_phi_diff"])
+        final_differences["num_nodes"] = final_test_nodes
     except Exception as e:
         print("Error occurred while creating the final_differences DataFrame:", str(e))
 
