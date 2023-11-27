@@ -14,7 +14,7 @@ from torch_geometric.loader import DenseDataLoader
 from torch_geometric.nn import DenseGCNConv as GCNConv, dense_diff_pool
 
 # Global variables
-epoch_number = 21
+epoch_number = 51
 cap_norm_factor = 1000
 
 
@@ -430,7 +430,7 @@ def main():
 
     model = DiffPool()
     model = model.to(device)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=0.001)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     criterion = torch.nn.MSELoss().to(device)
 
     def shape_check(dataset, max_nodes):
