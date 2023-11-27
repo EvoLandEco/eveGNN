@@ -15,6 +15,7 @@ from torch_geometric.nn import DenseGCNConv as GCNConv, dense_diff_pool
 
 # Global variables
 epoch_number = 21
+cap_norm_factor = 1000
 
 
 def read_table(path):
@@ -181,9 +182,9 @@ def read_rds_to_pytorch(path, count):
         params = get_params(filename)
         params_list.append(params)
 
-    # Normalize carrying capacity by dividing by 1000
+    # Normalize carrying capacity by dividing by a factor
     for vector in params_list:
-        vector[2] = vector[2] / 1000
+        vector[2] = vector[2] / cap_norm_factor
 
     check_list_count(count, data_list, length_list, params_list)
 
@@ -399,16 +400,18 @@ def main():
         model.eval()
 
         diffs_all = torch.tensor([], dtype=torch.float, device=device)
+        nodes_all = torch.tensor([], dtype=torch.long, device=device)
 
         for data in loader:
             data.to(device)
             out, _, _ = model(data.x, data.adj, data.mask)
             diffs = torch.abs(out - data.y.view(data.num_nodes.__len__(), 3))
             diffs_all = torch.cat((diffs_all, diffs), dim=0)
+            nodes_all = torch.cat((nodes_all, data.num_nodes), dim=0)
 
         print(f"diffs_all length: {len(diffs_all)}; test_loader.dataset length: {len(test_loader.dataset)}; Equal: {len(diffs_all) == len(test_loader.dataset)}")
         mean_diffs = torch.sum(diffs_all, dim=0) / len(test_loader.dataset)
-        return mean_diffs.cpu().detach().numpy(), diffs_all.cpu().detach().numpy()
+        return mean_diffs.cpu().detach().numpy(), diffs_all.cpu().detach().numpy(), nodes_all.cpu().detach().numpy()
 
     @torch.no_grad()
     def compute_validation_loss():
@@ -466,6 +469,7 @@ def main():
     train_loss_history = []
     test_loss_history = []
     final_test_diffs = []
+    final_test_nodes = []
 
     train_dir = os.path.join(name, task_type, "training")
     test_dir = os.path.join(name, task_type, "testing")
@@ -479,7 +483,7 @@ def main():
     for epoch in range(1, epoch_number):
         train_loss_all = train()
         test_loss_all = compute_validation_loss()
-        test_mean_diffs, test_diffs_all = test_diff(test_loader)
+        test_mean_diffs, test_diffs_all, test_nodes_all = test_diff(test_loader)
         print(f'Epoch: {epoch:03d}, Par 1 Mean Diff: {test_mean_diffs[0]:.4f}, Par 2 Mean Diff: {test_mean_diffs[1]:.4f}, Par 3 Mean Diff: {test_mean_diffs[2]:.4f}, Train Loss: {train_loss_all:.4f}, Test Loss: {test_loss_all:.4f}')
 
         # Record the values
@@ -487,6 +491,7 @@ def main():
         train_loss_history.append(train_loss_all)
         test_loss_history.append(test_loss_all)
         final_test_diffs = test_diffs_all
+        final_test_nodes = test_nodes_all
         print(f"Final test diffs length: {len(final_test_diffs)}")
 
     # Save the model
@@ -508,6 +513,7 @@ def main():
     # Convert the dictionary to a pandas DataFrame
     model_performance = pd.DataFrame(data_dict)
     final_differences = pd.DataFrame(final_test_diffs, columns=["lambda_diff", "mu_diff", "cap_diff"])
+    final_differences["num_nodes"] = final_test_nodes
     # Save the data to a file using pyreadr
     pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_diffpool.rds"), model_performance)
     pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_diffs_diffpool.rds"), final_differences)
