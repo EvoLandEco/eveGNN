@@ -329,6 +329,12 @@ def main():
             self.convs.append(GCNConv(hidden_channels, hidden_channels, normalize))
             self.bns.append(torch.nn.BatchNorm1d(hidden_channels))
 
+            self.convs.append(GCNConv(hidden_channels, hidden_channels, normalize))
+            self.bns.append(torch.nn.BatchNorm1d(hidden_channels))
+
+            self.convs.append(GCNConv(hidden_channels, hidden_channels, normalize))
+            self.bns.append(torch.nn.BatchNorm1d(hidden_channels))
+
             self.convs.append(GCNConv(hidden_channels, out_channels, normalize))
             self.bns.append(torch.nn.BatchNorm1d(out_channels))
 
