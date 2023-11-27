@@ -12,7 +12,6 @@ if (!dir.exists("DDD_FREE_TES")) {
   dir.create("DDD_FREE_TES")
 }
 
-dir.create("DDD_FREE_TES")
 setwd("DDD_FREE_TES")
 
 dists <- list(

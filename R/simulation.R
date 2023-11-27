@@ -34,6 +34,15 @@ randomized_ddd_fixed_age <- function(dists, cap_range, age, model) {
 }
 
 
+#' @export randomized_pbd_fixed_age
+randomized_pbd_fixed_age <- function(dists, age) {
+  params <- generate_params(dists)
+  result <- pbd_sim(pars = unlist(params), age = age, soc = 2)
+
+  return(result)
+}
+
+
 #' @export randomized_eve_fixed_age
 randomized_eve_fixed_age <- function(dists, age, model, metric, offset) {
   ntip <- 0
