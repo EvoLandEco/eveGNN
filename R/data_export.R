@@ -150,7 +150,7 @@ export_to_gnn_with_params_pbd <- function(data, which = "tes", undirected = FALS
       mu1 <- data$pars[[i]][4]
       mu2 <- data$pars[[i]][5]
       age <- data$age[[i]]
-      file_name <- paste0(path, "/EL_", la1, "_", la2, "_", la3, "_", mu1, "_", mu2, "_", age, "_", i, ".rds")
+      file_name <- paste0(path_EL, "/EL_", la1, "_", la2, "_", la3, "_", mu1, "_", mu2, "_", age, "_", i, ".rds")
       saveRDS(tree_to_adj_mat(data$tas[[i]]), file = file_name)
     }
   } else if (which == "tes") {
@@ -171,7 +171,7 @@ export_to_gnn_with_params_pbd <- function(data, which = "tes", undirected = FALS
       mu1 <- data$pars[[i]][4]
       mu2 <- data$pars[[i]][5]
       age <- data$age[[i]]
-      file_name <- paste0(path, "/EL_", la1, "_", la2, "_", la3, "_", mu1, "_", mu2, "_", age, "_", i, ".rds")
+      file_name <- paste0(path_EL, "/EL_", la1, "_", la2, "_", la3, "_", mu1, "_", mu2, "_", age, "_", i, ".rds")
       saveRDS(tree_to_adj_mat(data$tes[[i]]), file = file_name)
     }
   }
