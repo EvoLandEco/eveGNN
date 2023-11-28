@@ -175,8 +175,9 @@ pbd_sim <- function(pars, age, soc = 2, limitsize = Inf)
   absL[, 2] <- abs(L[, 2])
   tree <- ape::as.phylo(ape::read.tree(text = detphy(absL, age)))
   pars <- c(la1, la2, la3, mu1, mu2)
+  brts <- treestats::branching_times(tree)
 
-  Ltreeslist <- list(tes = tree, pars = pars, age = age)
+  Ltreeslist <- list(tes = tree, pars = pars, age = age, brts = brts)
 
   return(Ltreeslist)
 }
