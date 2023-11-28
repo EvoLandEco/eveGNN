@@ -28,3 +28,19 @@ pbd_free_tes_list <- future.apply::future_replicate(50000, eveGNN::randomized_pb
 pbd_free_tes_list <- purrr::transpose(pbd_free_tes_list)
 
 eveGNN::export_to_gnn_with_params_pbd(pbd_free_tes_list, "tes", undirected = FALSE)
+
+# pbd_free_tes_list_test <- eveGNN::get_test_data(pbd_free_tes_list, 0.005)
+#
+# if (!dir.exists("MLE")) {
+#   dir.create("MLE")
+# }
+#
+# setwd("MLE")
+#
+# test_pbd_ml <- PBD::pbd_ML(brts = pbd_free_tes_list$brts[[1]],
+#        idparsopt = c(1, 2, 3),
+#        exteq = 1,
+#        btorph = 0,
+#        soc = 2,
+#       # cond = 0,
+#        verbose = FALSE)
