@@ -14,7 +14,7 @@ from torch_geometric.loader import DenseDataLoader
 from torch_geometric.nn import DenseGCNConv as GCNConv, dense_diff_pool
 
 # Global variables
-epoch_number = 51
+epoch_number = 21
 cap_norm_factor = 1000
 
 
@@ -310,7 +310,7 @@ def main():
     max_nodes = max(max_nodes_train, max_nodes_test)
     # Hacking max_nodes is needed to match out-of-sample validation dataset
     # max_nodes should actually be max(max_nodes_train, max_nodes_test, max_nodes_val)
-    # max_nodes = 2012
+    max_nodes = 2012
 
     training_dataset = TreeData(root=None, data_list=filtered_training_data, transform=T.ToDense(max_nodes))
     testing_dataset = TreeData(root=None, data_list=filtered_testing_data, transform=T.ToDense(max_nodes))
