@@ -219,6 +219,7 @@ while true; do
             while true; do
                 echo
                 echo "Please select one or more data-set(s) that should be generated, must be a combination of B, D, P, E or single A, N, Q."
+                echo
                 echo "(B)irth-Death Trees"
                 echo "(D)iversity-Dependent-Diversification Trees"
                 echo "(P)rotracted Birth-Death Trees"
@@ -226,8 +227,9 @@ while true; do
                 echo
                 echo "(A)ll the above"
                 echo
-                echo "(N) togo back"
+                echo "(N) to go back"
                 echo "(Q) to abort"
+                echo
 
                 read -p "Enter your choice: " sim_func_input
                 valid_input=true
@@ -255,6 +257,7 @@ while true; do
                                 *)
                                     echo
                                     echo "Invalid input. Please enter a combination of B, D, P, E, or single A, N, Q."
+                                    echo
                                     valid_input=false
                                     break
                                     ;;
@@ -291,6 +294,7 @@ while true; do
                                 ;;
                         esac
                     done
+                    break
                 fi
             done
             ;;
