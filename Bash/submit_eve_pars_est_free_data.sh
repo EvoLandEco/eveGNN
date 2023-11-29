@@ -1,10 +1,11 @@
 #!/bin/bash
-#SBATCH --time=23:00:00
+#SBATCH --time=3-23:59:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
+#SBATCH --cpus-per-task=6
 #SBATCH --job-name=gnn_eve_pars_free
 #SBATCH --output=logs/gnn_eve_pars_free-%j.log
-#SBATCH --mem=16GB
+#SBATCH --mem=64GB
 #SBATCH --partition=regular
 
 name=${1}
