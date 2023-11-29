@@ -322,12 +322,10 @@ while true; do
 
                         for folder in "$name"/*_*_*; do
                             if [ -d "$folder" ]; then
-                                echo "true"
                                 function_name=$(interpret_folder_name "$(basename "$folder")")
                                 echo "$function_name"
-                                if [ "$function_name" != "Unknown" ] && [ -z "${folder_types[$function_name]}" ]; then
+                                if [ "$function_name" != "Unknown" ]; then
                                     folder_types[$function_name]=1
-                                    echo "true"
                                     unique_folder_types+=("$function_name")
                                 fi
                                 echo "$unique_folder_types"
