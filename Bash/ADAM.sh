@@ -390,7 +390,7 @@ main_menu() {
                                 echo
                                 echo "Found the following data-set type(s):"
                                 echo
-                                echo "Select a data-set type or 'All' to proceed with all data-sets:"
+                                echo "Select a data-set or 'All' to proceed with all data-sets:"
                                 select folder_type_option in "${unique_folder_types[@]}" "All" "Back"; do
                                     case $folder_type_option in
                                         "All")
@@ -434,7 +434,7 @@ main_menu() {
                             ;;
                         3)
                             echo
-                            echo "Selected model: $model_choice"
+                            echo "Selected GNN model: $model_choice"
                             # List unique folder types using shell's glob pattern
                             local -A folder_types
                             local unique_folder_types
@@ -536,9 +536,9 @@ main_menu() {
                     echo "No data-set found."
                 else
                     echo
-                    echo "Found the following data-set type(s):"
+                    echo "Found the following data-set(s):"
                     echo
-                    echo "Select a data-set type or 'All' to proceed with all data-sets:"
+                    echo "Select a data-set or 'All' to proceed with all data-sets:"
                     select folder_type_option in "${unique_folder_types[@]}" "All" "Cancel"; do
                         case $folder_type_option in
                             "All")
@@ -589,10 +589,10 @@ main_menu() {
                             done
                         else
                             echo
-                            echo "Selected folder type for removal:"
+                            echo "Selected data-set for removal:"
                             printf '%s\n' "${selected_folder_types[@]}"
                             echo
-                            read -p "Are you sure you want to remove all folders of this type? (y/N): " confirm
+                            read -p "Are you sure you want to remove this data-set? (y/N): " confirm
                             if [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]]; then
                                 for folder_type in "${selected_folder_types[@]}"; do
                                     for folder in "$name"/*_*_*; do
