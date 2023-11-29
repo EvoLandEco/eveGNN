@@ -38,8 +38,84 @@ interpret_folder_name() {
     esac
 }
 
+interpret_combination() {
+    local combination=$1
+    local A=${combination%%_*}
+    local B=${combination##*_}
+
+    case $A in
+        FREE)
+            A="model training"
+            ;;
+        VAL)
+            A="model out-of-sample validation"
+            ;;
+    esac
+
+    echo "$A data-set ($B trees)"
+}
+
+verify_data_integrity() {
+    local name=$1
+    echo "Verifying simulation data integrity..."
+
+    if [ ! -d "$name" ]; then
+        echo "The specified folder '$name' does not exist."
+        return 1
+    fi
+
+    IFS=$'\n' read -r -d '' -a raw_folders <<< "$(find "$name" -type d -name "*_*_*")"
+    declare -A unique_first_parts
+    for folder in "${raw_folders[@]}"; do
+        function_name=$(interpret_folder_name "$(basename "$folder")")
+        if [ "$function_name" != "Unknown" ]; then
+            unique_first_parts[$function_name]=1
+        fi
+    done
+
+    if [ ${#unique_first_parts[@]} -eq 0 ]; then
+        echo "No simulation data detected."
+        return 1
+    fi
+
+    local failed_check=0
+    for first_part in "${!unique_first_parts[@]}"; do
+        local combinations=("FREE_TES" "FREE_TAS" "VAL_TES" "VAL_TAS")
+
+        for combination in "${combinations[@]}"; do
+            local found_combination=0
+            for folder in "${raw_folders[@]}"; do
+                if [[ "$(basename "$folder")" == "$first_part"_"$combination" ]]; then
+                    found_combination=1
+                    break
+                fi
+            done
+            if [ $found_combination -eq 0 ]; then
+                local interpreted_combination=$(interpret_combination "$combination")
+                echo "WARNING: Missing $interpreted_combination in the $first_part data-set."
+                failed_check=1
+            fi
+        done
+    done
+
+    if [ $failed_check -eq 0 ]; then
+        echo "Passed."
+    else
+        echo "Data integrity check failed. Consider re-running the simulation."
+    fi
+}
+
 # Automated Data Manager for eveGNN
-echo "Automated Data Manager for eveGNN"
+echo "  █████╗ ██████╗  █████╗ ███╗   ███╗ "
+echo " ██╔══██╗██╔══██╗██╔══██╗████╗ ████║ "
+echo " ███████║██║  ██║███████║██╔████╔██║ "
+echo " ██╔══██║██║  ██║██╔══██║██║╚██╔╝██║ "
+echo " ██║  ██║██████╔╝██║  ██║██║ ╚═╝ ██║ "
+echo " ╚═╝  ╚═╝╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝ "
+
+echo "Welcome to the Automated Data Manager for eveGNN."
+
+verify_data_integrity "/path/to/name"
 
 while true; do
     echo "Please select a task:"
