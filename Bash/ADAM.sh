@@ -114,44 +114,68 @@ verify_data_at_start() {
 check_data_integrity() {
     local name=$1
     echo
-    echo "Checking data integrity in $name..."
+    echo "Checking data integrity in project $name..."
 
     # Possible combinations excluding MLE_TES
     local combinations=("FREE_TES" "FREE_TAS" "VAL_TES" "VAL_TAS")
-    local found_any_format=0
 
     for combination in "${combinations[@]}"; do
         for folder in "$name"/*_"$combination"; do
             if [ -d "$folder" ]; then
+                # Extract and interpret parts
                 local part1=$(basename "$folder" | cut -d '_' -f1)
+                local part2=$(basename "$folder" | cut -d '_' -f2)
+                local part3=$(basename "$folder" | cut -d '_' -f3)
                 local interpreted_part1=$(interpret_folder_name "$part1")
-
                 local found_format=0
+
+                # Check for GNN and GPS folders
                 if [ -d "$folder/GNN" ]; then
                     found_format=1
-                    found_any_format=1
-                    # (Continue with the existing logic for GNN)
+                    echo
+                    echo "Found GNN data format in $interpreted_part1 $part2 $part3"
+                    echo
+                    local count_tree=$(find "$folder/GNN/tree" -maxdepth 1 -name "*.rds" | wc -l)
+                    local count_el=$(find "$folder/GNN/tree/EL" -maxdepth 1 -name "*.rds" | wc -l)
+                    echo "Count in tree: $count_tree, Count in tree/EL: $count_el"
+                    if [ "$count_tree" -eq "$count_el" ]; then
+                        echo
+                        echo "Consistency check passed for GNN format."
+                    else
+                        echo
+                        echo "WARNING: Inconsistent file counts in GNN format."
+                    fi
                 fi
                 if [ -d "$folder/GPS" ]; then
                     found_format=1
-                    found_any_format=1
-                    # (Continue with the existing logic for GPS)
+                    echo
+                    echo "Found GPS data format in $interpreted_part1 $part2 $part3"
+                    echo
+                    local count_tree=$(find "$folder/GPS/tree" -maxdepth 1 -name "*.rds" | wc -l)
+                    local count_edge=$(find "$folder/GPS/tree/edge" -maxdepth 1 -name "*.rds" | wc -l)
+                    local count_node=$(find "$folder/GPS/tree/node" -maxdepth 1 -name "*.rds" | wc -l)
+                    echo "Count in tree: $count_tree, Count in tree/edge: $count_edge, Count in tree/node: $count_node"
+                    if [ "$count_tree" -eq "$count_edge" ] && [ "$count_tree" -eq "$count_node" ]; then
+                        echo
+                        echo "Consistency check passed for GPS format."
+                    else
+                        echo
+                        echo "WARNING: Inconsistent file counts in GPS format."
+                    fi
                 fi
 
+                # Check if no format was found
                 if [ $found_format -eq 0 ]; then
                     echo
-                    echo "WARNING: No recognizable data format found in $interpreted_part1 $part1"
+                    echo "WARNING: Neither GNN nor GPS data formats found in $interpreted_part1 $part2 $part3."
                 fi
             fi
         done
     done
-
-    if [ $found_any_format -eq 0 ]; then
-        echo "WARNING: No recognizable data formats were found in any of the datasets."
-    fi
 }
 
-# Automated Data Manager for eveGNN
+
+# Start Page: Automated Data Manager for eveGNN
 echo
 echo
 echo
@@ -194,7 +218,9 @@ while true; do
                 echo "(D)iversity-Dependent-Diversification Trees"
                 echo "(P)rotracted Birth-Death Trees"
                 echo "(E)volutionary-Relatedness-Dependent Trees"
+                echo
                 echo "(A)ll the above"
+                echo
                 echo "(N) togo back"
                 echo "(Q) to abort"
 
@@ -467,27 +493,7 @@ while true; do
             fi
             ;;
         C)
-            while true; do
-                echo
-                echo "Are you sure? Integrity check may take a while."
-                echo
-                echo "(C)heck integrity of existing data"
-                echo "(Q)uit"
-
-                read -p "Enter your choice: " choice
-                case $choice in
-                    C|c)
-                        check_data_integrity "$name"
-                        ;;
-                    Q|q)
-                        echo "Exiting..."
-                        break
-                        ;;
-                    *)
-                        echo "Invalid choice."
-                        ;;
-                esac
-            done
+            check_data_integrity "$name"
             ;;
         Q)
             echo
