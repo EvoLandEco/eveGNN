@@ -116,6 +116,7 @@ check_data_integrity() {
     local name=$1
     echo
     echo "Checking data integrity in project $name, this may take a while..."
+    echo
 
     # Possible combinations excluding MLE_TES
     local combinations=("FREE_TES" "FREE_TAS" "VAL_TES" "VAL_TAS")
@@ -129,14 +130,13 @@ check_data_integrity() {
                 local part2=$(basename "$folder" | cut -d '_' -f2)
                 local part3=$(basename "$folder" | cut -d '_' -f3)
                 local interpreted_part1=$(interpret_folder_name "$part1")
+                local interpreted_part2=$(interpret_combination "${part2}_${part3}")
                 local found_format=0
 
                 # Check for GNN and GPS folders
                 if [ -d "$folder/GNN" ]; then
                     found_format=1
-                    echo
-                    echo "Found GNN data format in $interpreted_part1 $part2 $part3"
-                    echo
+                    echo "Found GNN data format in $interpreted_part1 $interpreted_part2"
                     local count_tree=$(find "$folder/GNN/tree" -maxdepth 1 -name "*.rds" | wc -l)
                     local count_el=$(find "$folder/GNN/tree/EL" -maxdepth 1 -name "*.rds" | wc -l)
                     echo "Count in tree: $count_tree, Count in tree/EL: $count_el"
@@ -147,9 +147,7 @@ check_data_integrity() {
                 fi
                 if [ -d "$folder/GPS" ]; then
                     found_format=1
-                    echo
-                    echo "Found GPS data format in $interpreted_part1 $part2 $part3"
-                    echo
+                    echo "Found GPS data format in $interpreted_part1 $interpreted_part2"
                     local count_tree=$(find "$folder/GPS/tree" -maxdepth 1 -name "*.rds" | wc -l)
                     local count_edge=$(find "$folder/GPS/tree/edge" -maxdepth 1 -name "*.rds" | wc -l)
                     local count_node=$(find "$folder/GPS/tree/node" -maxdepth 1 -name "*.rds" | wc -l)
@@ -163,7 +161,7 @@ check_data_integrity() {
                 # Check if no format was found
                 if [ $found_format -eq 0 ]; then
                     echo
-                    echo "WARNING: Neither GNN nor GPS data formats found in $interpreted_part1 $part2 $part3."
+                    echo "WARNING: Neither GNN nor GPS data formats found in $interpreted_part1 $interpreted_part2."
                     all_checks_passed=0
                 fi
             fi
