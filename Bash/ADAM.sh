@@ -300,12 +300,12 @@ main_menu() {
                             # List unique folder types using shell's glob pattern
                             local -A folder_types
                             local unique_folder_types
+                            folder_types=()
                             unique_folder_types=()
 
                             for folder in "$name"/*_*_*; do
                                 if [ -d "$folder" ]; then
                                     function_name=$(interpret_folder_name "$(basename "$folder")")
-                                    echo "$function_name"
                                     if [ "$function_name" != "Unknown" ] && [ -z "${folder_types[$function_name]}" ]; then
                                         folder_types[$function_name]=1
                                         unique_folder_types+=("$function_name")
