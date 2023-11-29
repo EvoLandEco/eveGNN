@@ -64,12 +64,15 @@ verify_data_integrity() {
         return 1
     fi
 
-    IFS=$'\n' read -r -d '' -a raw_folders <<< "$(find "$name" -type d -name "*_*_*")"
+    # Directly list folders at the specified path
+    local raw_folders=("$name"/*_*_*)
     declare -A unique_first_parts
     for folder in "${raw_folders[@]}"; do
-        function_name=$(interpret_folder_name "$(basename "$folder")")
-        if [ "$function_name" != "Unknown" ]; then
-            unique_first_parts[$function_name]=1
+        if [ -d "$folder" ]; then
+            function_name=$(interpret_folder_name "$(basename "$folder")")
+            if [ "$function_name" != "Unknown" ]; then
+                unique_first_parts[$function_name]=1
+            fi
         fi
     done
 
@@ -78,6 +81,11 @@ verify_data_integrity() {
         return 1
     fi
 
+    echo "Unique data-set types detected:"
+    for first_part in "${!unique_first_parts[@]}"; do
+        echo "- $first_part"
+    done
+
     local failed_check=0
     for first_part in "${!unique_first_parts[@]}"; do
         local combinations=("FREE_TES" "FREE_TAS" "VAL_TES" "VAL_TAS")
@@ -85,7 +93,7 @@ verify_data_integrity() {
         for combination in "${combinations[@]}"; do
             local found_combination=0
             for folder in "${raw_folders[@]}"; do
-                if [[ "$(basename "$folder")" == "$first_part"_"$combination" ]]; then
+                if [ -d "$folder" ] && [[ "$(basename "$folder")" == "$first_part"_"$combination" ]]; then
                     found_combination=1
                     break
                 fi
@@ -101,7 +109,7 @@ verify_data_integrity() {
     if [ $failed_check -eq 0 ]; then
         echo "Passed."
     else
-        echo "Data integrity check failed. Consider re-running the simulation."
+        echo "Data integrity check failed."
     fi
 }
 
