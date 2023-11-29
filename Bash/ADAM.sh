@@ -477,8 +477,7 @@ while true; do
                 read -p "Enter your choice: " choice
                 case $choice in
                     C|c)
-                        read -p "Enter the path to the data folder: " data_folder
-                        check_data_integrity "$data_folder"
+                        check_data_integrity "$name"
                         ;;
                     Q|q)
                         echo "Exiting..."
