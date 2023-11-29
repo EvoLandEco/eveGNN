@@ -316,16 +316,17 @@ while true; do
                     1|2|3)
                         echo
                         echo "Selected model: $model_choice"
-                        # List unique folder types
-                        IFS=$'\n' read -r -d '' -a raw_folders <<< "$(find "$name" -type d -name "*_*_*")"
+                        # List unique folder types using shell's glob pattern
                         declare -A folder_types
                         unique_folder_types=()
 
-                        for folder in "${raw_folders[@]}"; do
-                            function_name=$(interpret_folder_name "$(basename "$folder")")
-                            if [ "$function_name" != "Unknown" ] && [ -z "${folder_types[$function_name]}" ]; then
-                                folder_types[$function_name]=1
-                                unique_folder_types+=("$function_name")
+                        for folder in "$name"/*_*_*; do
+                            if [ -d "$folder" ]; then
+                                function_name=$(interpret_folder_name "$(basename "$folder")")
+                                if [ "$function_name" != "Unknown" ] && [ -z "${folder_types[$function_name]}" ]; then
+                                    folder_types[$function_name]=1
+                                    unique_folder_types+=("$function_name")
+                                fi
                             fi
                         done
 
