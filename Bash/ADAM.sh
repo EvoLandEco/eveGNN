@@ -546,7 +546,7 @@ main_menu() {
                                 break
                                 ;;
                             "Cancel")
-                                break 2
+                                break
                                 ;;
                             *)
                                 selected_folder_types=("$folder_type_option")
