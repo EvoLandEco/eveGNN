@@ -330,6 +330,9 @@ while true; do
                             fi
                         done
 
+                        echo "$name"
+                        echo ${#unique_folder_types[@]}
+
                         if [ ${#unique_folder_types[@]} -eq 0 ]; then
                             echo
                             echo "No data-set found."
