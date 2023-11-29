@@ -19,7 +19,7 @@ bd_free_tes_list <- future.apply::future_replicate(50000, eveGNN::randomized_bd_
 
 # Split list into training/testging data and validation (out-of-sample) data
 within_ranges <- list(c(0.52, 0.78), c(0.02, 0.18))
-bd_list_all <- extract_by_range(tree_list = bd_free_tes_list, ranges = within_ranges)
+bd_list_all <- eveGNN::extract_by_range(tree_list = bd_free_tes_list, ranges = within_ranges)
 
 if (!dir.exists("BD_FREE_TES")) {
   dir.create("BD_FREE_TES")

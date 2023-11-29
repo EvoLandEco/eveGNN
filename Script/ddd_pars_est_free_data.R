@@ -24,7 +24,7 @@ ddd_free_tes_list <- future.apply::future_replicate(50000, eveGNN::randomized_dd
 
 # Split list into training/testging data and validation (out-of-sample) data
 within_ranges <- list(c(0.52, 0.98), c(0.02, 0.38), c(100, 900))
-ddd_list_all <- extract_by_range(tree_list = ddd_free_tes_list, ranges = within_ranges)
+ddd_list_all <- eveGNN::extract_by_range(tree_list = ddd_free_tes_list, ranges = within_ranges)
 
 if (!dir.exists("DDD_FREE_TES")) {
   dir.create("DDD_FREE_TES")
