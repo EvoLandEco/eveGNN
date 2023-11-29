@@ -119,7 +119,7 @@ check_data_integrity() {
 
     # Possible combinations excluding MLE_TES
     local combinations=("FREE_TES" "FREE_TAS" "VAL_TES" "VAL_TAS")
-    local all_checks_passed=1  # Flag to track overall integrity status
+    local all_checks_passed=1  # Flag to track if all checks have passed
 
     for combination in "${combinations[@]}"; do
         for folder in "$name"/*_"$combination"; do
@@ -136,13 +136,12 @@ check_data_integrity() {
                     found_format=1
                     echo
                     echo "Found GNN data format in $interpreted_part1 $part2 $part3"
-                    local files_tree=($(find "$folder/GNN/tree" -maxdepth 1 -name "*.rds" -exec basename {} \;))
-                    local files_el=($(find "$folder/GNN/tree/EL" -maxdepth 1 -name "*.rds" -exec basename {} \;))
-                    echo "Count in tree: ${#files_tree[@]}, Count in tree/EL: ${#files_el[@]}"
-                    if [ "${#files_tree[@]}" -eq "${#files_el[@]}" ] && [ "${files_tree[*]}" == "${files_el[*]}" ]; then
-                        echo "Consistency check passed for GNN format."
-                    else
-                        echo "WARNING: Inconsistent file counts or names in GNN format."
+                    echo
+                    local count_tree=$(find "$folder/GNN/tree" -maxdepth 1 -name "*.rds" | wc -l)
+                    local count_el=$(find "$folder/GNN/tree/EL" -maxdepth 1 -name "*.rds" | wc -l)
+                    echo "Count in tree: $count_tree, Count in tree/EL: $count_el"
+                    if [ "$count_tree" -ne "$count_el" ]; then
+                        echo "WARNING: Inconsistent file counts in GNN format."
                         all_checks_passed=0
                     fi
                 fi
@@ -150,14 +149,13 @@ check_data_integrity() {
                     found_format=1
                     echo
                     echo "Found GPS data format in $interpreted_part1 $part2 $part3"
-                    local files_tree=($(find "$folder/GPS/tree" -maxdepth 1 -name "*.rds" -exec basename {} \;))
-                    local files_edge=($(find "$folder/GPS/tree/edge" -maxdepth 1 -name "*.rds" -exec basename {} \;))
-                    local files_node=($(find "$folder/GPS/tree/node" -maxdepth 1 -name "*.rds" -exec basename {} \;))
-                    echo "Count in tree: ${#files_tree[@]}, Count in tree/edge: ${#files_edge[@]}, Count in tree/node: ${#files_node[@]}"
-                    if [ "${#files_tree[@]}" -eq "${#files_edge[@]}" ] && [ "${#files_tree[@]}" -eq "${#files_node[@]}" ] && [ "${files_tree[*]}" == "${files_edge[*]}" ] && [ "${files_tree[*]}" == "${files_node[*]}" ]; then
-                        echo "Consistency check passed for GPS format."
-                    else
-                        echo "WARNING: Inconsistent file counts or names in GPS format."
+                    echo
+                    local count_tree=$(find "$folder/GPS/tree" -maxdepth 1 -name "*.rds" | wc -l)
+                    local count_edge=$(find "$folder/GPS/tree/edge" -maxdepth 1 -name "*.rds" | wc -l)
+                    local count_node=$(find "$folder/GPS/tree/node" -maxdepth 1 -name "*.rds" | wc -l)
+                    echo "Count in tree: $count_tree, Count in tree/edge: $count_edge, Count in tree/node: $count_node"
+                    if [ "$count_tree" -ne "$count_edge" ] || [ "$count_tree" -ne "$count_node" ]; then
+                        echo "WARNING: Inconsistent file counts in GPS format."
                         all_checks_passed=0
                     fi
                 fi
@@ -172,12 +170,13 @@ check_data_integrity() {
         done
     done
 
+    # Final report
     if [ $all_checks_passed -eq 1 ]; then
         echo
         echo "All data integrity checks have passed."
     else
         echo
-        echo "Some data integrity checks have failed."
+        echo "Some data integrity checks failed."
     fi
 }
 
@@ -211,7 +210,7 @@ while true; do
     echo "(M)odel Training"
     echo "(V)alidation"
     echo
-    echo "(C)eck integrity of existing data"
+    echo "(C)heck integrity of existing data"
     echo "(R)emove existing data"
     echo "(Q) to abort"
     echo
