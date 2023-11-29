@@ -188,6 +188,7 @@ while true; do
     case $task in
         D)
             while true; do
+                echo
                 echo "Please select one or more data-set(s) that should be generated, must be a combination of B, D, P, E or single A, N, Q."
                 echo "(B)irth-Death Trees"
                 echo "(D)iversity-Dependent-Diversification Trees"
@@ -467,7 +468,9 @@ while true; do
             ;;
         C)
             while true; do
-                echo "Are you sure to check the integrity of existing data?"
+                echo
+                echo "Are you sure? Integrity check may take a while."
+                echo
                 echo "(C)heck integrity of existing data"
                 echo "(Q)uit"
 
