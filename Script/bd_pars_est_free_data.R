@@ -13,7 +13,7 @@ dists <- list(
   list(distribution = "uniform", n = 1, min = 0.0, max = 0.2)
 )
 
-future::plan("multicore", workers = 16)
+future::plan("multicore", workers = 4)
 
 bd_free_tes_list <- future.apply::future_replicate(50000, eveGNN::randomized_bd_fixed_age(dists, age = 10), simplify = FALSE)
 
