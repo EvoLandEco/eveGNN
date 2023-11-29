@@ -16,7 +16,11 @@ all_differences <- function(x, y) {
   }
 
   all_diff <- x - y
-  return(abs(all_diff))
+  result <- list()
+  result$diff <- all_diff
+  result$mle <- x
+  result$true <- y
+  return(result)
 }
 
 
@@ -233,4 +237,71 @@ sample2 <- function(x,size,replace = FALSE,prob = NULL)
   }
   sam <- sample(x,size,replace,prob)
   return(sam)
+}
+
+
+#' @export extract_by_range
+extract_by_range <- function(tree_list, ranges) {
+  # Initialize empty lists to store the results
+  within_range <- list()
+  outside_range <- list()
+
+  # Iterate over each element in the list
+  for (i in seq_along(tree_list)) {
+    if (!is.null(tree_list[[i]]$pars) && length(tree_list[[i]]$pars) == length(ranges)) {
+      # Assume initially that the element is within the range
+      is_within_range <- TRUE
+
+      # Check each par against its corresponding range
+      for (j in seq_along(tree_list[[i]]$pars)) {
+        if (tree_list[[i]]$pars[[j]] < ranges[[j]][1] || tree_list[[i]]$pars[[j]] > ranges[[j]][2]) {
+          is_within_range <- FALSE
+          break
+        }
+      }
+
+      # Add to the appropriate list based on whether it is within the range or not
+      if (is_within_range) {
+        within_range[[length(within_range) + 1]] <- tree_list[[i]]
+      } else {
+        outside_range[[length(outside_range) + 1]] <- tree_list[[i]]
+      }
+    } else {
+      # Add to outside range if number of pars doesn't match the number of ranges
+      outside_range[[length(outside_range) + 1]] <- tree_list[[i]]
+    }
+  }
+
+  # Return both results
+  list(within_range = purrr::transpose(within_range), outside_range = purrr::transpose(outside_range))
+}
+
+
+#' @export get_test_data
+get_test_data <- function(original_list, quantile) {
+  # Ensure the quantile argument is within a valid range
+  if (quantile <= 0 || quantile > 1) {
+    stop("Quantile must be between 0 and 1 (exclusive).")
+  }
+
+  # Initialize an empty list to store the extracted data
+  test_data_list <- list()
+
+  # Iterate through each sublist in the original list
+  for (sublist_name in names(original_list)) {
+    # Retrieve the current sublist
+    sublist <- original_list[[sublist_name]]
+
+    # Determine the number of elements to extract based on the quantile argument
+    num_sublists <- length(sublist)
+    num_to_extract <- floor(quantile * num_sublists)
+
+    # Extract the specified proportion of data from the end of the sublist
+    test_data <- tail(sublist, n = num_to_extract)
+
+    # Store the extracted data in the test_data_list using the sublist_name as the list name
+    test_data_list[[sublist_name]] <- test_data
+  }
+
+  return(test_data_list)
 }

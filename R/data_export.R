@@ -72,6 +72,47 @@ export_to_gnn_with_params <- function(data, which = "tas", undirected = FALSE) {
 }
 
 
+#' @export export_to_gnn_with_params_bd
+export_to_gnn_with_params_bd <- function(data, which = "tas", undirected = FALSE) {
+  path <- file.path("GNN/tree/")
+  path_EL <- file.path("GNN/tree/EL/")
+  eve:::check_path(path)
+  eve:::check_path(path_EL)
+
+  if (which == "tas") {
+    for (i in seq_along(data$tas)) {
+      la <- data$pars[[i]][1]
+      mu <- data$pars[[i]][2]
+      age <- data$age[[i]]
+      file_name <- paste0(path, "/tree_", la, "_", mu, "_", age, "_", i, ".rds")
+      saveRDS(tree_to_connectivity(data$tas[[i]], undirected = undirected), file = file_name)
+    }
+    for (i in seq_along(data$tas)) {
+      la <- data$pars[[i]][1]
+      mu <- data$pars[[i]][2]
+      age <- data$age[[i]]
+      file_name <- paste0(path_EL, "/EL_", la, "_", mu, "_", age, "_", i, ".rds")
+      saveRDS(tree_to_adj_mat(data$tas[[i]]), file = file_name)
+    }
+  } else if (which == "tes") {
+    for (i in seq_along(data$tes)) {
+      la <- data$pars[[i]][1]
+      mu <- data$pars[[i]][2]
+      age <- data$age[[i]]
+      file_name <- paste0(path, "/tree_", la, "_", mu, "_", age, "_", i, ".rds")
+      saveRDS(tree_to_connectivity(data$tes[[i]], undirected = undirected), file = file_name)
+    }
+    for (i in seq_along(data$tes)) {
+      la <- data$pars[[i]][1]
+      mu <- data$pars[[i]][2]
+      age <- data$age[[i]]
+      file_name <- paste0(path_EL, "/EL_", la, "_", mu, "_", age, "_", i, ".rds")
+      saveRDS(tree_to_adj_mat(data$tes[[i]]), file = file_name)
+    }
+  }
+}
+
+
 #' @export export_to_gnn_with_params_eve
 export_to_gnn_with_params_eve <- function(data, which = "tas", undirected = FALSE) {
   path <- file.path("GNN/tree/")
