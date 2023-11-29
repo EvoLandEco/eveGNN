@@ -306,6 +306,7 @@ while true; do
                 echo "(1) for Simple GCN"
                 echo "(2) for GCN+DiffPool"
                 echo "(3) for Graph Transformer"
+                echo "(A)ll the above"
                 echo
                 echo "(N) to go back"
                 echo "(Q) to abort"
@@ -314,85 +315,10 @@ while true; do
                 read -p "Enter your choice: " model_choice
                 case $model_choice in
                     1|2|3)
-                        echo
-                        echo "Selected model: $model_choice"
-                        # List unique folder types using shell's glob pattern
-                        declare -A folder_types
-                        unique_folder_types=()
-
-                        for folder in "$name"/*_*_*; do
-                            if [ -d "$folder" ]; then
-                                function_name=$(interpret_folder_name "$(basename "$folder")")
-                                if [ "$function_name" != "Unknown" ] && [ -z "${folder_types[$function_name]}" ]; then
-                                    folder_types[$function_name]=1
-                                    unique_folder_types+=("$function_name")
-                                fi
-                            fi
-                        done
-
-                        if [ ${#unique_folder_types[@]} -eq 0 ]; then
-                            echo
-                            echo "No data-set found."
-                            continue
-                        else
-                            echo
-                            echo "Found the following data-set type(s):"
-                            selected_folder_types=()
-                            local options=("${unique_folder_types[@]}" "Done" "Back" "Quit")
-                            while true; do
-                                echo
-                                echo "Select data-set type(s) or 'Done' to proceed:"
-                                select folder_type_option in "${options[@]}"; do
-                                    case $folder_type_option in
-                                        "Done")
-                                            break 2
-                                            ;;
-                                        "Back")
-                                            break 3
-                                            ;;
-                                        "Quit")
-                                            exit 0
-                                            ;;
-                                        *)
-                                            selected_folder_types+=("$folder_type_option")
-                                            echo
-                                            echo "Selected data-set(s): ${selected_folder_types[*]}"
-                                            # Remove selected option from the list
-                                            options=(${options[@]/$folder_type_option})
-                                            break
-                                            ;;
-                                    esac
-                                done
-                            done
-
-                            for folder_type in "${selected_folder_types[@]}"; do
-                                echo
-                                echo "Training model on selected data-set: $folder_type"
-                                # Logic based on selected data-set type
-                                case $folder_type in
-                                    "Birth-Death")
-                                        echo
-                                        echo "Training model on Birth-Death Trees..."
-                                        # Logic for Birth-Death Trees
-                                        ;;
-                                    "Diversity-Dependent-Diversification")
-                                        echo
-                                        echo "Training model on Diversity-Dependent-Diversification Trees..."
-                                        # Logic for Diversity-Dependent-Diversification Trees
-                                        ;;
-                                    "Protracted Birth-Death")
-                                        echo
-                                        echo "Training model on Protracted Birth-Death Trees..."
-                                        # Logic for Protracted Birth-Death Trees
-                                        ;;
-                                    "Evolutionary-Relatedness-Dependent")
-                                        echo
-                                        echo "Training model on Evolutionary-Relatedness-Dependent Trees..."
-                                        # Logic for Evolutionary-Relatedness-Dependent Trees
-                                        ;;
-                                esac
-                            done
-                        fi
+                        selected_folder_types=($(interpret_folder_name "$model_choice"))
+                        ;;
+                    A)
+                        selected_folder_types=("Birth-Death" "Diversity-Dependent-Diversification" "Protracted Birth-Death" "Evolutionary-Relatedness-Dependent")
                         ;;
                     N)
                         break
@@ -402,10 +328,40 @@ while true; do
                         ;;
                     *)
                         echo
-                        echo "Aborting..."
-                        exit 0
+                        echo "Invalid choice. Please select a valid option."
+                        continue
                         ;;
                 esac
+
+                echo
+                echo "Selected model(s): ${selected_folder_types[*]}"
+                for folder_type in "${selected_folder_types[@]}"; do
+                    echo
+                    echo "Training model on selected data-set: $folder_type"
+                    # Logic based on selected data-set type
+                    case $folder_type in
+                        "Birth-Death")
+                            echo
+                            echo "Training model on Birth-Death Trees..."
+                            # Logic for Birth-Death Trees
+                            ;;
+                        "Diversity-Dependent-Diversification")
+                            echo
+                            echo "Training model on Diversity-Dependent-Diversification Trees..."
+                            # Logic for Diversity-Dependent-Diversification Trees
+                            ;;
+                        "Protracted Birth-Death")
+                            echo
+                            echo "Training model on Protracted Birth-Death Trees..."
+                            # Logic for Protracted Birth-Death Trees
+                            ;;
+                        "Evolutionary-Relatedness-Dependent")
+                            echo
+                            echo "Training model on Evolutionary-Relatedness-Dependent Trees..."
+                            # Logic for Evolutionary-Relatedness-Dependent Trees
+                            ;;
+                    esac
+                done
             done
             ;;
         V|R)
