@@ -313,7 +313,7 @@ while true; do
 
                 read -p "Enter your choice: " model_choice
                 case $model_choice in
-                    1|2|3)
+                    1)
                         echo
                         echo "Selected model: $model_choice"
                         # List unique folder types using shell's glob pattern
@@ -361,22 +361,152 @@ while true; do
                                 # Logic based on selected data-set type
                                 case $folder_type in
                                     "Birth-Death")
-                                        echo
                                         echo "Training model on Birth-Death Trees..."
                                         # Logic for Birth-Death Trees
                                         ;;
                                     "Diversity-Dependent-Diversification")
-                                        echo
                                         echo "Training model on Diversity-Dependent-Diversification Trees..."
                                         # Logic for Diversity-Dependent-Diversification Trees
                                         ;;
                                     "Protracted Birth-Death")
-                                        echo
                                         echo "Training model on Protracted Birth-Death Trees..."
                                         # Logic for Protracted Birth-Death Trees
                                         ;;
                                     "Evolutionary-Relatedness-Dependent")
-                                        echo
+                                        echo "Training model on Evolutionary-Relatedness-Dependent Trees..."
+                                        # Logic for Evolutionary-Relatedness-Dependent Trees
+                                        ;;
+                                esac
+                            done
+                        fi
+                        ;;
+                    2)
+                        echo
+                        echo "Selected model: $model_choice"
+                        # List unique folder types using shell's glob pattern
+                        declare -A folder_types
+                        unique_folder_types=()
+
+                        for folder in "$name"/*_*_*; do
+                            if [ -d "$folder" ]; then
+                                function_name=$(interpret_folder_name "$(basename "$folder")")
+                                if [ "$function_name" != "Unknown" ] && [ -z "${folder_types[$function_name]}" ]; then
+                                    folder_types[$function_name]=1
+                                    unique_folder_types+=("$function_name")
+                                fi
+                            fi
+                        done
+
+                        if [ ${#unique_folder_types[@]} -eq 0 ]; then
+                            echo
+                            echo "No data-set found."
+                            continue
+                        else
+                            echo
+                            echo "Found the following data-set type(s):"
+                            echo
+                            echo "Select a data-set type or 'All' to proceed with all data-sets:"
+                            select folder_type_option in "${unique_folder_types[@]}" "All" "Back"; do
+                                case $folder_type_option in
+                                    "All")
+                                        selected_folder_types=("${unique_folder_types[@]}")
+                                        break
+                                        ;;
+                                    "Back")
+                                        break 2
+                                        ;;
+                                    *)
+                                        selected_folder_types=("$folder_type_option")
+                                        break
+                                        ;;
+                                esac
+                            done
+
+                            for folder_type in "${selected_folder_types[@]}"; do
+                                echo
+                                echo "Training model on selected data-set: $folder_type"
+                                # Logic based on selected data-set type
+                                case $folder_type in
+                                    "Birth-Death")
+                                        echo "Training model on Birth-Death Trees..."
+                                        # Logic for Birth-Death Trees
+                                        ;;
+                                    "Diversity-Dependent-Diversification")
+                                        echo "Training model on Diversity-Dependent-Diversification Trees..."
+                                        # Logic for Diversity-Dependent-Diversification Trees
+                                        ;;
+                                    "Protracted Birth-Death")
+                                        echo "Training model on Protracted Birth-Death Trees..."
+                                        # Logic for Protracted Birth-Death Trees
+                                        ;;
+                                    "Evolutionary-Relatedness-Dependent")
+                                        echo "Training model on Evolutionary-Relatedness-Dependent Trees..."
+                                        # Logic for Evolutionary-Relatedness-Dependent Trees
+                                        ;;
+                                esac
+                            done
+                        fi
+                        ;;
+                    3)
+                        echo
+                        echo "Selected model: $model_choice"
+                        # List unique folder types using shell's glob pattern
+                        declare -A folder_types
+                        unique_folder_types=()
+
+                        for folder in "$name"/*_*_*; do
+                            if [ -d "$folder" ]; then
+                                function_name=$(interpret_folder_name "$(basename "$folder")")
+                                if [ "$function_name" != "Unknown" ] && [ -z "${folder_types[$function_name]}" ]; then
+                                    folder_types[$function_name]=1
+                                    unique_folder_types+=("$function_name")
+                                fi
+                            fi
+                        done
+
+                        if [ ${#unique_folder_types[@]} -eq 0 ]; then
+                            echo
+                            echo "No data-set found."
+                            continue
+                        else
+                            echo
+                            echo "Found the following data-set type(s):"
+                            echo
+                            echo "Select a data-set type or 'All' to proceed with all data-sets:"
+                            select folder_type_option in "${unique_folder_types[@]}" "All" "Back"; do
+                                case $folder_type_option in
+                                    "All")
+                                        selected_folder_types=("${unique_folder_types[@]}")
+                                        break
+                                        ;;
+                                    "Back")
+                                        break 2
+                                        ;;
+                                    *)
+                                        selected_folder_types=("$folder_type_option")
+                                        break
+                                        ;;
+                                esac
+                            done
+
+                            for folder_type in "${selected_folder_types[@]}"; do
+                                echo
+                                echo "Training model on selected data-set: $folder_type"
+                                # Logic based on selected data-set type
+                                case $folder_type in
+                                    "Birth-Death")
+                                        echo "Training model on Birth-Death Trees..."
+                                        # Logic for Birth-Death Trees
+                                        ;;
+                                    "Diversity-Dependent-Diversification")
+                                        echo "Training model on Diversity-Dependent-Diversification Trees..."
+                                        # Logic for Diversity-Dependent-Diversification Trees
+                                        ;;
+                                    "Protracted Birth-Death")
+                                        echo "Training model on Protracted Birth-Death Trees..."
+                                        # Logic for Protracted Birth-Death Trees
+                                        ;;
+                                    "Evolutionary-Relatedness-Dependent")
                                         echo "Training model on Evolutionary-Relatedness-Dependent Trees..."
                                         # Logic for Evolutionary-Relatedness-Dependent Trees
                                         ;;
@@ -399,15 +529,16 @@ while true; do
             done
             ;;
         V|R)
-            IFS=$'\n' read -r -d '' -a raw_folders <<< "$(find "$name" -type d -name "*_*_*")"
             declare -A folder_types
             unique_folder_types=()
 
-            for folder in "${raw_folders[@]}"; do
-                function_name=$(interpret_folder_name "$(basename "$folder")")
-                if [ "$function_name" != "Unknown" ] && [ -z "${folder_types[$function_name]}" ]; then
-                    folder_types[$function_name]=1
-                    unique_folder_types+=("$function_name")
+            for folder in "$name"/*_*_*; do
+                if [ -d "$folder" ]; then
+                    function_name=$(interpret_folder_name "$(basename "$folder")")
+                    if [ "$function_name" != "Unknown" ] && [ -z "${folder_types[$function_name]}" ]; then
+                        folder_types[$function_name]=1
+                        unique_folder_types+=("$function_name")
+                    fi
                 fi
             done
 
@@ -417,26 +548,22 @@ while true; do
             else
                 echo
                 echo "Found the following data-set type(s):"
-                selected_folder_types=()
-                while true; do
-                    echo
-                    echo "Select data-set type(s) or 'Done' to proceed:"
-                    select folder_type_option in "${unique_folder_types[@]}" "Done" "Cancel"; do
-                        case $folder_type_option in
-                            "Done")
-                                break 2
-                                ;;
-                            "Cancel")
-                                break 3
-                                ;;
-                            *)
-                                selected_folder_types+=("$folder_type_option")
-                                echo
-                                echo "Selected: ${selected_folder_types[*]}"
-                                break
-                                ;;
-                        esac
-                    done
+                echo
+                echo "Select a data-set type or 'All' to proceed with all data-sets:"
+                select folder_type_option in "${unique_folder_types[@]}" "All" "Cancel"; do
+                    case $folder_type_option in
+                        "All")
+                            selected_folder_types=("${unique_folder_types[@]}")
+                            break
+                            ;;
+                        "Cancel")
+                            break 2
+                            ;;
+                        *)
+                            selected_folder_types=("$folder_type_option")
+                            break
+                            ;;
+                    esac
                 done
 
                 if [ ${#selected_folder_types[@]} -eq 0 ]; then
@@ -473,14 +600,14 @@ while true; do
                         done
                     else
                         echo
-                        echo "Selected folder types for removal:"
+                        echo "Selected folder type for removal:"
                         printf '%s\n' "${selected_folder_types[@]}"
                         echo
-                        read -p "Are you sure you want to remove all folders of these types? (y/N): " confirm
+                        read -p "Are you sure you want to remove all folders of this type? (y/N): " confirm
                         if [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]]; then
                             for folder_type in "${selected_folder_types[@]}"; do
-                                for folder in "${raw_folders[@]}"; do
-                                    if [[ "$(interpret_folder_name "$(basename "$folder")")" == "$folder_type" ]]; then
+                                for folder in "$name"/*_*_*; do
+                                    if [ -d "$folder" ] && [[ "$(interpret_folder_name "$(basename "$folder")")" == "$folder_type" ]]; then
                                         echo
                                         echo "Removing $folder..."
                                         rm -rf "$folder"
