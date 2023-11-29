@@ -118,7 +118,7 @@ echo " ╚═╝  ╚═╝╚═════╝ ╚═╝  ╚═╝╚═╝  
 
 echo
 echo
-echo "Welcome to the Automated Data Manager for eveGNN."
+echo "Welcome to the Automated DAta Manager V1 for eveGNN."
 
 echo
 verify_data_integrity "$name"
