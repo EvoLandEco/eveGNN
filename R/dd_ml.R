@@ -100,6 +100,7 @@ compute_accuracy_dd_ml_free <- function(dist_info, cap_range, data, strategy = "
                                # If no error occurred, proceed as before.
                                names(ml) <- NULL
                                differences <- eveGNN::all_differences(as.numeric(ml[1:3]), data$pars[[i]])
+                               differences$nnode <- data$tes[[i]]$Nnode
 
                                # Save the differences to an RDS file with a timestamp-based filename
                                timestamp <- format(Sys.time(), "%Y%m%d%H%M%S")
