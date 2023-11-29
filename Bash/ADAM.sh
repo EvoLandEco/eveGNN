@@ -325,6 +325,7 @@ while true; do
                                 function_name=$(interpret_folder_name "$(basename "$folder")")
                                 if [ "$function_name" != "Unknown" ] && [ -z "${folder_types[$function_name]}" ]; then
                                     folder_types[$function_name]=1
+                                    echo "$function_name"
                                     unique_folder_types+=("$function_name")
                                 fi
                             fi
