@@ -191,7 +191,7 @@ main_menu() {
         echo
         echo "(C)heck integrity of existing data"
         echo "(R)emove existing data"
-        echo "(Q) to abort"
+        echo "(Q)uit"
         echo
 
         read -p "Enter your choice: " task
@@ -209,7 +209,7 @@ main_menu() {
                     echo "(A)ll the above"
                     echo
                     echo "(N) to go back"
-                    echo "(Q) to abort"
+                    echo "(Q)uit"
                     echo
 
                     read -p "Enter your choice: " sim_func_input
@@ -289,7 +289,7 @@ main_menu() {
                     echo "(3) for Graph Transformer"
                     echo
                     echo "(N) to go back"
-                    echo "(Q) to abort"
+                    echo "(Q)uit"
                     echo
 
                     read -p "Enter your choice: " model_choice
