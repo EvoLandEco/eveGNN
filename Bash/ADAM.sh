@@ -320,6 +320,8 @@ while true; do
                         declare -A folder_types
                         unique_folder_types=()
 
+                        echo "$name"
+
                         for folder in "$name"/*_*_*; do
                             if [ -d "$folder" ]; then
                                 function_name=$(interpret_folder_name "$(basename "$folder")")
