@@ -299,6 +299,7 @@ main_menu() {
                             echo "Selected model: $model_choice"
                             # List unique folder types using shell's glob pattern
                             local -A folder_types
+                            local unique_folder_types
                             unique_folder_types=()
 
                             for folder in "$name"/*_*_*; do
@@ -309,7 +310,6 @@ main_menu() {
                                         folder_types[$function_name]=1
                                         unique_folder_types+=("$function_name")
                                     fi
-                                    echo "$unique_folder_types"
                                 fi
                             done
 
