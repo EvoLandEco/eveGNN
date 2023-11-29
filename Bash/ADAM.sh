@@ -1,5 +1,6 @@
 #!/bin/bash
 
+# ADAM.sh: Automated Data Manager for eveGNN
 # Check if a path argument is provided
 if [ $# -ne 1 ]; then
     echo "Usage: $0 <path_to_project>"
@@ -14,7 +15,7 @@ if [ ! -d "$name" ]; then
     exit 1
 fi
 
-# Function to interpret folder names
+# Function list
 interpret_folder_name() {
     local folder_name=$1
     local func_part=${folder_name%%_*}
@@ -114,10 +115,11 @@ verify_data_at_start() {
 check_data_integrity() {
     local name=$1
     echo
-    echo "Checking data integrity in project $name..."
+    echo "Checking data integrity in project $name, this may take a while..."
 
     # Possible combinations excluding MLE_TES
     local combinations=("FREE_TES" "FREE_TAS" "VAL_TES" "VAL_TAS")
+    local all_checks_passed=1  # Flag to track overall integrity status
 
     for combination in "${combinations[@]}"; do
         for folder in "$name"/*_"$combination"; do
@@ -134,33 +136,29 @@ check_data_integrity() {
                     found_format=1
                     echo
                     echo "Found GNN data format in $interpreted_part1 $part2 $part3"
-                    echo
-                    local count_tree=$(find "$folder/GNN/tree" -maxdepth 1 -name "*.rds" | wc -l)
-                    local count_el=$(find "$folder/GNN/tree/EL" -maxdepth 1 -name "*.rds" | wc -l)
-                    echo "Count in tree: $count_tree, Count in tree/EL: $count_el"
-                    if [ "$count_tree" -eq "$count_el" ]; then
-                        echo
+                    local files_tree=($(find "$folder/GNN/tree" -maxdepth 1 -name "*.rds" -exec basename {} \;))
+                    local files_el=($(find "$folder/GNN/tree/EL" -maxdepth 1 -name "*.rds" -exec basename {} \;))
+                    echo "Count in tree: ${#files_tree[@]}, Count in tree/EL: ${#files_el[@]}"
+                    if [ "${#files_tree[@]}" -eq "${#files_el[@]}" ] && [ "${files_tree[*]}" == "${files_el[*]}" ]; then
                         echo "Consistency check passed for GNN format."
                     else
-                        echo
-                        echo "WARNING: Inconsistent file counts in GNN format."
+                        echo "WARNING: Inconsistent file counts or names in GNN format."
+                        all_checks_passed=0
                     fi
                 fi
                 if [ -d "$folder/GPS" ]; then
                     found_format=1
                     echo
                     echo "Found GPS data format in $interpreted_part1 $part2 $part3"
-                    echo
-                    local count_tree=$(find "$folder/GPS/tree" -maxdepth 1 -name "*.rds" | wc -l)
-                    local count_edge=$(find "$folder/GPS/tree/edge" -maxdepth 1 -name "*.rds" | wc -l)
-                    local count_node=$(find "$folder/GPS/tree/node" -maxdepth 1 -name "*.rds" | wc -l)
-                    echo "Count in tree: $count_tree, Count in tree/edge: $count_edge, Count in tree/node: $count_node"
-                    if [ "$count_tree" -eq "$count_edge" ] && [ "$count_tree" -eq "$count_node" ]; then
-                        echo
+                    local files_tree=($(find "$folder/GPS/tree" -maxdepth 1 -name "*.rds" -exec basename {} \;))
+                    local files_edge=($(find "$folder/GPS/tree/edge" -maxdepth 1 -name "*.rds" -exec basename {} \;))
+                    local files_node=($(find "$folder/GPS/tree/node" -maxdepth 1 -name "*.rds" -exec basename {} \;))
+                    echo "Count in tree: ${#files_tree[@]}, Count in tree/edge: ${#files_edge[@]}, Count in tree/node: ${#files_node[@]}"
+                    if [ "${#files_tree[@]}" -eq "${#files_edge[@]}" ] && [ "${#files_tree[@]}" -eq "${#files_node[@]}" ] && [ "${files_tree[*]}" == "${files_edge[*]}" ] && [ "${files_tree[*]}" == "${files_node[*]}" ]; then
                         echo "Consistency check passed for GPS format."
                     else
-                        echo
-                        echo "WARNING: Inconsistent file counts in GPS format."
+                        echo "WARNING: Inconsistent file counts or names in GPS format."
+                        all_checks_passed=0
                     fi
                 fi
 
@@ -168,13 +166,22 @@ check_data_integrity() {
                 if [ $found_format -eq 0 ]; then
                     echo
                     echo "WARNING: Neither GNN nor GPS data formats found in $interpreted_part1 $part2 $part3."
+                    all_checks_passed=0
                 fi
             fi
         done
     done
+
+    if [ $all_checks_passed -eq 1 ]; then
+        echo
+        echo "All data integrity checks have passed."
+    else
+        echo
+        echo "Some data integrity checks have failed."
+    fi
 }
 
-
+###############################################
 # Start Page: Automated Data Manager for eveGNN
 echo
 echo
@@ -194,9 +201,10 @@ echo
 echo "Current project folder: $name"
 echo
 verify_data_at_start "$name"
-echo
 
+# Main loop
 while true; do
+    echo
     echo "Please select a task:"
     echo
     echo "(D)ata Generation"
