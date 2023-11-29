@@ -2,7 +2,7 @@
 
 # Check if a path argument is provided
 if [ $# -ne 1 ]; then
-    echo "Usage: $0 <path>"
+    echo "Usage: $0 <path_to_project>"
     exit 1
 fi
 
@@ -10,7 +10,7 @@ name=$1
 
 # Check if the specified folder exists
 if [ ! -d "$name" ]; then
-    echo "The specified folder '$name' does not exist."
+    echo "The specified project folder '$name' does not exist."
     exit 1
 fi
 
@@ -166,6 +166,8 @@ echo
 echo
 echo "Welcome to the Automated DAta Manager V1 for eveGNN."
 
+echo
+echo "Current project folder: $name"
 echo
 verify_data_at_start "$name"
 echo
