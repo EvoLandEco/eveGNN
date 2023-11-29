@@ -121,11 +121,12 @@ echo
 echo "Welcome to the Automated Data Manager for eveGNN."
 
 echo
-verify_data_integrity "/path/to/name"
+verify_data_integrity "$name"
 echo
 
 while true; do
     echo "Please select a task:"
+    echo
     echo "(D)ata Generation"
     echo "(M)odel Training"
     echo "(V)alidation"
