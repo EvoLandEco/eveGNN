@@ -45,19 +45,19 @@ interpret_combination() {
 
     case $A in
         FREE)
-            A="model training"
+            A="training"
             ;;
         VAL)
-            A="model out-of-sample validation"
+            A="out-of-sample validation"
             ;;
     esac
 
-    echo "$A data-set ($B trees)"
+    echo "$A data ($B trees)"
 }
 
-verify_data_integrity() {
+verify_data_at_start() {
     local name=$1
-    echo "Verifying simulation data integrity..."
+    echo "Detecting simulation data..."
 
     # List directories matching the pattern and identify unique first parts
     local raw_folders=("$name"/*_*_*)
@@ -74,7 +74,7 @@ verify_data_integrity() {
         return 1
     fi
 
-    echo "Detected data-set types:"
+    echo "Detected data-set(s):"
     for first_part in "${!unique_first_parts[@]}"; do
         local interpreted_name=$(interpret_folder_name "$first_part")
         echo "- $interpreted_name ($first_part)"
@@ -105,9 +105,49 @@ verify_data_integrity() {
     done
 
     if [ $failed_check -eq 0 ]; then
-        echo "Data integrity check passed."
+        echo "Data seem OK. You can run integrity check to be sure."
     else
-        echo "Data integrity check failed."
+        echo "Incomplete simulation data. Consider cleaning up and re-generating the data."
+    fi
+}
+
+check_data_integrity() {
+    local name=$1
+    echo
+    echo "Checking data integrity in $name..."
+
+    # Possible combinations excluding MLE_TES
+    local combinations=("FREE_TES" "FREE_TAS" "VAL_TES" "VAL_TAS")
+    local found_any_format=0
+
+    for combination in "${combinations[@]}"; do
+        for folder in "$name"/*_"$combination"; do
+            if [ -d "$folder" ]; then
+                local part1=$(basename "$folder" | cut -d '_' -f1)
+                local interpreted_part1=$(interpret_folder_name "$part1")
+
+                local found_format=0
+                if [ -d "$folder/GNN" ]; then
+                    found_format=1
+                    found_any_format=1
+                    # (Continue with the existing logic for GNN)
+                fi
+                if [ -d "$folder/GPS" ]; then
+                    found_format=1
+                    found_any_format=1
+                    # (Continue with the existing logic for GPS)
+                fi
+
+                if [ $found_format -eq 0 ]; then
+                    echo
+                    echo "WARNING: No recognizable data format found in $interpreted_part1 $part1"
+                fi
+            fi
+        done
+    done
+
+    if [ $found_any_format -eq 0 ]; then
+        echo "WARNING: No recognizable data formats were found in any of the datasets."
     fi
 }
 
@@ -127,7 +167,7 @@ echo
 echo "Welcome to the Automated DAta Manager V1 for eveGNN."
 
 echo
-verify_data_integrity "$name"
+verify_data_at_start "$name"
 echo
 
 while true; do
@@ -136,6 +176,8 @@ while true; do
     echo "(D)ata Generation"
     echo "(M)odel Training"
     echo "(V)alidation"
+    echo
+    echo "(C)eck integrity of existing data"
     echo "(R)emove existing data"
     echo "(Q) to abort"
     echo
@@ -420,6 +462,28 @@ while true; do
                     fi
                 fi
             fi
+            ;;
+        C)
+            while true; do
+                echo "Are you sure to check the integrity of existing data?"
+                echo "(C)heck integrity of existing data"
+                echo "(Q)uit"
+
+                read -p "Enter your choice: " choice
+                case $choice in
+                    C|c)
+                        read -p "Enter the path to the data folder: " data_folder
+                        check_data_integrity "$data_folder"
+                        ;;
+                    Q|q)
+                        echo "Exiting..."
+                        break
+                        ;;
+                    *)
+                        echo "Invalid choice."
+                        ;;
+                esac
+            done
             ;;
         Q)
             echo
