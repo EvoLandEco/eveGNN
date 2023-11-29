@@ -338,10 +338,11 @@ while true; do
                             echo
                             echo "Found the following data-set type(s):"
                             selected_folder_types=()
+                            local options=("${unique_folder_types[@]}" "Done" "Back" "Quit")
                             while true; do
                                 echo
                                 echo "Select data-set type(s) or 'Done' to proceed:"
-                                select folder_type_option in "${unique_folder_types[@]}" "Done" "Back" "Quit"; do
+                                select folder_type_option in "${options[@]}"; do
                                     case $folder_type_option in
                                         "Done")
                                             break 2
@@ -356,6 +357,8 @@ while true; do
                                             selected_folder_types+=("$folder_type_option")
                                             echo
                                             echo "Selected data-set(s): ${selected_folder_types[*]}"
+                                            # Remove selected option from the list
+                                            options=(${options[@]/$folder_type_option})
                                             break
                                             ;;
                                     esac
