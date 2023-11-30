@@ -84,7 +84,7 @@ verify_data_at_start() {
         return 1
     fi
 
-    echo -e "${Cyan}Detected data-set(s):${NC}}"
+    echo -e "${Cyan}Detected data-set(s):${NC}"
     for first_part in "${!unique_first_parts[@]}"; do
         local interpreted_name=$(interpret_folder_name "$first_part")
         echo -e "${Purple}- $interpreted_name ($first_part)${NC}"
@@ -126,7 +126,7 @@ verify_data_at_start() {
 check_data_integrity() {
     local name=$1
     echo
-    echo "Checking data integrity in project $name, this may take a while..."
+    echo -e "Checking data integrity in project ${Orange}$name${NC}, this may take a while..."
     echo
 
     # Possible combinations excluding MLE_TES
