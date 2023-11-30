@@ -520,8 +520,10 @@ main_menu() {
             V|R)
                 local -A folder_types
                 local unique_folder_types
+                local selected_folder_types
                 folder_types=()
                 unique_folder_types=()
+                selected_folder_types=()
 
                 for folder in "$name"/*_*_*; do
                     if [ -d "$folder" ]; then
