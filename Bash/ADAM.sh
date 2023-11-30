@@ -421,10 +421,20 @@ main_menu() {
                                             if [ -d "../Config/eve_train_gnn.yaml" ]; then
                                                 echo -e "${Blue}Training model on Evolutionary-Relatedness-Dependent Trees...${NC}"
                                                 # Logic for Evolutionary-Relatedness-Dependent Trees
-                                                echo "Submitting job for TES"
-                                                sbatch submit_eve_pars_est_model_training.sh "$name" "EVE_FREE_TES"
+                                                echo "Submitting jobs for TES"
+                                                echo "Submitting PD"
+                                                sbatch submit_eve_pars_est_model_training.sh "$name" "EVE_FREE_TES" "pd"
+                                                echo "Submitting ED"
+                                                sbatch submit_eve_pars_est_model_training.sh "$name" "EVE_FREE_TES" "ed"
+                                                echo "Submitting NND"
+                                                sbatch submit_eve_pars_est_model_training.sh "$name" "EVE_FREE_TES" "nnd"
                                                 echo "Submitting job for TAS"
-                                                sbatch submit_eve_pars_est_model_training.sh "$name" "EVE_FREE_TAS"
+                                                echo "Submitting PD"
+                                                sbatch submit_eve_pars_est_model_training.sh "$name" "EVE_FREE_TAS" "pd"
+                                                echo "Submitting ED"
+                                                sbatch submit_eve_pars_est_model_training.sh "$name" "EVE_FREE_TAS" "ed"
+                                                echo "Submitting NND"
+                                                sbatch submit_eve_pars_est_model_training.sh "$name" "EVE_FREE_TAS" "nnd"
                                             else
                                                 echo
                                                 echo -e "${Red}ERROR: ${NC}Missing configuration file for Evolutionary-Relatedness-Dependent simple GNN model."
@@ -527,9 +537,19 @@ main_menu() {
                                                 echo -e "${Blue}Training model on Evolutionary-Relatedness-Dependent Trees...${NC}"
                                                 # Logic for Evolutionary-Relatedness-Dependent Trees
                                                 echo "Submitting job for TES"
-                                                sbatch submit_eve_pars_est_model_training_diffpool.sh "$name" "EVE_FREE_TES"
+                                                echo "Submitting PD"
+                                                sbatch submit_eve_pars_est_model_training_diffpool_reg.sh "$name" "EVE_FREE_TES" "pd"
+                                                echo "Submitting ED"
+                                                sbatch submit_eve_pars_est_model_training_diffpool_reg.sh "$name" "EVE_FREE_TES" "ed"
+                                                echo "Submitting NND"
+                                                sbatch submit_eve_pars_est_model_training_diffpool_reg.sh "$name" "EVE_FREE_TES" "nnd"
                                                 echo "Submitting job for TAS"
-                                                sbatch submit_eve_pars_est_model_training_diffpool_reg.sh "$name" "EVE_FREE_TAS"
+                                                echo "Submitting PD"
+                                                sbatch submit_eve_pars_est_model_training_diffpool_reg.sh "$name" "EVE_FREE_TAS" "pd"
+                                                echo "Submitting ED"
+                                                sbatch submit_eve_pars_est_model_training_diffpool_reg.sh "$name" "EVE_FREE_TAS" "ed"
+                                                echo "Submitting NND"
+                                                sbatch submit_eve_pars_est_model_training_diffpool_reg.sh "$name" "EVE_FREE_TAS" "nnd"
                                             else
                                                 echo
                                                 echo -e "${Red}ERROR: ${NC}Missing configuration file for Evolutionary-Relatedness-Dependent DiffPool model."
@@ -632,9 +652,19 @@ main_menu() {
                                                 echo -e "${Blue}Training model on Evolutionary-Relatedness-Dependent Trees...${NC}"
                                                 # Logic for Evolutionary-Relatedness-Dependent Trees
                                                 echo "Submitting job for TES"
-                                                sbatch submit_eve_pars_est_model_training_gps.sh "$name" "EVE_FREE_TES"
+                                                echo "Submitting PD"
+                                                sbatch submit_eve_pars_est_model_training_gps.sh "$name" "EVE_FREE_TES" "pd"
+                                                echo "Submitting ED"
+                                                sbatch submit_eve_pars_est_model_training_gps.sh "$name" "EVE_FREE_TES" "ed"
+                                                echo "Submitting NND"
+                                                sbatch submit_eve_pars_est_model_training_gps.sh "$name" "EVE_FREE_TES" "nnd"
                                                 echo "Submitting job for TAS"
-                                                sbatch submit_eve_pars_est_model_training_gps.sh "$name" "EVE_FREE_TAS"
+                                                echo "Submitting PD"
+                                                sbatch submit_eve_pars_est_model_training_gps.sh "$name" "EVE_FREE_TAS" "pd"
+                                                echo "Submitting ED"
+                                                sbatch submit_eve_pars_est_model_training_gps.sh "$name" "EVE_FREE_TAS" "ed"
+                                                echo "Submitting NND"
+                                                sbatch submit_eve_pars_est_model_training_gps.sh "$name" "EVE_FREE_TAS" "nnd"
                                             else
                                                 echo
                                                 echo -e "${Red}ERROR: ${NC}Missing configuration file for Evolutionary-Relatedness-Dependent Graph Transformer model."
