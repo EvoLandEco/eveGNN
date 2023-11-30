@@ -305,11 +305,31 @@ def main():
     training_dataset_list.append(current_training_data)
     testing_dataset_list.append(current_testing_data)
 
+    validation_dataset_list = []
+    val_dir = ""
+    if task_type == "DDD_FREE_TES":
+        val_dir = os.path.join(name, "DDD_VAL_TES")
+    elif task_type == "DDD_FREE_TAS":
+        val_dir = os.path.join(name, "DDD_VAL_TAS")
+    else:
+        raise ValueError("Invalid task type.")
+    full_val_dir_tree = os.path.join(val_dir, 'GNN', 'tree')
+    full_val_dir_el = os.path.join(val_dir, 'GNN', 'tree', 'EL')
+    val_rds_count = check_rds_files_count(full_val_dir_tree, full_val_dir_el)
+    print(f'There are: {val_rds_count} trees in the validation folder.')
+    print(f"Now reading validation data...")
+    current_val_dataset = read_rds_to_pytorch(val_dir, val_rds_count)
+    validation_dataset_list.append(current_val_dataset)
+
     sum_training_data = functools.reduce(lambda x, y: x + y, training_dataset_list)
     sum_testing_data = functools.reduce(lambda x, y: x + y, testing_dataset_list)
-    # Filtering out elements with None in edge_index
+    sum_validation_data = functools.reduce(lambda x, y: x + y, validation_dataset_list)
+
+    # Filtering out trees with only 3 nodes
+    # They might cause problems with ToDense
     filtered_training_data = [data for data in sum_training_data if data.edge_index.shape != torch.Size([2, 2])]
     filtered_testing_data = [data for data in sum_testing_data if data.edge_index.shape != torch.Size([2, 2])]
+    filtered_validation_data = [data for data in sum_validation_data if data.edge_index.shape != torch.Size([2, 2])]
 
     class TreeData(InMemoryDataset):
         def __init__(self, root, data_list, transform=None, pre_transform=None):
@@ -324,7 +344,8 @@ def main():
 
     max_nodes_train = max([data.num_nodes for data in filtered_training_data])
     max_nodes_test = max([data.num_nodes for data in filtered_testing_data])
-    max_nodes = max(max_nodes_train, max_nodes_test)
+    max_nodes_val = max([data.num_nodes for data in filtered_validation_data])
+    max_nodes = max(max_nodes_train, max_nodes_test, max_nodes_val)
     # Hacking max_nodes is needed to match out-of-sample validation dataset
     # max_nodes should actually be max(max_nodes_train, max_nodes_test, max_nodes_val)
     # max_nodes = 2012
