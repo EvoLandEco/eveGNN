@@ -1,0 +1,29 @@
+dists:
+- distribution: uniform
+  'n': 1
+  min: 0.5
+  max: 0.9
+- distribution: uniform
+  'n': 1
+  min: 0.0
+  max: 0.4
+- distribution: uniform
+  'n': 1
+  min: -0.03
+  max: 0.0
+- distribution: uniform
+  'n': 1
+  min: -0.003
+  max: 0.0
+within_ranges:
+- - 0.52
+  - 0.88
+- - 0.02
+  - 0.38
+- - -0.028
+  - -0.002
+- - -0.0028
+  - -0.0002
+nrep: 50000
+age: 8
+nworkers_sim: 6

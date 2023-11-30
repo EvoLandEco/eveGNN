@@ -18,4 +18,5 @@ Imports:
   purrr,
   stringr,
   treestats,
-  umap
+  umap,
+  yaml

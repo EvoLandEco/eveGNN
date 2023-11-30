@@ -8,17 +8,21 @@ if (!dir.exists(name)) {
 
 setwd(name)
 
-dists <- list(
-  list(distribution = "uniform", n = 1, min = 0.5, max = 0.8),
-  list(distribution = "uniform", n = 1, min = 0.0, max = 0.2)
-)
+params <- yaml::read_yaml("../Config/bd_sim.yaml")
 
-future::plan("multicore", workers = 4)
+dists <- params$dists
+within_ranges <- params$within_ranges
+nrep <- params$nrep
+age <- params$age
+proportion <- params$proportion
+nworkers_sim <- params$nworkers_sim
+nworkers_mle <- params$nworkers_mle
 
-bd_free_tes_list <- future.apply::future_replicate(50000, eveGNN::randomized_bd_fixed_age(dists, age = 10), simplify = FALSE)
+future::plan("multicore", workers = nworkers_sim)
+
+bd_free_tes_list <- future.apply::future_replicate(nrep, eveGNN::randomized_bd_fixed_age(dists, age = age), simplify = FALSE)
 
 # Split list into training/testging data and validation (out-of-sample) data
-within_ranges <- list(c(0.52, 0.78), c(0.02, 0.18))
 bd_list_all <- eveGNN::extract_by_range(tree_list = bd_free_tes_list, ranges = within_ranges)
 
 if (!dir.exists("BD_FREE_TES")) {
@@ -69,8 +73,6 @@ eveGNN::export_to_gnn_with_params(bd_list_all$outside_range, "tas", undirected =
 
 setwd("..")
 
-proportion <- 0.005
-
 num_elements_to_sample <- ceiling(length(bd_free_tes_list) * proportion)
 
 bd_mle_list <- sample(bd_free_tes_list, num_elements_to_sample)
@@ -85,6 +87,6 @@ setwd("BD_MLE_TES")
 
 print("Computing MLE for TES")
 
-bd_mle_diffs_tes <- eveGNN::compute_accuracy_bd_ml_free(dists, bd_mle_list, strategy = "multicore", workers = 16)
+bd_mle_diffs_tes <- eveGNN::compute_accuracy_bd_ml_free(dists, bd_mle_list, strategy = "multicore", workers = nworkers_mle)
 
 saveRDS(bd_mle_diffs_tes, "mle_diffs_BD_FREE_TES.rds")

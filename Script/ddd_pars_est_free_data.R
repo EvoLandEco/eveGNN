@@ -8,22 +8,26 @@ if (!dir.exists(name)) {
 
 setwd(name)
 
-dists <- list(
-  list(distribution = "uniform", n = 1, min = 0.5, max = 1.0),
-  list(distribution = "uniform", n = 1, min = 0, max = 0.4)
-)
+params <- yaml::read_yaml("../Config/ddd_sim.yaml")
 
-cap_range <- c(10,1000)
+dists <- params$dists
+cap_range <- params$cap_range
+within_ranges <- params$within_ranges
+nrep <- params$nrep
+age <- params$age
+ddmodel <- params$ddmodel
+proportion <- params$proportion
+nworkers_sim <- params$nworkers_sim
+nworkers_mle <- params$nworkers_mle
 
-future::plan("multicore", workers = 4)
+future::plan("multicore", workers = nworkers_sim)
 
-ddd_free_tes_list <- future.apply::future_replicate(50000, eveGNN::randomized_ddd_fixed_age(dists,
+ddd_free_tes_list <- future.apply::future_replicate(nrep, eveGNN::randomized_ddd_fixed_age(dists,
                                                                         cap_range = cap_range,
-                                                                        age = 10,
-                                                                        model = 1), simplify = FALSE)
+                                                                        age = age,
+                                                                        model = ddmodel), simplify = FALSE)
 
 # Split list into training/testging data and validation (out-of-sample) data
-within_ranges <- list(c(0.52, 0.98), c(0.02, 0.38), c(100, 900))
 ddd_list_all <- eveGNN::extract_by_range(tree_list = ddd_free_tes_list, ranges = within_ranges)
 
 if (!dir.exists("DDD_FREE_TES")) {
@@ -74,8 +78,6 @@ eveGNN::export_to_gnn_with_params(ddd_list_all$outside_range, "tas", undirected 
 
 setwd("..")
 
-proportion <- 0.005
-
 num_elements_to_sample <- ceiling(length(ddd_free_tes_list) * proportion)
 
 ddd_mle_list <- sample(ddd_free_tes_list, num_elements_to_sample)
@@ -90,6 +92,6 @@ setwd("DDD_MLE_TES")
 
 print("Computing MLE for TES")
 
-ddd_mle_diffs_tes <- eveGNN::compute_accuracy_dd_ml_free(dists, cap_range, ddd_mle_list, strategy = "multicore", workers = 16)
+ddd_mle_diffs_tes <- eveGNN::compute_accuracy_dd_ml_free(dists, cap_range, ddd_mle_list, strategy = "multicore", workers = nworkers_mle)
 
 saveRDS(ddd_mle_diffs_tes, "mle_diffs_DDD_FREE_TES.rds")
