@@ -115,9 +115,9 @@ verify_data_at_start() {
     done
 
     if [ $failed_check -eq 0 ]; then
-        echo "Data seem OK. You can run integrity check to be sure."
+        echo -e "${Blue}Data seem OK. You can run integrity check to be sure.${NC}"
     else
-        echo "Incomplete simulation data. Consider cleaning up and re-generating the data."
+        echo -e "${Orange}Incomplete simulation data. Consider cleaning up and re-generating the data.${NC}"
     fi
 }
 
@@ -180,10 +180,10 @@ check_data_integrity() {
     # Final report
     if [ $all_checks_passed -eq 1 ]; then
         echo
-        echo "All data integrity checks have passed."
+        echo -e "${Blue}All data integrity checks have passed.${NC}"
     else
         echo
-        echo "Some data integrity checks failed."
+        echo -e "${Orange}Some data integrity checks failed.${NC}"
     fi
 }
 
@@ -191,7 +191,7 @@ main_menu() {
     local name=$1
     # Main loop
     while true; do
-        echo
+        echo -e "${Cyan}"
         echo "Please select a task:"
         echo
         echo "(D)ata Generation"
@@ -200,14 +200,14 @@ main_menu() {
         echo
         echo "(C)heck integrity of existing data"
         echo "(R)emove existing data"
-        echo "(Q)uit"
-        echo
+        echo -e "${Red}(Q)uit"
+        echo -e "${NC}"
 
         read -p "Enter your choice: " task
         case $task in
             D)
                 while true; do
-                    echo
+                    echo -e "${Cyan}"
                     echo "Please select one or more data-set(s) that should be generated, must be a combination of B, D, P, E or single A, N, Q."
                     echo
                     echo "(B)irth-Death Trees"
@@ -218,8 +218,8 @@ main_menu() {
                     echo "(A)ll the above"
                     echo
                     echo "(N) to go back"
-                    echo "(Q)uit"
-                    echo
+                    echo -e "${Red}(Q)uit"
+                    echo -e "${NC}"
 
                     read -p "Enter your choice: " sim_func_input
                     valid_input=true
@@ -246,7 +246,7 @@ main_menu() {
                                         ;;
                                     *)
                                         echo
-                                        echo "Invalid input. Please enter a combination of B, D, P, E, or single A, N, Q."
+                                        echo -e "${Red}Invalid input. ${NC}Please enter a combination of B, D, P, E, or single A, N, Q."
                                         echo
                                         valid_input=false
                                         break
@@ -314,7 +314,7 @@ main_menu() {
                 ;;
             M)
                 while true; do
-                    echo
+                    echo -e "${Cyan}"
                     echo "Please select one GNN model to train:"
                     echo
                     echo "(1) for Simple GCN"
@@ -322,8 +322,8 @@ main_menu() {
                     echo "(3) for Graph Transformer"
                     echo
                     echo "(N) to go back"
-                    echo "(Q)uit"
-                    echo
+                    echo -e "${Red}(Q)uit"
+                    echo -e "${NC}"
 
                     read -p "Enter your choice: " model_choice
                     case $model_choice in
@@ -348,10 +348,10 @@ main_menu() {
 
                             if [ ${#unique_folder_types[@]} -eq 0 ]; then
                                 echo
-                                echo "No data-set found."
+                                echo -e "${Red}No data-set found.${NC}"
                                 continue
                             else
-                                echo
+                                echo -e "${Cyan}"
                                 echo "Found the following data-set type(s):"
                                 echo
                                 echo "Select a data-set type or 'All' to proceed with all data-sets:"
@@ -372,7 +372,7 @@ main_menu() {
                                 done
 
                                 for folder_type in "${selected_folder_types[@]}"; do
-                                    echo
+                                    echo -e "${NC}"
                                     echo "Training model on selected data-set: $folder_type"
                                     # Logic based on selected data-set type
                                     case $folder_type in
@@ -441,10 +441,10 @@ main_menu() {
 
                             if [ ${#unique_folder_types[@]} -eq 0 ]; then
                                 echo
-                                echo "No data-set found."
+                                echo -e "${Red}No data-set found.${NC}"
                                 continue
                             else
-                                echo
+                                echo -e "${Cyan}"
                                 echo "Found the following data-set type(s):"
                                 echo
                                 echo "Select a data-set or 'All' to proceed with all data-sets:"
@@ -465,7 +465,7 @@ main_menu() {
                                 done
 
                                 for folder_type in "${selected_folder_types[@]}"; do
-                                    echo
+                                    echo -e "${NC}"
                                     echo "Training model on selected data-set: $folder_type"
                                     # Logic based on selected data-set type
                                     case $folder_type in
@@ -514,7 +514,7 @@ main_menu() {
                             fi
                             ;;
                         3)
-                            echo
+                            echo -e "${Cyan}"
                             echo "Selected GNN model: $model_choice"
                             # List unique folder types using shell's glob pattern
                             local -A folder_types
@@ -534,10 +534,10 @@ main_menu() {
 
                             if [ ${#unique_folder_types[@]} -eq 0 ]; then
                                 echo
-                                echo "No data-set found."
+                                echo -e "${Red}No data-set found.${NC}"
                                 continue
                             else
-                                echo
+                                echo -e "${Cyan}"
                                 echo "Found the following data-set type(s):"
                                 echo
                                 echo "Select a data-set type or 'All' to proceed with all data-sets:"
@@ -558,7 +558,7 @@ main_menu() {
                                 done
 
                                 for folder_type in "${selected_folder_types[@]}"; do
-                                    echo
+                                    echo -e "${NC}"
                                     echo "Training model on selected data-set: $folder_type"
                                     # Logic based on selected data-set type
                                     case $folder_type in
@@ -640,9 +640,9 @@ main_menu() {
 
                 if [ ${#unique_folder_types[@]} -eq 0 ]; then
                     echo
-                    echo "No data-set found."
+                    echo -e "${Red}No data-set found.${NC}"
                 else
-                    echo
+                    echo -e "${Cyan}"
                     echo "Found the following data-set(s):"
                     echo
                     echo "Select a data-set or 'All' to proceed with all data-sets:"
@@ -663,12 +663,12 @@ main_menu() {
                     done
 
                     if [ ${#selected_folder_types[@]} -eq 0 ]; then
-                        echo
+                        echo -e "${NC}"
                         echo "No selection made."
                     else
                         if [ "$task" == "V" ]; then
                             for folder_type in "${selected_folder_types[@]}"; do
-                                echo
+                                echo -e "${NC}"
                                 echo "Performing validation on selected data-set: $folder_type"
                                 # Validation logic here based on folder type
                                 case $folder_type in
@@ -695,7 +695,7 @@ main_menu() {
                                 esac
                             done
                         else
-                            echo
+                            echo -e "${NC}"
                             echo "Selected data-set for removal:"
                             printf '%s\n' "${selected_folder_types[@]}"
                             echo
