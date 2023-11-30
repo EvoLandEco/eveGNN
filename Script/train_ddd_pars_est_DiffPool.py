@@ -8,15 +8,32 @@ import functools
 import random
 import torch_geometric.transforms as T
 import torch.nn.functional as F
+import yaml
 from math import ceil
 from torch_geometric.data import InMemoryDataset, Data
 from torch_geometric.loader import DenseDataLoader
 from torch_geometric.nn import DenseGCNConv as GCNConv, dense_diff_pool
 
-# Global variables
-epoch_number = 21
-cap_norm_factor = 1000
+# Load the global parameters from the config file
+global_params = None
 
+with open("../Config/ddd_train_diffpool.yaml", "r") as ymlfile:
+    global_params = yaml.safe_load(ymlfile)
+
+# Set global variables
+cap_norm_factor = global_params["cap_norm_factor"]
+epoch_number = global_params["epoch_number"]
+diffpool_ratio = global_params["diffpool_ratio"]
+dropout_ratio = global_params["dropout_ratio"]
+learning_rate = global_params["learning_rate"]
+train_batch_size = global_params["train_batch_size"]
+test_batch_size = global_params["test_batch_size"]
+gcn_layer1_hidden_channels = global_params["gcn_layer1_hidden_channels"]
+gcn_layer2_hidden_channels = global_params["gcn_layer2_hidden_channels"]
+gcn_layer3_hidden_channels = global_params["gcn_layer3_hidden_channels"]
+lin_layer1_hidden_channels = global_params["lin_layer1_hidden_channels"]
+lin_layer2_hidden_channels = global_params["lin_layer2_hidden_channels"]
+n_predicted_values = global_params["n_predicted_values"]
 
 def read_table(path):
     return pd.read_csv(path, sep="\s+", header=0)  # assuming the tables are tab-delimited
@@ -345,18 +362,18 @@ def main():
         def __init__(self):
             super(DiffPool, self).__init__()
 
-            num_nodes = ceil(0.25 * max_nodes)
-            self.gnn1_pool = GNN(training_dataset.num_node_features, 256, num_nodes)
-            self.gnn1_embed = GNN(training_dataset.num_node_features, 256, 256)
+            num_nodes = ceil(diffpool_ratio * max_nodes)
+            self.gnn1_pool = GNN(training_dataset.num_node_features, gcn_layer1_hidden_channels, num_nodes)
+            self.gnn1_embed = GNN(training_dataset.num_node_features, gcn_layer1_hidden_channels, gcn_layer2_hidden_channels)
 
-            num_nodes = ceil(0.25 * num_nodes)
-            self.gnn2_pool = GNN(256, 256, num_nodes)
-            self.gnn2_embed = GNN(256, 256, 256, lin=False)
+            num_nodes = ceil(diffpool_ratio * num_nodes)
+            self.gnn2_pool = GNN(gcn_layer2_hidden_channels, gcn_layer2_hidden_channels, num_nodes)
+            self.gnn2_embed = GNN(gcn_layer2_hidden_channels, gcn_layer2_hidden_channels, gcn_layer3_hidden_channels, lin=False)
 
-            self.gnn3_embed = GNN(256, 128, 128, lin=False)
+            self.gnn3_embed = GNN(gcn_layer3_hidden_channels, gcn_layer3_hidden_channels, lin_layer1_hidden_channels, lin=False)
 
-            self.lin1 = torch.nn.Linear(128, 64)
-            self.lin2 = torch.nn.Linear(64, 3)
+            self.lin1 = torch.nn.Linear(lin_layer1_hidden_channels, lin_layer2_hidden_channels)
+            self.lin2 = torch.nn.Linear(lin_layer2_hidden_channels, n_predicted_values)
 
         def forward(self, x, adj, mask=None):
             s = self.gnn1_pool(x, adj, mask)
@@ -373,10 +390,10 @@ def main():
 
             x = x.mean(dim=1)
 
-            x = F.dropout(x, p=0.5, training=self.training)
+            x = F.dropout(x, p=dropout_ratio, training=self.training)
             x = self.lin1(x)
             x = F.relu(x)
-            x = F.dropout(x, p=0.5, training=self.training)
+            x = F.dropout(x, p=dropout_ratio, training=self.training)
             x = self.lin2(x)
             return x, l1 + l2, e1 + e2
 
@@ -430,7 +447,7 @@ def main():
 
     model = DiffPool()
     model = model.to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     criterion = torch.nn.MSELoss().to(device)
 
     def shape_check(dataset, max_nodes):
@@ -456,8 +473,8 @@ def main():
     shape_check(training_dataset, max_nodes)
     shape_check(testing_dataset, max_nodes)
 
-    train_loader = DenseDataLoader(training_dataset, batch_size=64, shuffle=False)
-    test_loader = DenseDataLoader(testing_dataset, batch_size=64, shuffle=False)
+    train_loader = DenseDataLoader(training_dataset, batch_size=train_batch_size, shuffle=False)
+    test_loader = DenseDataLoader(testing_dataset, batch_size=test_batch_size, shuffle=False)
     print(f"Training dataset length: {len(train_loader.dataset)}")
     print(f"Testing dataset length: {len(test_loader.dataset)}")
     print(train_loader.dataset.transform)

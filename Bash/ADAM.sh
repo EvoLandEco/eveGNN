@@ -382,7 +382,10 @@ main_menu() {
                                             if [ -d "../Config/bd_train_gnn.yaml" ]; then
                                                 echo -e "${Blue}Training model on Birth-Death Trees...${NC}"
                                                 # Logic for Birth-Death Trees
-                                                sbatch submit_bd_pars_est_model_training.sh "$name"
+                                                echo "Submitting job for TES"
+                                                sbatch submit_bd_pars_est_model_training.sh "$name" "BD_FREE_TES"
+                                                echo "Submitting job for TAS"
+                                                sbatch submit_bd_pars_est_model_training.sh "$name" "BD_FREE_TAS"
                                             else
                                                 echo
                                                 echo -e "${Red}ERROR: ${NC}Missing configuration file for Birth-Death simple GNN model."
@@ -392,7 +395,10 @@ main_menu() {
                                             if [ -d "../Config/ddd_train_gnn.yaml" ]; then
                                                 echo -e "${Blue}Training model on Diversity-Dependent-Diversification Trees...${NC}"
                                                 # Logic for Diversity-Dependent-Diversification Trees
-                                                sbatch submit_ddd_pars_est_model_training.sh "$name"
+                                                echo "Submitting job for TES"
+                                                sbatch submit_ddd_pars_est_model_training.sh "$name" "DDD_FREE_TES"
+                                                echo "Submitting job for TAS"
+                                                sbatch submit_ddd_pars_est_model_training.sh "$name" "DDD_FREE_TAS"
                                             else
                                                 echo
                                                 echo -e "${Red}ERROR: ${NC}Missing configuration file for Diversity-Dependent-Diversification simple GNN model."
@@ -402,7 +408,10 @@ main_menu() {
                                             if [ -d "../Config/pbd_train_gnn.yaml" ]; then
                                                 echo -e "${Blue}Training model on Protracted Birth-Death Trees...${NC}"
                                                 # Logic for Protracted Birth-Death Trees
-                                                sbatch submit_pbd_pars_est_model_training.sh "$name"
+                                                echo "Submitting job for TES"
+                                                sbatch submit_pbd_pars_est_model_training.sh "$name" "PBD_FREE_TES"
+                                                echo "Submitting job for TAS"
+                                                sbatch submit_pbd_pars_est_model_training.sh "$name" "PBD_FREE_TAS"
                                             else
                                                 echo
                                                 echo -e "${Red}ERROR: ${NC}Missing configuration file for Protracted Birth-Death simple GNN model."
@@ -412,7 +421,10 @@ main_menu() {
                                             if [ -d "../Config/eve_train_gnn.yaml" ]; then
                                                 echo -e "${Blue}Training model on Evolutionary-Relatedness-Dependent Trees...${NC}"
                                                 # Logic for Evolutionary-Relatedness-Dependent Trees
-                                                sbatch submit_eve_pars_est_model_training.sh "$name"
+                                                echo "Submitting job for TES"
+                                                sbatch submit_eve_pars_est_model_training.sh "$name" "EVE_FREE_TES"
+                                                echo "Submitting job for TAS"
+                                                sbatch submit_eve_pars_est_model_training.sh "$name" "EVE_FREE_TAS"
                                             else
                                                 echo
                                                 echo -e "${Red}ERROR: ${NC}Missing configuration file for Evolutionary-Relatedness-Dependent simple GNN model."
@@ -475,7 +487,10 @@ main_menu() {
                                             if [ -d "../Config/bd_train_diffpool.yaml" ]; then
                                                 echo -e "${Blue}Training model on Birth-Death Trees...${NC}"
                                                 # Logic for Birth-Death Trees
-                                                sbatch submit_bd_pars_est_model_training_diffpool.sh "$name"
+                                                echo "Submitting job for TES"
+                                                sbatch submit_bd_pars_est_model_training_diffpool.sh "$name" "BD_FREE_TES"
+                                                echo "Submitting job for TAS"
+                                                sbatch submit_bd_pars_est_model_training_diffpool.sh "$name" "BD_FREE_TAS"
                                             else
                                                 echo
                                                 echo -e "${Red}ERROR: ${NC}Missing configuration file for Birth-Death DiffPool model."
@@ -485,7 +500,10 @@ main_menu() {
                                             if [ -d "../Config/ddd_train_diffpool.yaml" ]; then
                                                 echo -e "${Blue}Training model on Diversity-Dependent-Diversification Trees...${NC}"
                                                 # Logic for Diversity-Dependent-Diversification Trees
-                                                sbatch submit_ddd_pars_est_model_training_diffpool.sh "$name"
+                                                echo "Submitting job for TES"
+                                                sbatch submit_ddd_pars_est_model_training_diffpool.sh "$name" "DDD_FREE_TES"
+                                                echo "Submitting job for TAS"
+                                                sbatch submit_ddd_pars_est_model_training_diffpool.sh "$name" "DDD_FREE_TAS"
                                             else
                                                 echo
                                                 echo -e "${Red}ERROR: ${NC}Missing configuration file for Diversity-Dependent-Diversification DiffPool model."
@@ -495,7 +513,10 @@ main_menu() {
                                             if [ -d "../Config/pbd_train_diffpool.yaml" ]; then
                                                 echo -e "${Blue}Training model on Protracted Birth-Death Trees...${NC}"
                                                 # Logic for Protracted Birth-Death Trees
-                                                sbatch submit_pbd_pars_est_model_training_diffpool.sh "$name"
+                                                echo "Submitting job for TES"
+                                                sbatch submit_pbd_pars_est_model_training_diffpool.sh "$name" "PBD_FREE_TES"
+                                                echo "Submitting job for TAS"
+                                                sbatch submit_pbd_pars_est_model_training_diffpool.sh "$name" "PBD_FREE_TAS"
                                             else
                                                 echo
                                                 echo -e "${Red}ERROR: ${NC}Missing configuration file for Protracted Birth-Death DiffPool model."
@@ -505,7 +526,10 @@ main_menu() {
                                             if [ -d "../Config/eve_train_diffpool.yaml" ]; then
                                                 echo -e "${Blue}Training model on Evolutionary-Relatedness-Dependent Trees...${NC}"
                                                 # Logic for Evolutionary-Relatedness-Dependent Trees
-                                                sbatch submit_eve_pars_est_model_training_diffpool_reg.sh "$name"
+                                                echo "Submitting job for TES"
+                                                sbatch submit_eve_pars_est_model_training_diffpool.sh "$name" "EVE_FREE_TES"
+                                                echo "Submitting job for TAS"
+                                                sbatch submit_eve_pars_est_model_training_diffpool_reg.sh "$name" "EVE_FREE_TAS"
                                             else
                                                 echo
                                                 echo -e "${Red}ERROR: ${NC}Missing configuration file for Evolutionary-Relatedness-Dependent DiffPool model."
@@ -568,7 +592,10 @@ main_menu() {
                                             if [ -d "../Config/bd_train_gps.yaml" ]; then
                                                 echo -e "${Blue}Training model on Birth-Death Trees...${NC}"
                                                 # Logic for Birth-Death Trees
-                                                sbatch submit_bd_pars_est_model_training_gps.sh "$name"
+                                                echo "Submitting job for TES"
+                                                sbatch submit_bd_pars_est_model_training_gps.sh "$name" "BD_FREE_TES"
+                                                echo "Submitting job for TAS"
+                                                sbatch submit_bd_pars_est_model_training_gps.sh "$name" "BD_FREE_TAS"
                                             else
                                                 echo
                                                 echo -e "${Red}ERROR: ${NC}Missing configuration file for Birth-Death Graph Transformer model."
@@ -578,7 +605,10 @@ main_menu() {
                                             if [ -d "../Config/ddd_train_gps.yaml" ]; then
                                                 echo -e "${Blue}Training model on Diversity-Dependent-Diversification Trees...${NC}"
                                                 # Logic for Diversity-Dependent-Diversification Trees
-                                                sbatch submit_ddd_pars_est_model_training_gps.sh "$name"
+                                                echo "Submitting job for TES"
+                                                sbatch submit_ddd_pars_est_model_training_gps.sh "$name" "DDD_FREE_TES"
+                                                echo "Submitting job for TAS"
+                                                sbatch submit_ddd_pars_est_model_training_gps.sh "$name" "DDD_FREE_TAS"
                                             else
                                                 echo
                                                 echo -e "${Red}ERROR: ${NC}Missing configuration file for Diversity-Dependent-Diversification Graph Transformer model."
@@ -588,7 +618,10 @@ main_menu() {
                                             if [ -d "../Config/pbd_train_gps.yaml" ]; then
                                                 echo -e "${Blue}Training model on Protracted Birth-Death Trees...${NC}"
                                                 # Logic for Protracted Birth-Death Trees
-                                                sbatch submit_pbd_pars_est_model_training_gps.sh "$name"
+                                                echo "Submitting job for TES"
+                                                sbatch submit_pbd_pars_est_model_training_gps.sh "$name" "PBD_FREE_TES"
+                                                echo "Submitting job for TAS"
+                                                sbatch submit_pbd_pars_est_model_training_gps.sh "$name" "PBD_FREE_TAS"
                                             else
                                                 echo
                                                 echo -e "${Red}ERROR: ${NC}Missing configuration file for Protracted Birth-Death Graph Transformer model."
@@ -598,7 +631,10 @@ main_menu() {
                                             if [ -d "../Config/eve_train_gps.yaml" ]; then
                                                 echo -e "${Blue}Training model on Evolutionary-Relatedness-Dependent Trees...${NC}"
                                                 # Logic for Evolutionary-Relatedness-Dependent Trees
-                                                sbatch submit_eve_pars_est_model_training_gps.sh "$name"
+                                                echo "Submitting job for TES"
+                                                sbatch submit_eve_pars_est_model_training_gps.sh "$name" "EVE_FREE_TES"
+                                                echo "Submitting job for TAS"
+                                                sbatch submit_eve_pars_est_model_training_gps.sh "$name" "EVE_FREE_TAS"
                                             else
                                                 echo
                                                 echo -e "${Red}ERROR: ${NC}Missing configuration file for Evolutionary-Relatedness-Dependent Graph Transformer model."
