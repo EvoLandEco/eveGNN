@@ -18,8 +18,10 @@ fi
 # Define some colors
 Red='\033[0;31m'
 Blue='\033[0;34m'
+Green='\033[0;32m'
 Orange='\033[0;33m'
 Cyan='\033[0;36m'
+Purple='\033[0;35m'
 NC='\033[0m' # No Color
 
 # Function list
@@ -65,7 +67,7 @@ interpret_combination() {
 
 verify_data_at_start() {
     local name=$1
-    echo "Detecting simulation data..."
+    echo -e "${Cyan}Detecting simulation data...${NC}"
 
     # List directories matching the pattern and identify unique first parts
     local raw_folders=("$name"/*_*_*)
@@ -78,14 +80,14 @@ verify_data_at_start() {
     done
 
     if [ ${#unique_first_parts[@]} -eq 0 ]; then
-        echo "No simulation data detected."
+        echo -e "${Red}No simulation data detected.${NC}"
         return 1
     fi
 
-    echo "Detected data-set(s):"
+    echo -e "${Cyan}Detected data-set(s):${NC}}"
     for first_part in "${!unique_first_parts[@]}"; do
         local interpreted_name=$(interpret_folder_name "$first_part")
-        echo "- $interpreted_name ($first_part)"
+        echo -e "${Purple}- $interpreted_name ($first_part)${NC}"
     done
 
     # Check for required combinations
@@ -115,7 +117,7 @@ verify_data_at_start() {
     done
 
     if [ $failed_check -eq 0 ]; then
-        echo -e "${Blue}Data seem OK. You can run integrity check to be sure.${NC}"
+        echo -e "${Green}Data seem OK. You can run integrity check to be sure.${NC}"
     else
         echo -e "${Orange}Incomplete simulation data. Consider cleaning up and re-generating the data.${NC}"
     fi
@@ -180,7 +182,7 @@ check_data_integrity() {
     # Final report
     if [ $all_checks_passed -eq 1 ]; then
         echo
-        echo -e "${Blue}All data integrity checks have passed.${NC}"
+        echo -e "${Green}All data integrity checks have passed.${NC}"
     else
         echo
         echo -e "${Orange}Some data integrity checks failed.${NC}"
@@ -747,12 +749,12 @@ echo " ██╔══██║██║  ██║██╔══██║█�
 echo " ██║  ██║██████╔╝██║  ██║██║ ╚═╝ ██║ "
 echo " ╚═╝  ╚═╝╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝ "
 
-echo -e "${NC}"
+echo
 echo
 echo "Welcome to the Automated DAta Manager V1 for eveGNN."
 
 echo
-echo "Current project folder: $name"
+echo -e "Current project folder: ${Orange}$name${NC}"
 echo
 
 verify_data_at_start "$name"
