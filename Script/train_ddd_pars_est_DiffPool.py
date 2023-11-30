@@ -35,6 +35,7 @@ lin_layer1_hidden_channels = global_params["lin_layer1_hidden_channels"]
 lin_layer2_hidden_channels = global_params["lin_layer2_hidden_channels"]
 n_predicted_values = global_params["n_predicted_values"]
 
+
 def read_table(path):
     return pd.read_csv(path, sep="\s+", header=0)  # assuming the tables are tab-delimited
 
@@ -426,7 +427,7 @@ def main():
             data.to(device)
             optimizer.zero_grad()
             out, _, _ = model(data.x, data.adj, data.mask)
-            loss = criterion(out, data.y.view(data.num_nodes.__len__(), 3))
+            loss = criterion(out, data.y.view(data.num_nodes.__len__(), n_predicted_values))
             loss.backward()
             loss_all += loss.item() * data.num_nodes.__len__()
             optimizer.step()
@@ -445,10 +446,10 @@ def main():
         for data in loader:
             data.to(device)
             out, _, _ = model(data.x, data.adj, data.mask)
-            diffs = torch.abs(out - data.y.view(data.num_nodes.__len__(), 3))
+            diffs = torch.abs(out - data.y.view(data.num_nodes.__len__(), n_predicted_values))
             diffs_all = torch.cat((diffs_all, diffs), dim=0)
             outputs_all = torch.cat((outputs_all, out), dim=0)
-            y_all = torch.cat((y_all, data.y.view(data.num_nodes.__len__(), 3)), dim=0)
+            y_all = torch.cat((y_all, data.y.view(data.num_nodes.__len__(), n_predicted_values)), dim=0)
             nodes_all = torch.cat((nodes_all, data.num_nodes), dim=0)
 
         print(f"diffs_all length: {len(diffs_all)}; test_loader.dataset length: {len(test_loader.dataset)}; Equal: {len(diffs_all) == len(test_loader.dataset)}")
@@ -462,7 +463,7 @@ def main():
         for data in test_loader:
             data.to(device)
             out, _, _ = model(data.x, data.adj, data.mask)
-            loss = criterion(out, data.y.view(data.num_nodes.__len__(), 3))
+            loss = criterion(out, data.y.view(data.num_nodes.__len__(), n_predicted_values))
             loss_all += loss.item() * data.num_nodes.__len__()
 
         return loss_all / len(train_loader.dataset)
@@ -481,7 +482,7 @@ def main():
             data = dataset[i]
             # Check the shapes of data.x, data.adj, and data.mask
             if data.x.shape != torch.Size([max_nodes, 3]) or \
-                    data.y.shape != torch.Size([3]) or \
+                    data.y.shape != torch.Size([n_predicted_values]) or \
                     data.adj.shape != torch.Size([max_nodes, max_nodes]) or \
                     data.mask.shape != torch.Size([max_nodes]):
                 incorrect_shapes.append(i)  # Add index to the list if any shape is incorrect
