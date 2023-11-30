@@ -99,9 +99,11 @@ verify_data_at_start() {
         done
 
         # Check for MLE_TES combination
-        if [ ! -d "$name/${first_part}_MLE_TES" ] && [ ! "$first_part" == "EVE" ]; then
-            echo "WARNING: Missing Maximum Likelihood Estimation (MLE) results in the $(interpret_folder_name "$first_part") data-set."
-            failed_check=1
+        if  [ "$first_part" != "EVE" ]; then
+            if [ ! -d "$name/${first_part}_MLE_TES" ]; then
+                echo "WARNING: Missing Maximum Likelihood Estimation (MLE) results in the $(interpret_folder_name "$first_part") data-set."
+                failed_check=1
+            fi
         fi
     done
 
