@@ -752,6 +752,7 @@ echo " ╚═╝  ╚═╝╚═════╝ ╚═╝  ╚═╝╚═╝  
 echo
 echo
 echo "Welcome to the Automated DAta Manager V1 for eveGNN."
+echo "Author: Tianjian Qin"
 
 echo
 echo -e "Current project folder: ${Orange}$name${NC}"
