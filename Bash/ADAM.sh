@@ -265,7 +265,7 @@ main_menu() {
                         for scenario in "${selected_scenarios[@]}"; do
                             case $scenario in
                                 B)
-                                    if [ -d "../Config/bd_sim.yaml" ]; then
+                                    if [ -e "../Config/bd_sim.yaml" ]; then
                                         echo
                                         echo -e "${Blue}Submitting Birth-Death simulation job...${NC}}"
                                         # Add logic for Birth-Death Trees here
@@ -276,7 +276,7 @@ main_menu() {
                                     fi
                                     ;;
                                 D)
-                                    if [ -d "../Config/ddd_sim.yaml" ]; then
+                                    if [ -e "../Config/ddd_sim.yaml" ]; then
                                         echo
                                         echo -e "${Blue}Submitting Diversity-Dependent-Diversification simulation job...${NC}"
                                         # Add logic for Diversity-Dependent-Diversification Trees here
@@ -287,7 +287,7 @@ main_menu() {
                                     fi
                                     ;;
                                 P)
-                                    if [ -d "../Config/pbd_sim.yaml" ]; then
+                                    if [ -e "../Config/pbd_sim.yaml" ]; then
                                         echo
                                         echo -e "${Blue}Submitting Protracted Birth-Death simulation job...${NC}"
                                         # Add logic for Protracted Birth-Death Trees here
@@ -298,7 +298,7 @@ main_menu() {
                                     fi
                                     ;;
                                 E)
-                                    if [ -d "../Config/eve_sim.yaml" ]; then
+                                    if [ -e "../Config/eve_sim.yaml" ]; then
                                         echo
                                         echo -e "${Blue}Submitting Evolutionary-Relatedness-Dependent simulation job...${NC}"
                                         # Add logic for Evolutionary-Relatedness-Dependent Trees here
@@ -379,7 +379,7 @@ main_menu() {
                                     # Logic based on selected data-set type
                                     case $folder_type in
                                         "Birth-Death")
-                                            if [ -d "../Config/bd_train_gnn.yaml" ]; then
+                                            if [ -e "../Config/bd_train_gnn.yaml" ]; then
                                                 echo -e "${Blue}Training model on Birth-Death Trees...${NC}"
                                                 # Logic for Birth-Death Trees
                                                 echo "Submitting job for TES"
@@ -392,7 +392,7 @@ main_menu() {
                                             fi
                                             ;;
                                         "Diversity-Dependent-Diversification")
-                                            if [ -d "../Config/ddd_train_gnn.yaml" ]; then
+                                            if [ -e "../Config/ddd_train_gnn.yaml" ]; then
                                                 echo -e "${Blue}Training model on Diversity-Dependent-Diversification Trees...${NC}"
                                                 # Logic for Diversity-Dependent-Diversification Trees
                                                 echo "Submitting job for TES"
@@ -405,7 +405,7 @@ main_menu() {
                                             fi
                                             ;;
                                         "Protracted Birth-Death")
-                                            if [ -d "../Config/pbd_train_gnn.yaml" ]; then
+                                            if [ -e "../Config/pbd_train_gnn.yaml" ]; then
                                                 echo -e "${Blue}Training model on Protracted Birth-Death Trees...${NC}"
                                                 # Logic for Protracted Birth-Death Trees
                                                 echo "Submitting job for TES"
@@ -418,7 +418,7 @@ main_menu() {
                                             fi
                                             ;;
                                         "Evolutionary-Relatedness-Dependent")
-                                            if [ -d "../Config/eve_train_gnn.yaml" ]; then
+                                            if [ -e "../Config/eve_train_gnn.yaml" ]; then
                                                 echo -e "${Blue}Training model on Evolutionary-Relatedness-Dependent Trees...${NC}"
                                                 # Logic for Evolutionary-Relatedness-Dependent Trees
                                                 echo "Submitting jobs for TES"
@@ -494,7 +494,7 @@ main_menu() {
                                     # Logic based on selected data-set type
                                     case $folder_type in
                                         "Birth-Death")
-                                            if [ -d "../Config/bd_train_diffpool.yaml" ]; then
+                                            if [ -e "../Config/bd_train_diffpool.yaml" ]; then
                                                 echo -e "${Blue}Training model on Birth-Death Trees...${NC}"
                                                 # Logic for Birth-Death Trees
                                                 echo "Submitting job for TES"
@@ -507,7 +507,7 @@ main_menu() {
                                             fi
                                             ;;
                                         "Diversity-Dependent-Diversification")
-                                            if [ -d "../Config/ddd_train_diffpool.yaml" ]; then
+                                            if [ -e "../Config/ddd_train_diffpool.yaml" ]; then
                                                 echo -e "${Blue}Training model on Diversity-Dependent-Diversification Trees...${NC}"
                                                 # Logic for Diversity-Dependent-Diversification Trees
                                                 echo "Submitting job for TES"
@@ -520,7 +520,7 @@ main_menu() {
                                             fi
                                             ;;
                                         "Protracted Birth-Death")
-                                            if [ -d "../Config/pbd_train_diffpool.yaml" ]; then
+                                            if [ -e "../Config/pbd_train_diffpool.yaml" ]; then
                                                 echo -e "${Blue}Training model on Protracted Birth-Death Trees...${NC}"
                                                 # Logic for Protracted Birth-Death Trees
                                                 echo "Submitting job for TES"
@@ -533,7 +533,7 @@ main_menu() {
                                             fi
                                             ;;
                                         "Evolutionary-Relatedness-Dependent")
-                                            if [ -d "../Config/eve_train_diffpool.yaml" ]; then
+                                            if [ -e "../Config/eve_train_diffpool.yaml" ]; then
                                                 echo -e "${Blue}Training model on Evolutionary-Relatedness-Dependent Trees...${NC}"
                                                 # Logic for Evolutionary-Relatedness-Dependent Trees
                                                 echo "Submitting job for TES"
@@ -609,7 +609,7 @@ main_menu() {
                                     # Logic based on selected data-set type
                                     case $folder_type in
                                         "Birth-Death")
-                                            if [ -d "../Config/bd_train_gps.yaml" ]; then
+                                            if [ -e "../Config/bd_train_gps.yaml" ]; then
                                                 echo -e "${Blue}Training model on Birth-Death Trees...${NC}"
                                                 # Logic for Birth-Death Trees
                                                 echo "Submitting job for TES"
@@ -622,7 +622,7 @@ main_menu() {
                                             fi
                                             ;;
                                         "Diversity-Dependent-Diversification")
-                                            if [ -d "../Config/ddd_train_gps.yaml" ]; then
+                                            if [ -e "../Config/ddd_train_gps.yaml" ]; then
                                                 echo -e "${Blue}Training model on Diversity-Dependent-Diversification Trees...${NC}"
                                                 # Logic for Diversity-Dependent-Diversification Trees
                                                 echo "Submitting job for TES"
@@ -635,7 +635,7 @@ main_menu() {
                                             fi
                                             ;;
                                         "Protracted Birth-Death")
-                                            if [ -d "../Config/pbd_train_gps.yaml" ]; then
+                                            if [ -e "../Config/pbd_train_gps.yaml" ]; then
                                                 echo -e "${Blue}Training model on Protracted Birth-Death Trees...${NC}"
                                                 # Logic for Protracted Birth-Death Trees
                                                 echo "Submitting job for TES"
@@ -648,7 +648,7 @@ main_menu() {
                                             fi
                                             ;;
                                         "Evolutionary-Relatedness-Dependent")
-                                            if [ -d "../Config/eve_train_gps.yaml" ]; then
+                                            if [ -e "../Config/eve_train_gps.yaml" ]; then
                                                 echo -e "${Blue}Training model on Evolutionary-Relatedness-Dependent Trees...${NC}"
                                                 # Logic for Evolutionary-Relatedness-Dependent Trees
                                                 echo "Submitting job for TES"
