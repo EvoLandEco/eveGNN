@@ -257,23 +257,27 @@ main_menu() {
                             case $scenario in
                                 B)
                                     echo
-                                    echo "Processing Birth-Death Trees..."
+                                    echo "Submitting Birth-Death simulation job..."
                                     # Add logic for Birth-Death Trees here
+                                    sbatch submit_bd_pars_est_free_data.sh "$name"
                                     ;;
                                 D)
                                     echo
-                                    echo "Processing Diversity-Dependent-Diversification Trees..."
+                                    echo "Submitting Diversity-Dependent-Diversification simulation job..."
                                     # Add logic for Diversity-Dependent-Diversification Trees here
+                                    sbatch submit_ddd_pars_est_free_data.sh "$name"
                                     ;;
                                 P)
                                     echo
-                                    echo "Processing Protracted Birth-Death Trees..."
+                                    echo "Submitting Protracted Birth-Death simulation job..."
                                     # Add logic for Protracted Birth-Death Trees here
+                                    sbatch submit_pbd_pars_est_free_data.sh "$name"
                                     ;;
                                 E)
                                     echo
-                                    echo "Processing Evolutionary-Relatedness-Dependent Trees..."
+                                    echo "Submitting Evolutionary-Relatedness-Dependent simulation job..."
                                     # Add logic for Evolutionary-Relatedness-Dependent Trees here
+                                    sbatch submit_eve_pars_est_free_data.sh "$name"
                                     ;;
                             esac
                         done
