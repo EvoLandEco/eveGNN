@@ -372,12 +372,12 @@ def main():
 
     if task_type == "EVE_FREE_TES":
         val_dir = os.path.join(name, "EVE_VAL_TES")
-        train_batch_size_adjusted = train_batch_size
-        test_batch_size_adjusted = test_batch_size
+        train_batch_size_adjusted = int(train_batch_size)
+        test_batch_size_adjusted = int(test_batch_size)
     elif task_type == "EVE_FREE_TAS":
         val_dir = os.path.join(name, "EVE_VAL_TAS")
-        train_batch_size_adjusted = ceil(train_batch_size * batch_size_reduce_factor)
-        test_batch_size_adjusted = ceil(test_batch_size * batch_size_reduce_factor)
+        train_batch_size_adjusted = int(ceil(train_batch_size * batch_size_reduce_factor))
+        test_batch_size_adjusted = int(ceil(test_batch_size * batch_size_reduce_factor))
     else:
         raise ValueError("Invalid task type")
 
