@@ -376,20 +376,44 @@ main_menu() {
                                     # Logic based on selected data-set type
                                     case $folder_type in
                                         "Birth-Death")
-                                            echo -e "${Blue}Training model on Birth-Death Trees...${NC}"
-                                            # Logic for Birth-Death Trees
+                                            if [ -d "../Config/bd_train_gnn.yaml" ]; then
+                                                echo -e "${Blue}Training model on Birth-Death Trees...${NC}"
+                                                # Logic for Birth-Death Trees
+                                                sbatch submit_bd_pars_est_model_training.sh "$name"
+                                            else
+                                                echo
+                                                echo -e "${Red}ERROR: ${NC}Missing configuration file for Birth-Death simple GNN model."
+                                            fi
                                             ;;
                                         "Diversity-Dependent-Diversification")
-                                            echo -e "${Blue}Training model on Diversity-Dependent-Diversification Trees...${NC}"
-                                            # Logic for Diversity-Dependent-Diversification Trees
+                                            if [ -d "../Config/ddd_train_gnn.yaml" ]; then
+                                                echo -e "${Blue}Training model on Diversity-Dependent-Diversification Trees...${NC}"
+                                                # Logic for Diversity-Dependent-Diversification Trees
+                                                sbatch submit_ddd_pars_est_model_training.sh "$name"
+                                            else
+                                                echo
+                                                echo -e "${Red}ERROR: ${NC}Missing configuration file for Diversity-Dependent-Diversification simple GNN model."
+                                            fi
                                             ;;
                                         "Protracted Birth-Death")
-                                            echo -e "${Blue}Training model on Protracted Birth-Death Trees...${NC}"
-                                            # Logic for Protracted Birth-Death Trees
+                                            if [ -d "../Config/pbd_train_gnn.yaml" ]; then
+                                                echo -e "${Blue}Training model on Protracted Birth-Death Trees...${NC}"
+                                                # Logic for Protracted Birth-Death Trees
+                                                sbatch submit_pbd_pars_est_model_training.sh "$name"
+                                            else
+                                                echo
+                                                echo -e "${Red}ERROR: ${NC}Missing configuration file for Protracted Birth-Death simple GNN model."
+                                            fi
                                             ;;
                                         "Evolutionary-Relatedness-Dependent")
-                                            echo -e "${Blue}Training model on Evolutionary-Relatedness-Dependent Trees...${NC}"
-                                            # Logic for Evolutionary-Relatedness-Dependent Trees
+                                            if [ -d "../Config/eve_train_gnn.yaml" ]; then
+                                                echo -e "${Blue}Training model on Evolutionary-Relatedness-Dependent Trees...${NC}"
+                                                # Logic for Evolutionary-Relatedness-Dependent Trees
+                                                sbatch submit_eve_pars_est_model_training.sh "$name"
+                                            else
+                                                echo
+                                                echo -e "${Red}ERROR: ${NC}Missing configuration file for Evolutionary-Relatedness-Dependent simple GNN model."
+                                            fi
                                             ;;
                                     esac
                                 done
@@ -445,20 +469,44 @@ main_menu() {
                                     # Logic based on selected data-set type
                                     case $folder_type in
                                         "Birth-Death")
-                                            echo -e "${Blue}Training model on Birth-Death Trees...${NC}"
-                                            # Logic for Birth-Death Trees
+                                            if [ -d "../Config/bd_train_diffpool.yaml" ]; then
+                                                echo -e "${Blue}Training model on Birth-Death Trees...${NC}"
+                                                # Logic for Birth-Death Trees
+                                                sbatch submit_bd_pars_est_model_training_diffpool.sh "$name"
+                                            else
+                                                echo
+                                                echo -e "${Red}ERROR: ${NC}Missing configuration file for Birth-Death DiffPool model."
+                                            fi
                                             ;;
                                         "Diversity-Dependent-Diversification")
-                                            echo -e "${Blue}Training model on Diversity-Dependent-Diversification Trees...${NC}"
-                                            # Logic for Diversity-Dependent-Diversification Trees
+                                            if [ -d "../Config/ddd_train_diffpool.yaml" ]; then
+                                                echo -e "${Blue}Training model on Diversity-Dependent-Diversification Trees...${NC}"
+                                                # Logic for Diversity-Dependent-Diversification Trees
+                                                sbatch submit_ddd_pars_est_model_training_diffpool.sh "$name"
+                                            else
+                                                echo
+                                                echo -e "${Red}ERROR: ${NC}Missing configuration file for Diversity-Dependent-Diversification DiffPool model."
+                                            fi
                                             ;;
                                         "Protracted Birth-Death")
-                                            echo -e "${Blue}Training model on Protracted Birth-Death Trees...${NC}"
-                                            # Logic for Protracted Birth-Death Trees
+                                            if [ -d "../Config/pbd_train_diffpool.yaml" ]; then
+                                                echo -e "${Blue}Training model on Protracted Birth-Death Trees...${NC}"
+                                                # Logic for Protracted Birth-Death Trees
+                                                sbatch submit_pbd_pars_est_model_training_diffpool.sh "$name"
+                                            else
+                                                echo
+                                                echo -e "${Red}ERROR: ${NC}Missing configuration file for Protracted Birth-Death DiffPool model."
+                                            fi
                                             ;;
                                         "Evolutionary-Relatedness-Dependent")
-                                            echo -e "${Blue}Training model on Evolutionary-Relatedness-Dependent Trees...${NC}"
-                                            # Logic for Evolutionary-Relatedness-Dependent Trees
+                                            if [ -d "../Config/eve_train_diffpool.yaml" ]; then
+                                                echo -e "${Blue}Training model on Evolutionary-Relatedness-Dependent Trees...${NC}"
+                                                # Logic for Evolutionary-Relatedness-Dependent Trees
+                                                sbatch submit_eve_pars_est_model_training_diffpool_reg.sh "$name"
+                                            else
+                                                echo
+                                                echo -e "${Red}ERROR: ${NC}Missing configuration file for Evolutionary-Relatedness-Dependent DiffPool model."
+                                            fi
                                             ;;
                                     esac
                                 done
@@ -514,20 +562,44 @@ main_menu() {
                                     # Logic based on selected data-set type
                                     case $folder_type in
                                         "Birth-Death")
-                                            echo -e "${Blue}Training model on Birth-Death Trees...${NC}"
-                                            # Logic for Birth-Death Trees
+                                            if [ -d "../Config/bd_train_gps.yaml" ]; then
+                                                echo -e "${Blue}Training model on Birth-Death Trees...${NC}"
+                                                # Logic for Birth-Death Trees
+                                                sbatch submit_bd_pars_est_model_training_gps.sh "$name"
+                                            else
+                                                echo
+                                                echo -e "${Red}ERROR: ${NC}Missing configuration file for Birth-Death Graph Transformer model."
+                                            fi
                                             ;;
                                         "Diversity-Dependent-Diversification")
-                                            echo -e "${Blue}Training model on Diversity-Dependent-Diversification Trees...${NC}"
-                                            # Logic for Diversity-Dependent-Diversification Trees
+                                            if [ -d "../Config/ddd_train_gps.yaml" ]; then
+                                                echo -e "${Blue}Training model on Diversity-Dependent-Diversification Trees...${NC}"
+                                                # Logic for Diversity-Dependent-Diversification Trees
+                                                sbatch submit_ddd_pars_est_model_training_gps.sh "$name"
+                                            else
+                                                echo
+                                                echo -e "${Red}ERROR: ${NC}Missing configuration file for Diversity-Dependent-Diversification Graph Transformer model."
+                                            fi
                                             ;;
                                         "Protracted Birth-Death")
-                                            echo -e "${Blue}Training model on Protracted Birth-Death Trees...${NC}"
-                                            # Logic for Protracted Birth-Death Trees
+                                            if [ -d "../Config/pbd_train_gps.yaml" ]; then
+                                                echo -e "${Blue}Training model on Protracted Birth-Death Trees...${NC}"
+                                                # Logic for Protracted Birth-Death Trees
+                                                sbatch submit_pbd_pars_est_model_training_gps.sh "$name"
+                                            else
+                                                echo
+                                                echo -e "${Red}ERROR: ${NC}Missing configuration file for Protracted Birth-Death Graph Transformer model."
+                                            fi
                                             ;;
                                         "Evolutionary-Relatedness-Dependent")
-                                            echo -e "${Blue}Training model on Evolutionary-Relatedness-Dependent Trees...${NC}"
-                                            # Logic for Evolutionary-Relatedness-Dependent Trees
+                                            if [ -d "../Config/eve_train_gps.yaml" ]; then
+                                                echo -e "${Blue}Training model on Evolutionary-Relatedness-Dependent Trees...${NC}"
+                                                # Logic for Evolutionary-Relatedness-Dependent Trees
+                                                sbatch submit_eve_pars_est_model_training_gps.sh "$name"
+                                            else
+                                                echo
+                                                echo -e "${Red}ERROR: ${NC}Missing configuration file for Evolutionary-Relatedness-Dependent Graph Transformer model."
+                                            fi
                                             ;;
                                     esac
                                 done
