@@ -256,28 +256,48 @@ main_menu() {
                         for scenario in "${selected_scenarios[@]}"; do
                             case $scenario in
                                 B)
-                                    echo
-                                    echo "Submitting Birth-Death simulation job..."
-                                    # Add logic for Birth-Death Trees here
-                                    sbatch submit_bd_pars_est_free_data.sh "$name"
+                                    if [ -d "../Config/bd_sim.yaml" ]; then
+                                        echo
+                                        echo "Submitting Birth-Death simulation job..."
+                                        # Add logic for Birth-Death Trees here
+                                        sbatch submit_bd_pars_est_free_data.sh "$name"
+                                    else
+                                        echo
+                                        echo "ERROR: Missing configuration file for Birth-Death simulation."
+                                    fi
                                     ;;
                                 D)
-                                    echo
-                                    echo "Submitting Diversity-Dependent-Diversification simulation job..."
-                                    # Add logic for Diversity-Dependent-Diversification Trees here
-                                    sbatch submit_ddd_pars_est_free_data.sh "$name"
+                                    if [ -d "../Config/ddd_sim.yaml" ]; then
+                                        echo
+                                        echo "Submitting Diversity-Dependent-Diversification simulation job..."
+                                        # Add logic for Diversity-Dependent-Diversification Trees here
+                                        sbatch submit_ddd_pars_est_free_data.sh "$name"
+                                    else
+                                        echo
+                                        echo "ERROR: Missing configuration file for Diversity-Dependent-Diversification simulation."
+                                    fi
                                     ;;
                                 P)
-                                    echo
-                                    echo "Submitting Protracted Birth-Death simulation job..."
-                                    # Add logic for Protracted Birth-Death Trees here
-                                    sbatch submit_pbd_pars_est_free_data.sh "$name"
+                                    if [ -d "../Config/pbd_sim.yaml" ]; then
+                                        echo
+                                        echo "Submitting Protracted Birth-Death simulation job..."
+                                        # Add logic for Protracted Birth-Death Trees here
+                                        sbatch submit_pbd_pars_est_free_data.sh "$name"
+                                    else
+                                        echo
+                                        echo "ERROR: Missing configuration file for Protracted Birth-Death simulation."
+                                    fi
                                     ;;
                                 E)
-                                    echo
-                                    echo "Submitting Evolutionary-Relatedness-Dependent simulation job..."
-                                    # Add logic for Evolutionary-Relatedness-Dependent Trees here
-                                    sbatch submit_eve_pars_est_free_data.sh "$name"
+                                    if [ -d "../Config/eve_sim.yaml" ]; then
+                                        echo
+                                        echo "Submitting Evolutionary-Relatedness-Dependent simulation job..."
+                                        # Add logic for Evolutionary-Relatedness-Dependent Trees here
+                                        sbatch submit_eve_pars_est_free_data.sh "$name"
+                                    else
+                                        echo
+                                        echo "ERROR: Missing configuration file for Evolutionary-Relatedness-Dependent simulation."
+                                    fi
                                     ;;
                             esac
                         done
