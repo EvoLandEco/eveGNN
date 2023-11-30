@@ -98,7 +98,7 @@ verify_data_at_start() {
                 local combination="${first_part}_${part2}_${part3}"
                 if [ ! -d "$name/$combination" ]; then
                     local interpreted_combination=$(interpret_combination "${part2}_${part3}")
-                    echo "${Orange}WARNING: ${NC}Missing $interpreted_combination in the $(interpret_folder_name "$first_part") data-set."
+                    echo -e "${Orange}WARNING: ${NC}Missing $interpreted_combination in the $(interpret_folder_name "$first_part") data-set."
                     failed_check=1
                 fi
             done
@@ -107,7 +107,7 @@ verify_data_at_start() {
         # Check for MLE_TES combination
         if  [ "$first_part" != "EVE" ]; then
             if [ ! -d "$name/${first_part}_MLE_TES" ]; then
-                echo "${Orange}WARNING: ${NC}Missing Maximum Likelihood Estimation (MLE) results in the $(interpret_folder_name "$first_part") data-set."
+                echo -e "${Orange}WARNING: ${NC}Missing Maximum Likelihood Estimation (MLE) results in the $(interpret_folder_name "$first_part") data-set."
                 failed_check=1
             fi
         fi
@@ -149,7 +149,7 @@ check_data_integrity() {
                     local count_el=$(find "$folder/GNN/tree/EL" -maxdepth 1 -name "*.rds" | wc -l)
                     echo "Count in tree: $count_tree, Count in tree/EL: $count_el"
                     if [ "$count_tree" -ne "$count_el" ]; then
-                        echo "${Orange}WARNING: ${NC}Inconsistent file counts in GNN format."
+                        echo -e "${Orange}WARNING: ${NC}Inconsistent file counts in GNN format."
                         all_checks_passed=0
                     fi
                 fi
@@ -161,7 +161,7 @@ check_data_integrity() {
                     local count_node=$(find "$folder/GPS/tree/node" -maxdepth 1 -name "*.rds" | wc -l)
                     echo "Count in tree: $count_tree, Count in tree/edge: $count_edge, Count in tree/node: $count_node"
                     if [ "$count_tree" -ne "$count_edge" ] || [ "$count_tree" -ne "$count_node" ]; then
-                        echo "${Orange}WARNING: ${NC}Inconsistent file counts in GPS format."
+                        echo -e "${Orange}WARNING: ${NC}Inconsistent file counts in GPS format."
                         all_checks_passed=0
                     fi
                 fi
@@ -169,7 +169,7 @@ check_data_integrity() {
                 # Check if no format was found
                 if [ $found_format -eq 0 ]; then
                     echo
-                    echo "${Orange}WARNING: ${NC}Neither GNN nor GPS data formats found in $interpreted_part1 $interpreted_part2."
+                    echo -e "${Orange}WARNING: ${NC}Neither GNN nor GPS data formats found in $interpreted_part1 $interpreted_part2."
                     all_checks_passed=0
                 fi
             fi
@@ -264,45 +264,45 @@ main_menu() {
                                 B)
                                     if [ -d "../Config/bd_sim.yaml" ]; then
                                         echo
-                                        echo "${Blue}Submitting Birth-Death simulation job..."
+                                        echo -e "${Blue}Submitting Birth-Death simulation job..."
                                         # Add logic for Birth-Death Trees here
                                         sbatch submit_bd_pars_est_free_data.sh "$name"
                                     else
                                         echo
-                                        echo "${Red}ERROR: ${NC}Missing configuration file for Birth-Death simulation."
+                                        echo -e "${Red}ERROR: ${NC}Missing configuration file for Birth-Death simulation."
                                     fi
                                     ;;
                                 D)
                                     if [ -d "../Config/ddd_sim.yaml" ]; then
                                         echo
-                                        echo "${Blue}Submitting Diversity-Dependent-Diversification simulation job..."
+                                        echo -e "${Blue}Submitting Diversity-Dependent-Diversification simulation job..."
                                         # Add logic for Diversity-Dependent-Diversification Trees here
                                         sbatch submit_ddd_pars_est_free_data.sh "$name"
                                     else
                                         echo
-                                        echo "${Red}ERROR: ${NC}Missing configuration file for Diversity-Dependent-Diversification simulation."
+                                        echo -e "${Red}ERROR: ${NC}Missing configuration file for Diversity-Dependent-Diversification simulation."
                                     fi
                                     ;;
                                 P)
                                     if [ -d "../Config/pbd_sim.yaml" ]; then
                                         echo
-                                        echo "${Blue}Submitting Protracted Birth-Death simulation job..."
+                                        echo -e "${Blue}Submitting Protracted Birth-Death simulation job..."
                                         # Add logic for Protracted Birth-Death Trees here
                                         sbatch submit_pbd_pars_est_free_data.sh "$name"
                                     else
                                         echo
-                                        echo "${Red}ERROR: ${NC}Missing configuration file for Protracted Birth-Death simulation."
+                                        echo -e "${Red}ERROR: ${NC}Missing configuration file for Protracted Birth-Death simulation."
                                     fi
                                     ;;
                                 E)
                                     if [ -d "../Config/eve_sim.yaml" ]; then
                                         echo
-                                        echo "${Blue}Submitting Evolutionary-Relatedness-Dependent simulation job..."
+                                        echo -e "${Blue}Submitting Evolutionary-Relatedness-Dependent simulation job..."
                                         # Add logic for Evolutionary-Relatedness-Dependent Trees here
                                         sbatch submit_eve_pars_est_free_data.sh "$name"
                                     else
                                         echo
-                                        echo "${Red}ERROR: ${NC}Missing configuration file for Evolutionary-Relatedness-Dependent simulation."
+                                        echo -e "${Red}ERROR: ${NC}Missing configuration file for Evolutionary-Relatedness-Dependent simulation."
                                     fi
                                     ;;
                             esac
@@ -376,19 +376,19 @@ main_menu() {
                                     # Logic based on selected data-set type
                                     case $folder_type in
                                         "Birth-Death")
-                                            echo "${Blue}Training model on Birth-Death Trees..."
+                                            echo -e "${Blue}Training model on Birth-Death Trees..."
                                             # Logic for Birth-Death Trees
                                             ;;
                                         "Diversity-Dependent-Diversification")
-                                            echo "${Blue}Training model on Diversity-Dependent-Diversification Trees..."
+                                            echo -e "${Blue}Training model on Diversity-Dependent-Diversification Trees..."
                                             # Logic for Diversity-Dependent-Diversification Trees
                                             ;;
                                         "Protracted Birth-Death")
-                                            echo "${Blue}Training model on Protracted Birth-Death Trees..."
+                                            echo -e "${Blue}Training model on Protracted Birth-Death Trees..."
                                             # Logic for Protracted Birth-Death Trees
                                             ;;
                                         "Evolutionary-Relatedness-Dependent")
-                                            echo "${Blue}Training model on Evolutionary-Relatedness-Dependent Trees..."
+                                            echo -e "${Blue}Training model on Evolutionary-Relatedness-Dependent Trees..."
                                             # Logic for Evolutionary-Relatedness-Dependent Trees
                                             ;;
                                     esac
@@ -445,19 +445,19 @@ main_menu() {
                                     # Logic based on selected data-set type
                                     case $folder_type in
                                         "Birth-Death")
-                                            echo "${Blue}Training model on Birth-Death Trees..."
+                                            echo -e "${Blue}Training model on Birth-Death Trees..."
                                             # Logic for Birth-Death Trees
                                             ;;
                                         "Diversity-Dependent-Diversification")
-                                            echo "${Blue}Training model on Diversity-Dependent-Diversification Trees..."
+                                            echo -e "${Blue}Training model on Diversity-Dependent-Diversification Trees..."
                                             # Logic for Diversity-Dependent-Diversification Trees
                                             ;;
                                         "Protracted Birth-Death")
-                                            echo "${Blue}Training model on Protracted Birth-Death Trees..."
+                                            echo -e "${Blue}Training model on Protracted Birth-Death Trees..."
                                             # Logic for Protracted Birth-Death Trees
                                             ;;
                                         "Evolutionary-Relatedness-Dependent")
-                                            echo "${Blue}Training model on Evolutionary-Relatedness-Dependent Trees..."
+                                            echo -e "${Blue}Training model on Evolutionary-Relatedness-Dependent Trees..."
                                             # Logic for Evolutionary-Relatedness-Dependent Trees
                                             ;;
                                     esac
@@ -514,19 +514,19 @@ main_menu() {
                                     # Logic based on selected data-set type
                                     case $folder_type in
                                         "Birth-Death")
-                                            echo "${Blue}Training model on Birth-Death Trees..."
+                                            echo -e "${Blue}Training model on Birth-Death Trees..."
                                             # Logic for Birth-Death Trees
                                             ;;
                                         "Diversity-Dependent-Diversification")
-                                            echo "${Blue}Training model on Diversity-Dependent-Diversification Trees..."
+                                            echo -e "${Blue}Training model on Diversity-Dependent-Diversification Trees..."
                                             # Logic for Diversity-Dependent-Diversification Trees
                                             ;;
                                         "Protracted Birth-Death")
-                                            echo "${Blue}Training model on Protracted Birth-Death Trees..."
+                                            echo -e "${Blue}Training model on Protracted Birth-Death Trees..."
                                             # Logic for Protracted Birth-Death Trees
                                             ;;
                                         "Evolutionary-Relatedness-Dependent")
-                                            echo "${Blue}Training model on Evolutionary-Relatedness-Dependent Trees..."
+                                            echo -e "${Blue}Training model on Evolutionary-Relatedness-Dependent Trees..."
                                             # Logic for Evolutionary-Relatedness-Dependent Trees
                                             ;;
                                     esac
@@ -601,22 +601,22 @@ main_menu() {
                                 case $folder_type in
                                     "Birth-Death")
                                         echo
-                                        echo "${Blue}Performing validation on Birth-Death Trees..."
+                                        echo -e "${Blue}Performing validation on Birth-Death Trees..."
                                         # Logic for Birth-Death Trees
                                         ;;
                                     "Diversity-Dependent-Diversification")
                                         echo
-                                        echo "${Blue}Performing validation on Diversity-Dependent-Diversification Trees..."
+                                        echo -e "${Blue}Performing validation on Diversity-Dependent-Diversification Trees..."
                                         # Logic for Diversity-Dependent-Diversification Trees
                                         ;;
                                     "Protracted Birth-Death")
                                         echo
-                                        echo "${Blue}Performing validation on Protracted Birth-Death Trees..."
+                                        echo -e "${Blue}Performing validation on Protracted Birth-Death Trees..."
                                         # Logic for Protracted Birth-Death Trees
                                         ;;
                                     "Evolutionary-Relatedness-Dependent")
                                         echo
-                                        echo "${Blue}Performing validation on Evolutionary-Relatedness-Dependent Trees..."
+                                        echo -e "${Blue}Performing validation on Evolutionary-Relatedness-Dependent Trees..."
                                         # Logic for Evolutionary-Relatedness-Dependent Trees
                                         ;;
                                 esac
@@ -632,14 +632,14 @@ main_menu() {
                                     for folder in "$name"/*_*_*; do
                                         if [ -d "$folder" ] && [[ "$(interpret_folder_name "$(basename "$folder")")" == "$folder_type" ]]; then
                                             echo
-                                            echo "${Blue}Removing $folder..."
+                                            echo -e "${Blue}Removing $folder..."
                                             rm -rf "$folder"
                                         fi
                                     done
                                 done
                             else
                                 echo
-                                echo "${Blue}Removal cancelled."
+                                echo -e "${Blue}Removal cancelled."
                             fi
                         fi
                     fi
