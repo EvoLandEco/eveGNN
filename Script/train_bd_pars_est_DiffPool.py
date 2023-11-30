@@ -33,6 +33,7 @@ gcn_layer3_hidden_channels = global_params["gcn_layer3_hidden_channels"]
 lin_layer1_hidden_channels = global_params["lin_layer1_hidden_channels"]
 lin_layer2_hidden_channels = global_params["lin_layer2_hidden_channels"]
 n_predicted_values = global_params["n_predicted_values"]
+batch_size_reduce_factor = global_params["batch_size_reduce_factor"]
 
 
 def read_table(path):
@@ -84,19 +85,19 @@ def list_subdirectories(path):
 
 def get_params_string(filename):
     # Function to extract parameters from the filename
-    params = filename.split('_')[1:-1]  # Exclude the first and last elements
+    params = filename.split('_')[1:2]  # Exclude the first and last elements
     return "_".join(params)
 
 
 def get_params(filename):
-    params = filename.split('_')[1:-1]
+    params = filename.split('_')[1:2]
     params = list(map(float, params))  # Convert string to float
     return params
 
 
 def get_sort_key(filename):
     # Split the filename by underscores, convert the parameter values to floats, and return them as a tuple
-    params = tuple(map(float, filename.split('_')[1:-1]))
+    params = tuple(map(float, filename.split('_')[1:2]))
     return params
 
 
@@ -112,7 +113,8 @@ def check_file_consistency(files_tree, files_el):
 
     # Define a function to extract parameters from filename
     def get_params_tuple(filename):
-        return tuple(map(float, filename.split('_')[1:-1]))
+        # Hack for BD trees, only read the first two parameters
+        return tuple(map(float, filename.split('_')[1:2]))
 
     # Check each pair of files for matching parameters
     for tree_file, el_file in zip(files_tree, files_el):
@@ -199,10 +201,6 @@ def read_rds_to_pytorch(path, count):
         params = get_params(filename)
         params_list.append(params)
 
-    # Normalize carrying capacity by dividing by a factor
-    for vector in params_list:
-        vector[2] = vector[2] / cap_norm_factor
-
     check_list_count(count, data_list, length_list, params_list)
 
     # List to hold the Data objects
@@ -222,7 +220,7 @@ def read_rds_to_pytorch(path, count):
 
         params_current = params_list[i]
 
-        params_current_tensor = torch.tensor(params_current[0:3], dtype=torch.float)
+        params_current_tensor = torch.tensor(params_current[0:n_predicted_values], dtype=torch.float)
 
         # Create a Data object with the edge index, number of nodes, and category value
         data = Data(x=edge_length_tensor,
@@ -307,12 +305,21 @@ def main():
 
     validation_dataset_list = []
     val_dir = ""
+
+    train_batch_size_adjusted = None
+    test_batch_size_adjusted = None
+
     if task_type == "BD_FREE_TES":
         val_dir = os.path.join(name, "BD_VAL_TES")
+        train_batch_size_adjusted = train_batch_size
+        test_batch_size_adjusted = test_batch_size
     elif task_type == "BD_FREE_TAS":
         val_dir = os.path.join(name, "BD_VAL_TAS")
+        train_batch_size_adjusted = ceil(train_batch_size * batch_size_reduce_factor)
+        test_batch_size_adjusted = ceil(test_batch_size * batch_size_reduce_factor)
     else:
         raise ValueError("Invalid task type.")
+
     full_val_dir_tree = os.path.join(val_dir, 'GNN', 'tree')
     full_val_dir_el = os.path.join(val_dir, 'GNN', 'tree', 'EL')
     val_rds_count = check_rds_files_count(full_val_dir_tree, full_val_dir_el)
@@ -346,9 +353,7 @@ def main():
     max_nodes_test = max([data.num_nodes for data in filtered_testing_data])
     max_nodes_val = max([data.num_nodes for data in filtered_validation_data])
     max_nodes = max(max_nodes_train, max_nodes_test, max_nodes_val)
-    # Hacking max_nodes is needed to match out-of-sample validation dataset
-    # max_nodes should actually be max(max_nodes_train, max_nodes_test, max_nodes_val)
-    # max_nodes = 2012
+    print(f"Max nodes: {max_nodes} for {task_type}")
 
     training_dataset = TreeData(root=None, data_list=filtered_training_data, transform=T.ToDense(max_nodes))
     testing_dataset = TreeData(root=None, data_list=filtered_testing_data, transform=T.ToDense(max_nodes))
@@ -498,8 +503,8 @@ def main():
     shape_check(training_dataset, max_nodes)
     shape_check(testing_dataset, max_nodes)
 
-    train_loader = DenseDataLoader(training_dataset, batch_size=train_batch_size, shuffle=False)
-    test_loader = DenseDataLoader(testing_dataset, batch_size=test_batch_size, shuffle=False)
+    train_loader = DenseDataLoader(training_dataset, batch_size=train_batch_size_adjusted, shuffle=False)
+    test_loader = DenseDataLoader(testing_dataset, batch_size=test_batch_size_adjusted, shuffle=False)
     print(f"Training dataset length: {len(train_loader.dataset)}")
     print(f"Testing dataset length: {len(test_loader.dataset)}")
     print(train_loader.dataset.transform)

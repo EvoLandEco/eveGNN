@@ -34,6 +34,7 @@ gcn_layer3_hidden_channels = global_params["gcn_layer3_hidden_channels"]
 lin_layer1_hidden_channels = global_params["lin_layer1_hidden_channels"]
 lin_layer2_hidden_channels = global_params["lin_layer2_hidden_channels"]
 n_predicted_values = global_params["n_predicted_values"]
+batch_size_reduce_factor = global_params["batch_size_reduce_factor"]
 
 
 def read_table(path):
@@ -223,7 +224,7 @@ def read_rds_to_pytorch(path, count):
 
         params_current = params_list[i]
 
-        params_current_tensor = torch.tensor(params_current[0:3], dtype=torch.float)
+        params_current_tensor = torch.tensor(params_current[0:n_predicted_values], dtype=torch.float)
 
         # Create a Data object with the edge index, number of nodes, and category value
         data = Data(x=edge_length_tensor,
@@ -308,12 +309,21 @@ def main():
 
     validation_dataset_list = []
     val_dir = ""
+
+    train_batch_size_adjusted = None
+    test_batch_size_adjusted = None
+
     if task_type == "DDD_FREE_TES":
         val_dir = os.path.join(name, "DDD_VAL_TES")
+        train_batch_size_adjusted = train_batch_size
+        test_batch_size_adjusted = test_batch_size
     elif task_type == "DDD_FREE_TAS":
         val_dir = os.path.join(name, "DDD_VAL_TAS")
+        train_batch_size_adjusted = train_batch_size * batch_size_reduce_factor
+        test_batch_size_adjusted = test_batch_size * batch_size_reduce_factor
     else:
         raise ValueError("Invalid task type.")
+
     full_val_dir_tree = os.path.join(val_dir, 'GNN', 'tree')
     full_val_dir_el = os.path.join(val_dir, 'GNN', 'tree', 'EL')
     val_rds_count = check_rds_files_count(full_val_dir_tree, full_val_dir_el)
@@ -347,9 +357,7 @@ def main():
     max_nodes_test = max([data.num_nodes for data in filtered_testing_data])
     max_nodes_val = max([data.num_nodes for data in filtered_validation_data])
     max_nodes = max(max_nodes_train, max_nodes_test, max_nodes_val)
-    # Hacking max_nodes is needed to match out-of-sample validation dataset
-    # max_nodes should actually be max(max_nodes_train, max_nodes_test, max_nodes_val)
-    # max_nodes = 2012
+    print(f"Max nodes: {max_nodes} for {task_type}")
 
     training_dataset = TreeData(root=None, data_list=filtered_training_data, transform=T.ToDense(max_nodes))
     testing_dataset = TreeData(root=None, data_list=filtered_testing_data, transform=T.ToDense(max_nodes))
@@ -499,8 +507,8 @@ def main():
     shape_check(training_dataset, max_nodes)
     shape_check(testing_dataset, max_nodes)
 
-    train_loader = DenseDataLoader(training_dataset, batch_size=train_batch_size, shuffle=False)
-    test_loader = DenseDataLoader(testing_dataset, batch_size=test_batch_size, shuffle=False)
+    train_loader = DenseDataLoader(training_dataset, batch_size=train_batch_size_adjusted, shuffle=False)
+    test_loader = DenseDataLoader(testing_dataset, batch_size=test_batch_size_adjusted, shuffle=False)
     print(f"Training dataset length: {len(train_loader.dataset)}")
     print(f"Testing dataset length: {len(test_loader.dataset)}")
     print(train_loader.dataset.transform)

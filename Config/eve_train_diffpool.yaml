@@ -1,3 +1,4 @@
+batch_size_reduce_factor: 0.25
 beta_n_norm_factor: 100
 beta_phi_norm_factor: 1000
 diffpool_ratio: 0.25

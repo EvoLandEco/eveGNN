@@ -37,10 +37,3 @@ eveGNN::export_to_gnn_with_params_pbd(pbd_free_tes_list, "tes", undirected = FAL
 #
 # setwd("MLE")
 #
-# test_pbd_ml <- PBD::pbd_ML(brts = pbd_free_tes_list$brts[[1]],
-#        idparsopt = c(1, 2, 3),
-#        exteq = 1,
-#        btorph = 0,
-#        soc = 2,
-#       # cond = 0,
-#        verbose = FALSE)
