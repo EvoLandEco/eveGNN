@@ -8,16 +8,34 @@ import functools
 import random
 import torch_geometric.transforms as T
 import torch.nn.functional as F
+import yaml
 from math import ceil
 from torch_geometric.data import InMemoryDataset, Data
 from torch_geometric.loader import DenseDataLoader
 from torch_geometric.nn import DenseGCNConv as GCNConv, dense_diff_pool
 
-# Global variables
+# Load the global parameters from the config file
+global_params = None
+
+with open("../Config/eve_train_diffpool.yaml", "r") as ymlfile:
+    global_params = yaml.safe_load(ymlfile)
+
+# Set global variables
 metric_to_category = {'pd': 0, 'ed': 1, 'nnd': 2}
-beta_n_norm_factor = 100
-beta_phi_norm_factor = 1000
-epoch_number = 60
+beta_n_norm_factor = global_params["beta_n_norm_factor"]
+beta_phi_norm_factor = global_params["beta_phi_norm_factor"]
+epoch_number = global_params["epoch_number"]
+diffpool_ratio = global_params["diffpool_ratio"]
+dropout_ratio = global_params["dropout_ratio"]
+learning_rate = global_params["learning_rate"]
+train_batch_size = global_params["train_batch_size"]
+test_batch_size = global_params["test_batch_size"]
+gcn_layer1_hidden_channels = global_params["gcn_layer1_hidden_channels"]
+gcn_layer2_hidden_channels = global_params["gcn_layer2_hidden_channels"]
+gcn_layer3_hidden_channels = global_params["gcn_layer3_hidden_channels"]
+lin_layer1_hidden_channels = global_params["lin_layer1_hidden_channels"]
+lin_layer2_hidden_channels = global_params["lin_layer2_hidden_channels"]
+n_predicted_values = global_params["n_predicted_values"]
 
 # Check if metric_to_category is a dictionary with string keys and integer values
 assert isinstance(metric_to_category, dict), "metric_to_category should be a dictionary"
@@ -385,12 +403,6 @@ def main():
             self.convs.append(GCNConv(hidden_channels, hidden_channels, normalize))
             self.bns.append(torch.nn.BatchNorm1d(hidden_channels))
 
-            self.convs.append(GCNConv(hidden_channels, hidden_channels, normalize))
-            self.bns.append(torch.nn.BatchNorm1d(hidden_channels))
-
-            self.convs.append(GCNConv(hidden_channels, hidden_channels, normalize))
-            self.bns.append(torch.nn.BatchNorm1d(hidden_channels))
-
             self.convs.append(GCNConv(hidden_channels, out_channels, normalize))
             self.bns.append(torch.nn.BatchNorm1d(out_channels))
 
@@ -407,19 +419,19 @@ def main():
         def __init__(self):
             super(DiffPool, self).__init__()
 
-            num_nodes = ceil(0.25 * max_nodes)
-            self.gnn1_pool = GNN(training_dataset.num_node_features, 256, num_nodes)
-            self.gnn1_embed = GNN(training_dataset.num_node_features, 256, 256)
+            num_nodes = ceil(diffpool_ratio * max_nodes)
+            self.gnn1_pool = GNN(training_dataset.num_node_features, gcn_layer1_hidden_channels, num_nodes)
+            self.gnn1_embed = GNN(training_dataset.num_node_features, gcn_layer1_hidden_channels, gcn_layer2_hidden_channels)
 
-            num_nodes = ceil(0.25 * num_nodes)
-            self.gnn2_pool = GNN(256, 256, num_nodes)
-            self.gnn2_embed = GNN(256, 256, 256, lin=False)
+            num_nodes = ceil(diffpool_ratio * num_nodes)
+            self.gnn2_pool = GNN(gcn_layer2_hidden_channels, gcn_layer2_hidden_channels, num_nodes)
+            self.gnn2_embed = GNN(gcn_layer2_hidden_channels, gcn_layer2_hidden_channels, gcn_layer3_hidden_channels, lin=False)
 
-            self.gnn3_embed = GNN(256, 128, 128, lin=False)
+            self.gnn3_embed = GNN(gcn_layer3_hidden_channels, gcn_layer3_hidden_channels, lin_layer1_hidden_channels, lin=False)
 
             # Layers for regression
-            self.lin1 = torch.nn.Linear(128, 64)
-            self.lin2 = torch.nn.Linear(64, 4)
+            self.lin1 = torch.nn.Linear(lin_layer1_hidden_channels, lin_layer2_hidden_channels)
+            self.lin2 = torch.nn.Linear(lin_layer2_hidden_channels, n_predicted_values)
 
         def forward(self, x, adj, mask=None):
             s = self.gnn1_pool(x, adj, mask)
@@ -436,10 +448,10 @@ def main():
 
             x = x.mean(dim=1)
 
-            xre = F.dropout(x, p=0.5, training=self.training)
+            xre = F.dropout(x, p=dropout_ratio, training=self.training)
             xre = self.lin1(xre)
             xre = F.relu(xre)
-            xre = F.dropout(xre, p=0.5, training=self.training)
+            xre = F.dropout(xre, p=dropout_ratio, training=self.training)
             xre = self.lin2(xre)
 
             return xre
@@ -493,7 +505,7 @@ def main():
 
     model = DiffPool()
     model = model.to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
     def shape_check(dataset, max_nodes):
         incorrect_shapes = []  # List to store indices of data elements with incorrect shapes
@@ -518,8 +530,8 @@ def main():
     shape_check(training_dataset, max_nodes)
     shape_check(testing_dataset, max_nodes)
 
-    train_loader = DenseDataLoader(training_dataset, batch_size=64, shuffle=False)
-    test_loader = DenseDataLoader(testing_dataset, batch_size=64, shuffle=False)
+    train_loader = DenseDataLoader(training_dataset, batch_size=train_batch_size, shuffle=False)
+    test_loader = DenseDataLoader(testing_dataset, batch_size=test_batch_size, shuffle=False)
     print(f"Training dataset length: {len(train_loader.dataset)}")
     print(f"Testing dataset length: {len(test_loader.dataset)}")
     print(train_loader.dataset.transform)

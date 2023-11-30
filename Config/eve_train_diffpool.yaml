@@ -1,0 +1,14 @@
+beta_n_norm_factor: 100
+beta_phi_norm_factor: 1000
+diffpool_ratio: 0.25
+dropout_ratio: 0.5
+epoch_number: 60
+gcn_layer1_hidden_channels: 256
+gcn_layer2_hidden_channels: 256
+gcn_layer3_hidden_channels: 128
+learning_rate: 0.001
+lin_layer1_hidden_channels: 64
+lin_layer2_hidden_channels: 32
+n_predicted_values: 4
+test_batch_size: 64
+train_batch_size: 64
