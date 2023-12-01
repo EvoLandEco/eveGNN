@@ -769,6 +769,7 @@ main_menu() {
                             echo
                             read -p $'\033[0;31mAre you sure you want to remove this data-set? (y/N): \033[0m' confirm
                             if [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]]; then
+                                echo "This may take a while..."
                                 for folder_type in "${selected_folder_types[@]}"; do
                                     for folder in "$name"/*_*_*; do
                                         if [ -d "$folder" ] && [[ "$(interpret_folder_name "$(basename "$folder")")" == "$folder_type" ]]; then
