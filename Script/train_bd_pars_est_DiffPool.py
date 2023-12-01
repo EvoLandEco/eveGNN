@@ -11,7 +11,7 @@ import torch.nn.functional as F
 import yaml
 import gc
 from math import ceil
-from torch_geometric.data import InMemoryDataset, Data, OnDiskDataset
+from torch_geometric.data import InMemoryDataset, Data
 
 from torch_geometric.loader import DenseDataLoader
 from torch_geometric.nn import DenseGCNConv as GCNConv, dense_diff_pool
@@ -350,7 +350,7 @@ def main():
     del sum_validation_data
     gc.collect()
 
-    class TreeData(OnDiskDataset):
+    class TreeData(InMemoryDataset):
         def __init__(self, root, data_list, transform=None, pre_transform=None):
             super(TreeData, self).__init__(root, transform, pre_transform)
             self.data, self.slices = self.collate(data_list)
