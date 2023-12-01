@@ -12,7 +12,7 @@ within_ranges:
   - 0.68
 - - 0.02
   - 0.28
-nrep: 50000
+nrep: 20000
 age: 10
 proportion: 0.005
 nworkers_sim: 4
