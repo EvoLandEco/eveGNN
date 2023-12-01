@@ -10,6 +10,8 @@ import torch_geometric.transforms as T
 import torch.nn.functional as F
 import yaml
 import optuna
+import gc
+import torch.cuda as cuda
 from math import ceil
 from torch_geometric.data import InMemoryDataset, Data
 from torch_geometric.loader import DenseDataLoader
@@ -34,7 +36,7 @@ lin_layer1_hidden_channels = global_params["lin_layer1_hidden_channels"]
 lin_layer2_hidden_channels = global_params["lin_layer2_hidden_channels"]
 n_predicted_values = global_params["n_predicted_values"]
 batch_size_reduce_factor = global_params["batch_size_reduce_factor"]
-#dropout_ratio = global_params["dropout_ratio"]
+# dropout_ratio = global_params["dropout_ratio"]
 
 
 def read_table(path):
@@ -510,6 +512,8 @@ def main():
             lambda_diff = diffs[0]
             mu_diff = diffs[1]
             cap_diff = diffs[2]
+            gc.collect()
+            cuda.empty_cache()
 
             return lambda_diff, mu_diff, cap_diff
 
