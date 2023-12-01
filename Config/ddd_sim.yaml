@@ -17,7 +17,7 @@ within_ranges:
   - 0.38
 - - 100.0
   - 900.0
-nrep: 50000
+nrep: 20000
 age: 10
 ddmodel: 1
 proportion: 0.005
