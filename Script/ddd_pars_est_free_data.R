@@ -2,13 +2,13 @@ args <- commandArgs(TRUE)
 
 name <- as.character(args[1])
 
+params <- yaml::read_yaml("../Config/ddd_sim.yaml")
+
 if (!dir.exists(name)) {
   dir.create(name)
 }
 
 setwd(name)
-
-params <- yaml::read_yaml("../Config/ddd_sim.yaml")
 
 dists <- params$dists
 cap_range <- params$cap_range
