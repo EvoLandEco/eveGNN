@@ -34,6 +34,7 @@ lin_layer1_hidden_channels = global_params["lin_layer1_hidden_channels"]
 lin_layer2_hidden_channels = global_params["lin_layer2_hidden_channels"]
 n_predicted_values = global_params["n_predicted_values"]
 batch_size_reduce_factor = global_params["batch_size_reduce_factor"]
+#dropout_ratio = global_params["dropout_ratio"]
 
 
 def read_table(path):
@@ -424,10 +425,10 @@ def main():
 
             x = x.mean(dim=1)
 
-            x = F.dropout(x, p=dropout_ratio, training=self.training)
+            x = F.dropout(x, p=self.dropout_ratio, training=self.training)
             x = self.lin1(x)
             x = F.relu(x)
-            x = F.dropout(x, p=dropout_ratio, training=self.training)
+            x = F.dropout(x, p=self.dropout_ratio, training=self.training)
             x = self.lin2(x)
             return x, l1 + l2, e1 + e2
 
