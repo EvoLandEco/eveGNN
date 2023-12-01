@@ -1,0 +1,11 @@
+batch_size_reduce_factor: 0.25
+cap_norm_factor: 1000
+epoch_number: 21
+gcn_layer1_hidden_channels: 256
+gcn_layer2_hidden_channels: 256
+gcn_layer3_hidden_channels: 128
+lin_layer1_hidden_channels: 64
+lin_layer2_hidden_channels: 32
+n_predicted_values: 3
+test_batch_size: 64
+train_batch_size: 64

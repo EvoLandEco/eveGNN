@@ -199,6 +199,7 @@ main_menu() {
         echo "(D)ata Generation"
         echo "(M)odel Training"
         echo "(V)alidation"
+        echo "(O)ptimization"
         echo
         echo "(C)heck integrity of existing data"
         echo "(R)emove existing data"
@@ -665,6 +666,380 @@ main_menu() {
                                                 sbatch submit_eve_pars_est_model_training_gps.sh "$name" "EVE_FREE_TAS" "ed"
                                                 echo "Submitting NND"
                                                 sbatch submit_eve_pars_est_model_training_gps.sh "$name" "EVE_FREE_TAS" "nnd"
+                                            else
+                                                echo
+                                                echo -e "${Red}ERROR: ${NC}Missing configuration file for Evolutionary-Relatedness-Dependent Graph Transformer model."
+                                            fi
+                                            ;;
+                                    esac
+                                done
+                            fi
+                            ;;
+                        N)
+                            break
+                            ;;
+                        Q)
+                            exit 0
+                            ;;
+                        *)
+                            echo
+                            echo "Aborting..."
+                            exit 0
+                            ;;
+                    esac
+                done
+                ;;
+            O)
+                while true; do
+                    echo -e "${Cyan}"
+                    echo "Please select one GNN model to optimize:"
+                    echo
+                    echo "(1) for Simple GCN"
+                    echo "(2) for GCN+DiffPool"
+                    echo "(3) for Graph Transformer"
+                    echo
+                    echo "(N) to go back"
+                    echo -e "${Red}(Q)uit"
+                    echo -e "${NC}"
+
+                    read -p "Enter your choice: " model_choice
+                    case $model_choice in
+                        1)
+                            echo
+                            echo "Selected model: $model_choice"
+                            # List unique folder types using shell's glob pattern
+                            local -A folder_types
+                            local unique_folder_types
+                            folder_types=()
+                            unique_folder_types=()
+
+                            for folder in "$name"/*_*_*; do
+                                if [ -d "$folder" ]; then
+                                    function_name=$(interpret_folder_name "$(basename "$folder")")
+                                    if [ "$function_name" != "Unknown" ] && [ -z "${folder_types[$function_name]}" ]; then
+                                        folder_types[$function_name]=1
+                                        unique_folder_types+=("$function_name")
+                                    fi
+                                fi
+                            done
+
+                            if [ ${#unique_folder_types[@]} -eq 0 ]; then
+                                echo
+                                echo -e "${Red}No data-set found.${NC}"
+                                continue
+                            else
+                                echo -e "${Cyan}"
+                                echo "Found the following data-set type(s):"
+                                echo
+                                echo "Select a data-set type or 'All' to proceed with all data-sets:"
+                                select folder_type_option in "${unique_folder_types[@]}" "All" "Back"; do
+                                    case $folder_type_option in
+                                        "All")
+                                            selected_folder_types=("${unique_folder_types[@]}")
+                                            break
+                                            ;;
+                                        "Back")
+                                            break 2
+                                            ;;
+                                        *)
+                                            selected_folder_types=("$folder_type_option")
+                                            break
+                                            ;;
+                                    esac
+                                done
+
+                                for folder_type in "${selected_folder_types[@]}"; do
+                                    echo -e "${NC}"
+                                    echo "Optimizing model on selected data-set: $folder_type"
+                                    # Logic based on selected data-set type
+                                    case $folder_type in
+                                        "Birth-Death")
+                                            if [ -e "../Config/bd_opt_gnn.yaml" ]; then
+                                                echo -e "${Blue}Optimizing model on Birth-Death Trees...${NC}"
+                                                # Logic for Birth-Death Trees
+                                                echo "Submitting job for TES"
+                                                sbatch submit_bd_pars_est_opt.sh "$name" "BD_FREE_TES"
+                                                echo "Submitting job for TAS"
+                                                sbatch submit_bd_pars_est_opt.sh "$name" "BD_FREE_TAS"
+                                            else
+                                                echo
+                                                echo -e "${Red}ERROR: ${NC}Missing configuration file for Birth-Death simple GNN model."
+                                            fi
+                                            ;;
+                                        "Diversity-Dependent-Diversification")
+                                            if [ -e "../Config/ddd_opt_gnn.yaml" ]; then
+                                                echo -e "${Blue}Optimizing model on Diversity-Dependent-Diversification Trees...${NC}"
+                                                # Logic for Diversity-Dependent-Diversification Trees
+                                                echo "Submitting job for TES"
+                                                sbatch submit_ddd_pars_est_opt.sh "$name" "DDD_FREE_TES"
+                                                echo "Submitting job for TAS"
+                                                sbatch submit_ddd_pars_est_opt.sh "$name" "DDD_FREE_TAS"
+                                            else
+                                                echo
+                                                echo -e "${Red}ERROR: ${NC}Missing configuration file for Diversity-Dependent-Diversification simple GNN model."
+                                            fi
+                                            ;;
+                                        "Protracted Birth-Death")
+                                            if [ -e "../Config/pbd_opt_gnn.yaml" ]; then
+                                                echo -e "${Blue}Optimizing model on Protracted Birth-Death Trees...${NC}"
+                                                # Logic for Protracted Birth-Death Trees
+                                                echo "Submitting job for TES"
+                                                sbatch submit_pbd_pars_est_opt.sh "$name" "PBD_FREE_TES"
+                                                echo "Submitting job for TAS"
+                                                sbatch submit_pbd_pars_est_opt.sh "$name" "PBD_FREE_TAS"
+                                            else
+                                                echo
+                                                echo -e "${Red}ERROR: ${NC}Missing configuration file for Protracted Birth-Death simple GNN model."
+                                            fi
+                                            ;;
+                                        "Evolutionary-Relatedness-Dependent")
+                                            if [ -e "../Config/eve_opt_gnn.yaml" ]; then
+                                                echo -e "${Blue}Optimizing model on Evolutionary-Relatedness-Dependent Trees...${NC}"
+                                                # Logic for Evolutionary-Relatedness-Dependent Trees
+                                                echo "Submitting jobs for TES"
+                                                echo "Submitting PD"
+                                                sbatch submit_eve_pars_est_opt.sh "$name" "EVE_FREE_TES" "pd"
+                                                echo "Submitting ED"
+                                                sbatch submit_eve_pars_est_opt.sh "$name" "EVE_FREE_TES" "ed"
+                                                echo "Submitting NND"
+                                                sbatch submit_eve_pars_est_opt.sh "$name" "EVE_FREE_TES" "nnd"
+                                                echo "Submitting job for TAS"
+                                                echo "Submitting PD"
+                                                sbatch submit_eve_pars_est_opt.sh "$name" "EVE_FREE_TAS" "pd"
+                                                echo "Submitting ED"
+                                                sbatch submit_eve_pars_est_opt.sh "$name" "EVE_FREE_TAS" "ed"
+                                                echo "Submitting NND"
+                                                sbatch submit_eve_pars_est_opt.sh "$name" "EVE_FREE_TAS" "nnd"
+                                            else
+                                                echo
+                                                echo -e "${Red}ERROR: ${NC}Missing configuration file for Evolutionary-Relatedness-Dependent simple GNN model."
+                                            fi
+                                            ;;
+                                    esac
+                                done
+                            fi
+                            ;;
+                        2)
+                            echo
+                            echo "Selected model: $model_choice"
+                            # List unique folder types using shell's glob pattern
+                            local -A folder_types
+                            local unique_folder_types
+                            folder_types=()
+                            unique_folder_types=()
+
+                            for folder in "$name"/*_*_*; do
+                                if [ -d "$folder" ]; then
+                                    function_name=$(interpret_folder_name "$(basename "$folder")")
+                                    if [ "$function_name" != "Unknown" ] && [ -z "${folder_types[$function_name]}" ]; then
+                                        folder_types[$function_name]=1
+                                        unique_folder_types+=("$function_name")
+                                    fi
+                                fi
+                            done
+
+                            if [ ${#unique_folder_types[@]} -eq 0 ]; then
+                                echo
+                                echo -e "${Red}No data-set found.${NC}"
+                                continue
+                            else
+                                echo -e "${Cyan}"
+                                echo "Found the following data-set type(s):"
+                                echo
+                                echo "Select a data-set or 'All' to proceed with all data-sets:"
+                                select folder_type_option in "${unique_folder_types[@]}" "All" "Back"; do
+                                    case $folder_type_option in
+                                        "All")
+                                            selected_folder_types=("${unique_folder_types[@]}")
+                                            break
+                                            ;;
+                                        "Back")
+                                            break 2
+                                            ;;
+                                        *)
+                                            selected_folder_types=("$folder_type_option")
+                                            break
+                                            ;;
+                                    esac
+                                done
+
+                                for folder_type in "${selected_folder_types[@]}"; do
+                                    echo -e "${NC}"
+                                    echo "Optimizing model on selected data-set: $folder_type"
+                                    # Logic based on selected data-set type
+                                    case $folder_type in
+                                        "Birth-Death")
+                                            if [ -e "../Config/bd_opt_diffpool.yaml" ]; then
+                                                echo -e "${Blue}Optimizing model on Birth-Death Trees...${NC}"
+                                                # Logic for Birth-Death Trees
+                                                echo "Submitting job for TES"
+                                                sbatch submit_bd_pars_est_opt_diffpool.sh "$name" "BD_FREE_TES"
+                                                echo "Submitting job for TAS"
+                                                sbatch submit_bd_pars_est_opt_diffpool.sh "$name" "BD_FREE_TAS"
+                                            else
+                                                echo
+                                                echo -e "${Red}ERROR: ${NC}Missing configuration file for Birth-Death DiffPool model."
+                                            fi
+                                            ;;
+                                        "Diversity-Dependent-Diversification")
+                                            if [ -e "../Config/ddd_opt_diffpool.yaml" ]; then
+                                                echo -e "${Blue}Optimizing model on Diversity-Dependent-Diversification Trees...${NC}"
+                                                # Logic for Diversity-Dependent-Diversification Trees
+                                                echo "Submitting job for TES"
+                                                sbatch submit_ddd_pars_est_opt_diffpool.sh "$name" "DDD_FREE_TES"
+                                                echo "Submitting job for TAS"
+                                                sbatch submit_ddd_pars_est_opt_diffpool.sh "$name" "DDD_FREE_TAS"
+                                            else
+                                                echo
+                                                echo -e "${Red}ERROR: ${NC}Missing configuration file for Diversity-Dependent-Diversification DiffPool model."
+                                            fi
+                                            ;;
+                                        "Protracted Birth-Death")
+                                            if [ -e "../Config/pbd_opt_diffpool.yaml" ]; then
+                                                echo -e "${Blue}Optimizing model on Protracted Birth-Death Trees...${NC}"
+                                                # Logic for Protracted Birth-Death Trees
+                                                echo "Submitting job for TES"
+                                                sbatch submit_pbd_pars_est_opt_diffpool.sh "$name" "PBD_FREE_TES"
+                                                echo "Submitting job for TAS"
+                                                sbatch submit_pbd_pars_est_opt_diffpool.sh "$name" "PBD_FREE_TAS"
+                                            else
+                                                echo
+                                                echo -e "${Red}ERROR: ${NC}Missing configuration file for Protracted Birth-Death DiffPool model."
+                                            fi
+                                            ;;
+                                        "Evolutionary-Relatedness-Dependent")
+                                            if [ -e "../Config/eve_opt_diffpool.yaml" ]; then
+                                                echo -e "${Blue}Optimizing model on Evolutionary-Relatedness-Dependent Trees...${NC}"
+                                                # Logic for Evolutionary-Relatedness-Dependent Trees
+                                                echo "Submitting job for TES"
+                                                echo "Submitting PD"
+                                                sbatch submit_eve_pars_est_opt_diffpool_reg.sh "$name" "EVE_FREE_TES" "pd"
+                                                echo "Submitting ED"
+                                                sbatch submit_eve_pars_est_opt_diffpool_reg.sh "$name" "EVE_FREE_TES" "ed"
+                                                echo "Submitting NND"
+                                                sbatch submit_eve_pars_est_opt_diffpool_reg.sh "$name" "EVE_FREE_TES" "nnd"
+                                                echo "Submitting job for TAS"
+                                                echo "Submitting PD"
+                                                sbatch submit_eve_pars_est_opt_diffpool_reg.sh "$name" "EVE_FREE_TAS" "pd"
+                                                echo "Submitting ED"
+                                                sbatch submit_eve_pars_est_opt_diffpool_reg.sh "$name" "EVE_FREE_TAS" "ed"
+                                                echo "Submitting NND"
+                                                sbatch submit_eve_pars_est_opt_diffpool_reg.sh "$name" "EVE_FREE_TAS" "nnd"
+                                            else
+                                                echo
+                                                echo -e "${Red}ERROR: ${NC}Missing configuration file for Evolutionary-Relatedness-Dependent DiffPool model."
+                                            fi
+                                            ;;
+                                    esac
+                                done
+                            fi
+                            ;;
+                        3)
+                            echo -e "${Cyan}"
+                            echo "Selected GNN model: $model_choice"
+                            # List unique folder types using shell's glob pattern
+                            local -A folder_types
+                            local unique_folder_types
+                            folder_types=()
+                            unique_folder_types=()
+
+                            for folder in "$name"/*_*_*; do
+                                if [ -d "$folder" ]; then
+                                    function_name=$(interpret_folder_name "$(basename "$folder")")
+                                    if [ "$function_name" != "Unknown" ] && [ -z "${folder_types[$function_name]}" ]; then
+                                        folder_types[$function_name]=1
+                                        unique_folder_types+=("$function_name")
+                                    fi
+                                fi
+                            done
+
+                            if [ ${#unique_folder_types[@]} -eq 0 ]; then
+                                echo
+                                echo -e "${Red}No data-set found.${NC}"
+                                continue
+                            else
+                                echo -e "${Cyan}"
+                                echo "Found the following data-set type(s):"
+                                echo
+                                echo "Select a data-set type or 'All' to proceed with all data-sets:"
+                                select folder_type_option in "${unique_folder_types[@]}" "All" "Back"; do
+                                    case $folder_type_option in
+                                        "All")
+                                            selected_folder_types=("${unique_folder_types[@]}")
+                                            break
+                                            ;;
+                                        "Back")
+                                            break 2
+                                            ;;
+                                        *)
+                                            selected_folder_types=("$folder_type_option")
+                                            break
+                                            ;;
+                                    esac
+                                done
+
+                                for folder_type in "${selected_folder_types[@]}"; do
+                                    echo -e "${NC}"
+                                    echo "Optimizing model on selected data-set: $folder_type"
+                                    # Logic based on selected data-set type
+                                    case $folder_type in
+                                        "Birth-Death")
+                                            if [ -e "../Config/bd_opt_gps.yaml" ]; then
+                                                echo -e "${Blue}Optimizing model on Birth-Death Trees...${NC}"
+                                                # Logic for Birth-Death Trees
+                                                echo "Submitting job for TES"
+                                                sbatch submit_bd_pars_est_opt_gps.sh "$name" "BD_FREE_TES"
+                                                echo "Submitting job for TAS"
+                                                sbatch submit_bd_pars_est_opt_gps.sh "$name" "BD_FREE_TAS"
+                                            else
+                                                echo
+                                                echo -e "${Red}ERROR: ${NC}Missing configuration file for Birth-Death Graph Transformer model."
+                                            fi
+                                            ;;
+                                        "Diversity-Dependent-Diversification")
+                                            if [ -e "../Config/ddd_opt_gps.yaml" ]; then
+                                                echo -e "${Blue}Optimizing model on Diversity-Dependent-Diversification Trees...${NC}"
+                                                # Logic for Diversity-Dependent-Diversification Trees
+                                                echo "Submitting job for TES"
+                                                sbatch submit_ddd_pars_est_opt_gps.sh "$name" "DDD_FREE_TES"
+                                                echo "Submitting job for TAS"
+                                                sbatch submit_ddd_pars_est_opt_gps.sh "$name" "DDD_FREE_TAS"
+                                            else
+                                                echo
+                                                echo -e "${Red}ERROR: ${NC}Missing configuration file for Diversity-Dependent-Diversification Graph Transformer model."
+                                            fi
+                                            ;;
+                                        "Protracted Birth-Death")
+                                            if [ -e "../Config/pbd_opt_gps.yaml" ]; then
+                                                echo -e "${Blue}Optimizing model on Protracted Birth-Death Trees...${NC}"
+                                                # Logic for Protracted Birth-Death Trees
+                                                echo "Submitting job for TES"
+                                                sbatch submit_pbd_pars_est_opt_gps.sh "$name" "PBD_FREE_TES"
+                                                echo "Submitting job for TAS"
+                                                sbatch submit_pbd_pars_est_opt_gps.sh "$name" "PBD_FREE_TAS"
+                                            else
+                                                echo
+                                                echo -e "${Red}ERROR: ${NC}Missing configuration file for Protracted Birth-Death Graph Transformer model."
+                                            fi
+                                            ;;
+                                        "Evolutionary-Relatedness-Dependent")
+                                            if [ -e "../Config/eve_opt_gps.yaml" ]; then
+                                                echo -e "${Blue}Optimizing model on Evolutionary-Relatedness-Dependent Trees...${NC}"
+                                                # Logic for Evolutionary-Relatedness-Dependent Trees
+                                                echo "Submitting job for TES"
+                                                echo "Submitting PD"
+                                                sbatch submit_eve_pars_est_opt_gps.sh "$name" "EVE_FREE_TES" "pd"
+                                                echo "Submitting ED"
+                                                sbatch submit_eve_pars_est_opt_gps.sh "$name" "EVE_FREE_TES" "ed"
+                                                echo "Submitting NND"
+                                                sbatch submit_eve_pars_est_opt_gps.sh "$name" "EVE_FREE_TES" "nnd"
+                                                echo "Submitting job for TAS"
+                                                echo "Submitting PD"
+                                                sbatch submit_eve_pars_est_opt_gps.sh "$name" "EVE_FREE_TAS" "pd"
+                                                echo "Submitting ED"
+                                                sbatch submit_eve_pars_est_opt_gps.sh "$name" "EVE_FREE_TAS" "ed"
+                                                echo "Submitting NND"
+                                                sbatch submit_eve_pars_est_opt_gps.sh "$name" "EVE_FREE_TAS" "nnd"
                                             else
                                                 echo
                                                 echo -e "${Red}ERROR: ${NC}Missing configuration file for Evolutionary-Relatedness-Dependent Graph Transformer model."

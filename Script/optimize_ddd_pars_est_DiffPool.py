@@ -5,15 +5,35 @@ import pyreadr
 import torch
 import glob
 import functools
+import random
 import torch_geometric.transforms as T
 import torch.nn.functional as F
+import yaml
 import optuna
-from optuna.study import Study
-from optuna.trial import FrozenTrial
 from math import ceil
 from torch_geometric.data import InMemoryDataset, Data
 from torch_geometric.loader import DenseDataLoader
 from torch_geometric.nn import DenseGCNConv as GCNConv, dense_diff_pool
+
+
+# Load the global parameters from the config file
+global_params = None
+
+with open("../Config/ddd_opt_diffpool.yaml", "r") as ymlfile:
+    global_params = yaml.safe_load(ymlfile)
+
+# Set global variables
+cap_norm_factor = global_params["cap_norm_factor"]
+epoch_number = global_params["epoch_number"]
+train_batch_size = global_params["train_batch_size"]
+test_batch_size = global_params["test_batch_size"]
+gcn_layer1_hidden_channels = global_params["gcn_layer1_hidden_channels"]
+gcn_layer2_hidden_channels = global_params["gcn_layer2_hidden_channels"]
+gcn_layer3_hidden_channels = global_params["gcn_layer3_hidden_channels"]
+lin_layer1_hidden_channels = global_params["lin_layer1_hidden_channels"]
+lin_layer2_hidden_channels = global_params["lin_layer2_hidden_channels"]
+n_predicted_values = global_params["n_predicted_values"]
+batch_size_reduce_factor = global_params["batch_size_reduce_factor"]
 
 
 def read_table(path):
@@ -180,9 +200,9 @@ def read_rds_to_pytorch(path, count):
         params = get_params(filename)
         params_list.append(params)
 
-    # Normalize carrying capacity by dividing by 1000
+    # Normalize carrying capacity by dividing by a factor
     for vector in params_list:
-        vector[2] = vector[2] / 1000
+        vector[2] = vector[2] / cap_norm_factor
 
     check_list_count(count, data_list, length_list, params_list)
 
@@ -203,7 +223,7 @@ def read_rds_to_pytorch(path, count):
 
         params_current = params_list[i]
 
-        params_current_tensor = torch.tensor(params_current[0:3], dtype=torch.float)
+        params_current_tensor = torch.tensor(params_current[0:n_predicted_values], dtype=torch.float)
 
         # Create a Data object with the edge index, number of nodes, and category value
         data = Data(x=edge_length_tensor,
@@ -231,6 +251,14 @@ def get_testing_data(data_list):
     # Use list slicing to get the last 10% of the data
     testing_data = data_list[split_index:]
     return testing_data
+
+
+def shuffle_data(data_list):
+    # Create a copy of the data list to shuffle
+    shuffled_list = data_list.copy()
+    # Shuffle the copied list in place
+    random.shuffle(shuffled_list)
+    return shuffled_list
 
 
 def export_to_rds(embeddings, epoch, name, task_type, which_set):
@@ -271,16 +299,47 @@ def main():
     print(f"Now reading {task_type}...")
     # Read the .rds files into a list of PyTorch Geometric Data objects
     current_dataset = read_rds_to_pytorch(full_dir, rds_count)
+    # Shuffle the data
+    current_dataset = shuffle_data(current_dataset)
     current_training_data = get_training_data(current_dataset)
     current_testing_data = get_testing_data(current_dataset)
     training_dataset_list.append(current_training_data)
     testing_dataset_list.append(current_testing_data)
 
+    validation_dataset_list = []
+    val_dir = ""
+
+    train_batch_size_adjusted = None
+    test_batch_size_adjusted = None
+
+    if task_type == "DDD_FREE_TES":
+        val_dir = os.path.join(name, "DDD_VAL_TES")
+        train_batch_size_adjusted = int(train_batch_size)
+        test_batch_size_adjusted = int(test_batch_size)
+    elif task_type == "DDD_FREE_TAS":
+        val_dir = os.path.join(name, "DDD_VAL_TAS")
+        train_batch_size_adjusted = int(ceil(train_batch_size * batch_size_reduce_factor))
+        test_batch_size_adjusted = int(ceil(test_batch_size * batch_size_reduce_factor))
+    else:
+        raise ValueError("Invalid task type.")
+
+    full_val_dir_tree = os.path.join(val_dir, 'GNN', 'tree')
+    full_val_dir_el = os.path.join(val_dir, 'GNN', 'tree', 'EL')
+    val_rds_count = check_rds_files_count(full_val_dir_tree, full_val_dir_el)
+    print(f'There are: {val_rds_count} trees in the validation folder.')
+    print(f"Now reading validation data...")
+    current_val_dataset = read_rds_to_pytorch(val_dir, val_rds_count)
+    validation_dataset_list.append(current_val_dataset)
+
     sum_training_data = functools.reduce(lambda x, y: x + y, training_dataset_list)
     sum_testing_data = functools.reduce(lambda x, y: x + y, testing_dataset_list)
-    # Filtering out elements with None in edge_index
+    sum_validation_data = functools.reduce(lambda x, y: x + y, validation_dataset_list)
+
+    # Filtering out trees with only 3 nodes
+    # They might cause problems with ToDense
     filtered_training_data = [data for data in sum_training_data if data.edge_index.shape != torch.Size([2, 2])]
     filtered_testing_data = [data for data in sum_testing_data if data.edge_index.shape != torch.Size([2, 2])]
+    filtered_validation_data = [data for data in sum_validation_data if data.edge_index.shape != torch.Size([2, 2])]
 
     class TreeData(InMemoryDataset):
         def __init__(self, root, data_list, transform=None, pre_transform=None):
@@ -295,7 +354,9 @@ def main():
 
     max_nodes_train = max([data.num_nodes for data in filtered_training_data])
     max_nodes_test = max([data.num_nodes for data in filtered_testing_data])
-    max_nodes = max(max_nodes_train, max_nodes_test)
+    max_nodes_val = max([data.num_nodes for data in filtered_validation_data])
+    max_nodes = max(max_nodes_train, max_nodes_test, max_nodes_val)
+    print(f"Max nodes: {max_nodes} for {task_type}")
 
     training_dataset = TreeData(root=None, data_list=filtered_training_data, transform=T.ToDense(max_nodes))
     testing_dataset = TreeData(root=None, data_list=filtered_testing_data, transform=T.ToDense(max_nodes))
@@ -318,8 +379,6 @@ def main():
             self.bns.append(torch.nn.BatchNorm1d(out_channels))
 
         def forward(self, x, adj, mask=None):
-            batch_size, num_nodes, in_channels = x.size()
-
             for step in range(len(self.convs)):
                 x = F.relu(self.convs[step](x, adj, mask))
                 x = torch.permute(x, (0, 2, 1))
@@ -332,24 +391,23 @@ def main():
         def __init__(self, trial):
             super(DiffPool, self).__init__()
 
-            diff_ratio = trial.suggest_float("diff_ratio", 0.1, 0.5)
-            drop_ratio = trial.suggest_float("drop_ratio", 0.1, 0.5)
+            diffpool_ratio = trial.suggest_float("diffpool_ratio", 0.05, 0.75)
+            dropout_ratio = trial.suggest_float("dropout_ratio", 0.01, 0.75)
 
-            num_nodes = ceil(diff_ratio * max_nodes)
-            self.gnn1_pool = GNN(training_dataset.num_node_features, 256, num_nodes)
-            self.gnn1_embed = GNN(training_dataset.num_node_features, 256, 256)
+            num_nodes = ceil(diffpool_ratio * max_nodes)
+            self.gnn1_pool = GNN(training_dataset.num_node_features, gcn_layer1_hidden_channels, num_nodes)
+            self.gnn1_embed = GNN(training_dataset.num_node_features, gcn_layer1_hidden_channels, gcn_layer2_hidden_channels)
 
-            num_nodes = ceil(diff_ratio * num_nodes)
-            self.gnn2_pool = GNN(256, 128, num_nodes)
-            self.gnn2_embed = GNN(256, 128, 128, lin=False)
+            num_nodes = ceil(diffpool_ratio * num_nodes)
+            self.gnn2_pool = GNN(gcn_layer2_hidden_channels, gcn_layer2_hidden_channels, num_nodes)
+            self.gnn2_embed = GNN(gcn_layer2_hidden_channels, gcn_layer2_hidden_channels, gcn_layer3_hidden_channels, lin=False)
 
-            self.gnn3_embed = GNN(128, 64, 64, lin=False)
+            self.gnn3_embed = GNN(gcn_layer3_hidden_channels, gcn_layer3_hidden_channels, lin_layer1_hidden_channels, lin=False)
 
-            self.lin1 = torch.nn.Linear(64, 32)
-            self.lin2 = torch.nn.Linear(32, 3)
+            self.lin1 = torch.nn.Linear(lin_layer1_hidden_channels, lin_layer2_hidden_channels)
+            self.lin2 = torch.nn.Linear(lin_layer2_hidden_channels, n_predicted_values)
 
-            # Store drop_ratio for use in the forward pass
-            self.drop_ratio = drop_ratio
+            self.dropout_ratio = dropout_ratio
 
         def forward(self, x, adj, mask=None):
             s = self.gnn1_pool(x, adj, mask)
@@ -366,10 +424,10 @@ def main():
 
             x = x.mean(dim=1)
 
-            x = F.dropout(x, p=self.drop_ratio, training=self.training)
+            x = F.dropout(x, p=dropout_ratio, training=self.training)
             x = self.lin1(x)
             x = F.relu(x)
-            x = F.dropout(x, p=self.drop_ratio, training=self.training)
+            x = F.dropout(x, p=dropout_ratio, training=self.training)
             x = self.lin2(x)
             return x, l1 + l2, e1 + e2
 
@@ -381,7 +439,7 @@ def main():
             data.to(device)
             optimizer.zero_grad()
             out, _, _ = model(data.x, data.adj, data.mask)
-            loss = criterion(out, data.y.view(data.num_nodes.__len__(), 3))
+            loss = criterion(out, data.y.view(data.num_nodes.__len__(), n_predicted_values))
             loss.backward()
             loss_all += loss.item() * data.num_nodes.__len__()
             optimizer.step()
@@ -397,10 +455,9 @@ def main():
         for data in loader:
             data.to(device)
             out, _, _ = model(data.x, data.adj, data.mask)
-            diffs = torch.abs(out - data.y.view(data.num_nodes.__len__(), 3))
+            diffs = torch.abs(out - data.y.view(data.num_nodes.__len__(), n_predicted_values))
             diffs_all = torch.cat((diffs_all, diffs), dim=0)
 
-        print(f"diffs_all length: {len(diffs_all)}; test_loader.dataset length: {len(test_loader.dataset)}; Equal: {len(diffs_all) == len(test_loader.dataset)}")
         mean_diffs = torch.sum(diffs_all, dim=0) / len(test_loader.dataset)
         return mean_diffs.cpu().detach().numpy(), diffs_all.cpu().detach().numpy()
 
@@ -413,7 +470,7 @@ def main():
             data = dataset[i]
             # Check the shapes of data.x, data.adj, and data.mask
             if data.x.shape != torch.Size([max_nodes, 3]) or \
-                    data.y.shape != torch.Size([3]) or \
+                    data.y.shape != torch.Size([n_predicted_values]) or \
                     data.adj.shape != torch.Size([max_nodes, max_nodes]) or \
                     data.mask.shape != torch.Size([max_nodes]):
                 incorrect_shapes.append(i)  # Add index to the list if any shape is incorrect
@@ -430,8 +487,8 @@ def main():
     shape_check(training_dataset, max_nodes)
     shape_check(testing_dataset, max_nodes)
 
-    train_loader = DenseDataLoader(training_dataset, batch_size=64, shuffle=False)
-    test_loader = DenseDataLoader(testing_dataset, batch_size=64, shuffle=False)
+    train_loader = DenseDataLoader(training_dataset, batch_size=train_batch_size_adjusted, shuffle=False)
+    test_loader = DenseDataLoader(testing_dataset, batch_size=test_batch_size_adjusted, shuffle=False)
     print(f"Training dataset length: {len(train_loader.dataset)}")
     print(f"Testing dataset length: {len(test_loader.dataset)}")
     print(train_loader.dataset.transform)
@@ -442,11 +499,11 @@ def main():
         vl_loader = test_loader
         model = DiffPool(trial).to(device)
         optimizer = torch.optim.Adam(
-            model.parameters(), trial.suggest_float("lr", 1e-5, 1e-1, log=True)
+            model.parameters(), trial.suggest_float("learning_rate", 1e-5, 1e-1, log=True)
         )
         criterion = torch.nn.MSELoss().to(device)
 
-        for epoch in range(20):
+        for epoch in range(1, epoch_number):
             train(model, optimizer, criterion, tr_loader)
             diffs, _ = test_diff(model, vl_loader)
             lambda_diff = diffs[0]
@@ -460,9 +517,9 @@ def main():
     print("Number of finished trials: ", len(study.trials))
     trials_df = study.trials_dataframe()
     print("Saving trials dataframe to CSV...")
-    trials_df.to_csv(os.path.join(name, task_type, f"{task_type}_diffpool_trials.rds"), index=False)
+    trials_df.to_csv(os.path.join(name, task_type, f"{task_type}_diffpool_opt_trials.csv"), index=False)
     print("Successfully saved trials dataframe to CSV at the following path:")
-    print(os.path.join(name, task_type, f"{task_type}_diffpool_trials.rds"))
+    print(os.path.join(name, task_type, f"{task_type}_diffpool_opt_trials.csv"))
 
 
 if __name__ == '__main__':
