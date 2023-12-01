@@ -9,6 +9,7 @@ import random
 import torch_geometric.transforms as T
 import torch.nn.functional as F
 import yaml
+import gc
 from math import ceil
 from torch_geometric.data import InMemoryDataset, Data
 from torch_geometric.loader import DenseDataLoader
@@ -332,11 +333,21 @@ def main():
     sum_testing_data = functools.reduce(lambda x, y: x + y, testing_dataset_list)
     sum_validation_data = functools.reduce(lambda x, y: x + y, validation_dataset_list)
 
+    del training_dataset_list
+    del testing_dataset_list
+    del validation_dataset_list
+    gc.collect()
+
     # Filtering out trees with only 3 nodes
     # They might cause problems with ToDense
     filtered_training_data = [data for data in sum_training_data if data.edge_index.shape != torch.Size([2, 2])]
     filtered_testing_data = [data for data in sum_testing_data if data.edge_index.shape != torch.Size([2, 2])]
     filtered_validation_data = [data for data in sum_validation_data if data.edge_index.shape != torch.Size([2, 2])]
+
+    del sum_training_data
+    del sum_testing_data
+    del sum_validation_data
+    gc.collect()
 
     class TreeData(InMemoryDataset):
         def __init__(self, root, data_list, transform=None, pre_transform=None):
@@ -357,6 +368,10 @@ def main():
 
     training_dataset = TreeData(root=None, data_list=filtered_training_data, transform=T.ToDense(max_nodes))
     testing_dataset = TreeData(root=None, data_list=filtered_testing_data, transform=T.ToDense(max_nodes))
+
+    del filtered_training_data
+    del filtered_testing_data
+    gc.collect()
 
     class GNN(torch.nn.Module):
         def __init__(self, in_channels, hidden_channels, out_channels,
@@ -405,12 +420,12 @@ def main():
             s = self.gnn1_pool(x, adj, mask)
             x = self.gnn1_embed(x, adj, mask)
 
-            x, adj, l1, e1 = dense_diff_pool(x, adj, s, mask)
+            x, adj, _, _ = dense_diff_pool(x, adj, s, mask)
 
             s = self.gnn2_pool(x, adj)
             x = self.gnn2_embed(x, adj)
 
-            x, adj, l2, e2 = dense_diff_pool(x, adj, s)
+            x, adj, _, _ = dense_diff_pool(x, adj, s)
 
             x = self.gnn3_embed(x, adj)
 
@@ -421,7 +436,7 @@ def main():
             x = F.relu(x)
             x = F.dropout(x, p=dropout_ratio, training=self.training)
             x = self.lin2(x)
-            return x, l1 + l2, e1 + e2
+            return x
 
     def train():
         model.train()
@@ -430,7 +445,7 @@ def main():
         for data in train_loader:
             data.to(device)
             optimizer.zero_grad()
-            out, _, _ = model(data.x, data.adj, data.mask)
+            out = model(data.x, data.adj, data.mask)
             loss = criterion(out, data.y.view(data.num_nodes.__len__(), n_predicted_values))
             loss.backward()
             loss_all += loss.item() * data.num_nodes.__len__()
@@ -449,7 +464,7 @@ def main():
 
         for data in loader:
             data.to(device)
-            out, _, _ = model(data.x, data.adj, data.mask)
+            out = model(data.x, data.adj, data.mask)
             diffs = torch.abs(out - data.y.view(data.num_nodes.__len__(), n_predicted_values))
             diffs_all = torch.cat((diffs_all, diffs), dim=0)
             outputs_all = torch.cat((outputs_all, out), dim=0)
@@ -466,7 +481,7 @@ def main():
         loss_all = 0  # Keep track of the loss
         for data in test_loader:
             data.to(device)
-            out, _, _ = model(data.x, data.adj, data.mask)
+            out = model(data.x, data.adj, data.mask)
             loss = criterion(out, data.y.view(data.num_nodes.__len__(), n_predicted_values))
             loss_all += loss.item() * data.num_nodes.__len__()
 
@@ -510,6 +525,10 @@ def main():
     print(train_loader.dataset.transform)
     print(test_loader.dataset.transform)
 
+    del training_dataset
+    del testing_dataset
+    gc.collect()
+
     print(model)
 
     test_mean_diffs_history = []
@@ -547,6 +566,7 @@ def main():
         print(f"Final predictions length: {len(final_test_predictions)}")
         print(f"Final y length: {len(final_test_y)}")
         print(f"Final nodes length: {len(final_test_nodes)}")
+        gc.collect()
 
     # Save the model
     print(f"Saving model to {os.path.join(name, task_type, f'{task_type}_model_diffpool.pt')}")
