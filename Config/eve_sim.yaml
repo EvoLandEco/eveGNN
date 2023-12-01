@@ -24,6 +24,6 @@ within_ranges:
   - -0.002
 - - -0.0028
   - -0.0002
-nrep: 50000
+nrep: 20000
 age: 8
 nworkers_sim: 6
