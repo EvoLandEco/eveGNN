@@ -33,7 +33,7 @@ setwd("BD_FREE_TES")
 
 print("Exporting Training/Testing TES Data to GNN")
 
-eveGNN::export_to_gnn_with_params(bd_list_all$within_range, "tes", undirected = FALSE)
+eveGNN::export_to_gnn_with_params_bd(bd_list_all$within_range, "tes", undirected = FALSE)
 
 setwd("..")
 
@@ -45,7 +45,7 @@ setwd("BD_FREE_TAS")
 
 print("Exporting Training/Testing TAS Data to GNN")
 
-eveGNN::export_to_gnn_with_params(bd_list_all$within_range, "tas", undirected = FALSE)
+eveGNN::export_to_gnn_with_params_bd(bd_list_all$within_range, "tas", undirected = FALSE)
 
 setwd("..")
 
@@ -57,7 +57,7 @@ setwd("BD_VAL_TES")
 
 print("Exporting Validation TES Data to GNN")
 
-eveGNN::export_to_gnn_with_params(bd_list_all$outside_range, "tes", undirected = FALSE)
+eveGNN::export_to_gnn_with_params_bd(bd_list_all$outside_range, "tes", undirected = FALSE)
 
 setwd("..")
 
@@ -69,7 +69,7 @@ setwd("BD_VAL_TAS")
 
 print("Exporting Validation TAS Data to GNN")
 
-eveGNN::export_to_gnn_with_params(bd_list_all$outside_range, "tas", undirected = FALSE)
+eveGNN::export_to_gnn_with_params_bd(bd_list_all$outside_range, "tas", undirected = FALSE)
 
 setwd("..")
 

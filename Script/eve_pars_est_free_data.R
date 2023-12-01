@@ -42,9 +42,9 @@ setwd("EVE_FREE_TES")
 
 print("Exporting Training/Testing TES Data to GNN")
 
-eveGNN::export_to_gnn_with_params(eve_pd_list_all$within_range, "tes", undirected = FALSE)
-eveGNN::export_to_gnn_with_params(eve_ed_list_all$within_range, "tes", undirected = FALSE)
-eveGNN::export_to_gnn_with_params(eve_nnd_list_all$within_range, "tes", undirected = FALSE)
+eveGNN::export_to_gnn_with_params_eve(eve_pd_list_all$within_range, "tes", undirected = FALSE)
+eveGNN::export_to_gnn_with_params_eve(eve_ed_list_all$within_range, "tes", undirected = FALSE)
+eveGNN::export_to_gnn_with_params_eve(eve_nnd_list_all$within_range, "tes", undirected = FALSE)
 
 setwd("..")
 
@@ -56,9 +56,9 @@ setwd("EVE_FREE_TAS")
 
 print("Exporting Training/Testing TAS Data to GNN")
 
-eveGNN::export_to_gnn_with_params(eve_pd_list_all$within_range, "tas", undirected = FALSE)
-eveGNN::export_to_gnn_with_params(eve_ed_list_all$within_range, "tas", undirected = FALSE)
-eveGNN::export_to_gnn_with_params(eve_nnd_list_all$within_range, "tas", undirected = FALSE)
+eveGNN::export_to_gnn_with_params_eve(eve_pd_list_all$within_range, "tas", undirected = FALSE)
+eveGNN::export_to_gnn_with_params_eve(eve_ed_list_all$within_range, "tas", undirected = FALSE)
+eveGNN::export_to_gnn_with_params_eve(eve_nnd_list_all$within_range, "tas", undirected = FALSE)
 
 setwd("..")
 
@@ -70,9 +70,9 @@ setwd("EVE_VAL_TES")
 
 print("Exporting Validation TES Data to GNN")
 
-eveGNN::export_to_gnn_with_params(eve_pd_list_all$outside_range, "tes", undirected = FALSE)
-eveGNN::export_to_gnn_with_params(eve_ed_list_all$outside_range, "tes", undirected = FALSE)
-eveGNN::export_to_gnn_with_params(eve_nnd_list_all$outside_range, "tes", undirected = FALSE)
+eveGNN::export_to_gnn_with_params_eve(eve_pd_list_all$outside_range, "tes", undirected = FALSE)
+eveGNN::export_to_gnn_with_params_eve(eve_ed_list_all$outside_range, "tes", undirected = FALSE)
+eveGNN::export_to_gnn_with_params_eve(eve_nnd_list_all$outside_range, "tes", undirected = FALSE)
 
 setwd("..")
 
@@ -84,6 +84,6 @@ setwd("EVE_VAL_TAS")
 
 print("Exporting Validation TAS Data to GNN")
 
-eveGNN::export_to_gnn_with_params(eve_pd_list_all$outside_range, "tas", undirected = FALSE)
-eveGNN::export_to_gnn_with_params(eve_ed_list_all$outside_range, "tas", undirected = FALSE)
-eveGNN::export_to_gnn_with_params(eve_nnd_list_all$outside_range, "tas", undirected = FALSE)
+eveGNN::export_to_gnn_with_params_eve(eve_pd_list_all$outside_range, "tas", undirected = FALSE)
+eveGNN::export_to_gnn_with_params_eve(eve_ed_list_all$outside_range, "tas", undirected = FALSE)
+eveGNN::export_to_gnn_with_params_eve(eve_nnd_list_all$outside_range, "tas", undirected = FALSE)
