@@ -67,7 +67,6 @@ interpret_combination() {
 
 verify_data_at_start() {
     local name=$1
-    echo -e "${Cyan}Detecting simulation data...${NC}"
 
     # List directories matching the pattern and identify unique first parts
     local raw_folders=("$name"/*_*_*)
