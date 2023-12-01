@@ -767,7 +767,7 @@ main_menu() {
                             echo "Selected data-set for removal:"
                             printf '%s\n' "${selected_folder_types[@]}"
                             echo
-                            read -p "${Red}Are you sure you want to remove this data-set? (y/N): ${NC}" confirm
+                            read -p $'\033[0;31mAre you sure you want to remove this data-set? (y/N): \033[0m' confirm
                             if [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]]; then
                                 for folder_type in "${selected_folder_types[@]}"; do
                                     for folder in "$name"/*_*_*; do
