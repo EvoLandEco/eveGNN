@@ -14,6 +14,6 @@ within_ranges:
   - 0.28
 nrep: 20000
 age: 10
-proportion: 0.005
+proportion: 0.1
 nworkers_sim: 4
 nworkers_mle: 16
