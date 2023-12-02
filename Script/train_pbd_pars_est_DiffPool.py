@@ -17,7 +17,7 @@ from torch_geometric.nn import DenseGCNConv as GCNConv, dense_diff_pool
 # Load the global parameters from the config file
 global_params = None
 
-with open("../Config/ddd_train_diffpool.yaml", "r") as ymlfile:
+with open("../Config/pbd_train_diffpool.yaml", "r") as ymlfile:
     global_params = yaml.safe_load(ymlfile)
 
 # Set global variables
