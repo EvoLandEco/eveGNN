@@ -59,7 +59,6 @@ randomized_pbd_fixed_age <- function(dists, age) {
   return(result)
 }
 
-
 #' @export randomized_eve_fixed_age
 randomized_eve_fixed_age <- function(dists, age, model, metric, offset) {
   ntip <- 0
@@ -68,7 +67,12 @@ randomized_eve_fixed_age <- function(dists, age, model, metric, offset) {
 
   while (ntip < 10) {
     params <- generate_params(dists)
-    result <- eve::edd_sim(unlist(params), age = age, model = model, metric = metric, offset = offset, history = FALSE)
+    result <- eve::edd_sim(unlist(params), age = age,
+                           model = model,
+                           metric = metric,
+                           offset = offset,
+                           history = FALSE,
+                           size_limit = 2200)
     ntip <- result$tes$Nnode + 1
   }
 
