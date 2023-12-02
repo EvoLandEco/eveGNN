@@ -515,11 +515,10 @@ def main():
     if incorrect_training_graph:
         # Remove incorrect graphs from training and testing datasets
         for index in sorted(incorrect_training_graph, reverse=True):
-            del training_dataset[index]
-        for index in sorted(incorrect_testing_graph, reverse=True):
-            del testing_dataset[index]
+            del filtered_training_data[index]
         print(f"Removed {len(incorrect_training_graph)} graphs from training dataset.")
         print("Checking shapes again...")
+        training_dataset = TreeData(root=None, data_list=filtered_training_data, transform=T.ToDense(max_nodes))
         incorrect_training_graph = shape_check(training_dataset, max_nodes)
         if incorrect_training_graph or incorrect_testing_graph:
             raise ValueError("Incorrect shapes found in training dataset after removing incorrect graphs.")
@@ -529,9 +528,10 @@ def main():
     if incorrect_testing_graph:
         # Remove incorrect graphs from training and testing datasets
         for index in sorted(incorrect_testing_graph, reverse=True):
-            del testing_dataset[index]
+            del filtered_testing_data[index]
         print(f"Removed {len(incorrect_testing_graph)} graphs from testing dataset.")
         print("Checking shapes again...")
+        testing_dataset = TreeData(root=None, data_list=filtered_testing_data, transform=T.ToDense(max_nodes))
         incorrect_testing_graph = shape_check(testing_dataset, max_nodes)
         if incorrect_training_graph or incorrect_testing_graph:
             raise ValueError("Incorrect shapes found in testing dataset after removing incorrect graphs.")
