@@ -520,7 +520,7 @@ def main():
         print("Checking shapes again...")
         training_dataset = TreeData(root=None, data_list=filtered_training_data, transform=T.ToDense(max_nodes))
         incorrect_training_graph = shape_check(training_dataset, max_nodes)
-        if incorrect_training_graph or incorrect_testing_graph:
+        if incorrect_training_graph:
             raise ValueError("Incorrect shapes found in training dataset after removing incorrect graphs.")
         else:
             print("Successfully removed incorrect shapes in training dataset.")
@@ -533,7 +533,7 @@ def main():
         print("Checking shapes again...")
         testing_dataset = TreeData(root=None, data_list=filtered_testing_data, transform=T.ToDense(max_nodes))
         incorrect_testing_graph = shape_check(testing_dataset, max_nodes)
-        if incorrect_training_graph or incorrect_testing_graph:
+        if incorrect_testing_graph:
             raise ValueError("Incorrect shapes found in testing dataset after removing incorrect graphs.")
         else:
             print("Successfully removed incorrect shapes in training dataset.")
