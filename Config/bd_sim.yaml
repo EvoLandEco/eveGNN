@@ -1,17 +1,17 @@
 dists:
 - distribution: uniform
   'n': 1
-  min: 0.4
-  max: 0.7
+  min: 0.2
+  max: 0.5
 - distribution: uniform
   'n': 1
   min: 0.0
-  max: 0.3
+  max: 0.2
 within_ranges:
-- - 0.42
-  - 0.68
+- - 0.22
+  - 0.48
 - - 0.02
-  - 0.28
+  - 0.18
 nrep: 20000
 age: 10
 proportion: 0.1
