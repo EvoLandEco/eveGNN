@@ -512,6 +512,8 @@ def main():
     print("Removing graphs with incorrect shapes...")
     incorrect_training_graph = shape_check(training_dataset, max_nodes)
     incorrect_testing_graph =  shape_check(testing_dataset, max_nodes)
+    print(f"Removed {len(incorrect_training_graph)} graphs from training dataset.")
+    print(f"Removed {len(incorrect_testing_graph)} graphs from testing dataset.")
 
     # Remove incorrect graphs from training and testing datasets
     training_dataset = [data for i, data in enumerate(training_dataset) if i not in incorrect_training_graph]
