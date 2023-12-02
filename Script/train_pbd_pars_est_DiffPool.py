@@ -494,6 +494,9 @@ def main():
                     data.adj.shape != torch.Size([max_nodes, max_nodes]) or \
                     data.mask.shape != torch.Size([max_nodes]):
                 incorrect_shapes.append(i)  # Add index to the list if any shape is incorrect
+                print(f"Index: {i}, x shape: {data.x.shape}, y shape: {data.y.shape}, adj shape: {data.adj.shape}, mask shape: {data.mask.shape}")
+                incorrect_graph = {"x": data.x, "y": data.y, "edge_index": data.edge_index}
+                pyreadr.write_rds(os.path.join(name, task_type, f"incorrect_graph_{i}.rds"), incorrect_graph)
 
         # Print the indices of incorrect data elements or a message if all shapes are correct
         if incorrect_shapes:
