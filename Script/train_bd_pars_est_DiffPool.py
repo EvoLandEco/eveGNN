@@ -87,19 +87,19 @@ def list_subdirectories(path):
 
 def get_params_string(filename):
     # Function to extract parameters from the filename
-    params = filename.split('_')[1:2]  # Exclude the first and last elements
+    params = filename.split('_')[1:-1]  # Exclude the first and last elements
     return "_".join(params)
 
 
 def get_params(filename):
-    params = filename.split('_')[1:2]
+    params = filename.split('_')[1:-1]
     params = list(map(float, params))  # Convert string to float
     return params
 
 
 def get_sort_key(filename):
     # Split the filename by underscores, convert the parameter values to floats, and return them as a tuple
-    params = tuple(map(float, filename.split('_')[1:2]))
+    params = tuple(map(float, filename.split('_')[1:-1]))
     return params
 
 
@@ -116,7 +116,7 @@ def check_file_consistency(files_tree, files_el):
     # Define a function to extract parameters from filename
     def get_params_tuple(filename):
         # Hack for BD trees, only read the first two parameters
-        return tuple(map(float, filename.split('_')[1:2]))
+        return tuple(map(float, filename.split('_')[1:-1]))
 
     # Check each pair of files for matching parameters
     for tree_file, el_file in zip(files_tree, files_el):
@@ -334,21 +334,16 @@ def main():
     sum_testing_data = functools.reduce(lambda x, y: x + y, testing_dataset_list)
     sum_validation_data = functools.reduce(lambda x, y: x + y, validation_dataset_list)
 
-    del training_dataset_list
-    del testing_dataset_list
-    del validation_dataset_list
-    gc.collect()
-
     # Filtering out trees with only 3 nodes
     # They might cause problems with ToDense
     filtered_training_data = [data for data in sum_training_data if data.edge_index.shape != torch.Size([2, 2])]
     filtered_testing_data = [data for data in sum_testing_data if data.edge_index.shape != torch.Size([2, 2])]
     filtered_validation_data = [data for data in sum_validation_data if data.edge_index.shape != torch.Size([2, 2])]
 
-    del sum_training_data
-    del sum_testing_data
-    del sum_validation_data
-    gc.collect()
+    # For BD trees, there might be possibility that they only have one edge. Should filter them out.
+    filtered_training_data = [data for data in sum_training_data if data.edge_index.shape != torch.Size([2, 1])]
+    filtered_testing_data = [data for data in sum_testing_data if data.edge_index.shape != torch.Size([2, 1])]
+    filtered_validation_data = [data for data in sum_validation_data if data.edge_index.shape != torch.Size([2, 1])]
 
     class TreeData(InMemoryDataset):
         def __init__(self, root, data_list, transform=None, pre_transform=None):
@@ -369,10 +364,6 @@ def main():
 
     training_dataset = TreeData(root=None, data_list=filtered_training_data, transform=T.ToDense(max_nodes))
     testing_dataset = TreeData(root=None, data_list=filtered_testing_data, transform=T.ToDense(max_nodes))
-
-    del filtered_training_data
-    del filtered_testing_data
-    gc.collect()
 
     class GNN(torch.nn.Module):
         def __init__(self, in_channels, hidden_channels, out_channels,
