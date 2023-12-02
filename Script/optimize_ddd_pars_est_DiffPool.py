@@ -512,8 +512,11 @@ def main():
             lambda_diff = diffs[0]
             mu_diff = diffs[1]
             cap_diff = diffs[2]
+            torch.cuda.memory_summary(device=None, abbreviated=False)
             gc.collect()
             cuda.empty_cache()
+            torch.cuda.memory_summary(device=None, abbreviated=False)
+
 
             return lambda_diff, mu_diff, cap_diff
 
