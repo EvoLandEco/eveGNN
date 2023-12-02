@@ -511,13 +511,32 @@ def main():
     # However, ToDense may create malformed data.y when the number of nodes is 3 (2 tips)
     print("Removing graphs with incorrect shapes...")
     incorrect_training_graph = shape_check(training_dataset, max_nodes)
-    incorrect_testing_graph =  shape_check(testing_dataset, max_nodes)
-    print(f"Removed {len(incorrect_training_graph)} graphs from training dataset.")
-    print(f"Removed {len(incorrect_testing_graph)} graphs from testing dataset.")
+    incorrect_testing_graph = shape_check(testing_dataset, max_nodes)
+    if incorrect_training_graph:
+        # Remove incorrect graphs from training and testing datasets
+        for index in sorted(incorrect_training_graph, reverse=True):
+            del training_dataset[index]
+        for index in sorted(incorrect_testing_graph, reverse=True):
+            del testing_dataset[index]
+        print(f"Removed {len(incorrect_training_graph)} graphs from training dataset.")
+        print("Checking shapes again...")
+        incorrect_training_graph = shape_check(training_dataset, max_nodes)
+        if incorrect_training_graph or incorrect_testing_graph:
+            raise ValueError("Incorrect shapes found in training dataset after removing incorrect graphs.")
+        else:
+            print("Successfully removed incorrect shapes in training dataset.")
 
-    # Remove incorrect graphs from training and testing datasets
-    training_dataset = [data for i, data in enumerate(training_dataset) if i not in incorrect_training_graph]
-    testing_dataset = [data for i, data in enumerate(testing_dataset) if i not in incorrect_testing_graph]
+    if incorrect_testing_graph:
+        # Remove incorrect graphs from training and testing datasets
+        for index in sorted(incorrect_testing_graph, reverse=True):
+            del testing_dataset[index]
+        print(f"Removed {len(incorrect_testing_graph)} graphs from testing dataset.")
+        print("Checking shapes again...")
+        incorrect_testing_graph = shape_check(testing_dataset, max_nodes)
+        if incorrect_training_graph or incorrect_testing_graph:
+            raise ValueError("Incorrect shapes found in testing dataset after removing incorrect graphs.")
+        else:
+            print("Successfully removed incorrect shapes in training dataset.")
 
     train_loader = DenseDataLoader(training_dataset, batch_size=train_batch_size_adjusted, shuffle=False)
     test_loader = DenseDataLoader(testing_dataset, batch_size=test_batch_size_adjusted, shuffle=False)
