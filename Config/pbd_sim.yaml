@@ -1,0 +1,37 @@
+dists:
+  - distribution: uniform
+    'n': 1
+    min: 0.5
+    max: 0.8
+  - distribution: uniform
+    'n': 1
+    min: 0.6
+    max: 1.0
+  - distribution: uniform
+    'n': 1
+    min: 0.0
+    max: 0.3
+  - distribution: uniform
+    'n': 1
+    min: 0.0
+    max: 0.3
+  - distribution: uniform
+    'n': 1
+    min: 0.0
+    max: 0.3
+within_ranges:
+  - - 0.52
+    - 0.78
+  - - 0.62
+    - 0.98
+  - - 0.02
+    - 0.28
+  - - 0.02
+    - 0.28
+  - - 0.02
+    - 0.28
+nrep: 20000
+age: 10
+proportion: 0.1
+nworkers_sim: 6
+nworkers_mle: 16

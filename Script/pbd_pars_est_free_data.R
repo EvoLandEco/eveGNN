@@ -2,11 +2,28 @@ args <- commandArgs(TRUE)
 
 name <- as.character(args[1])
 
+params <- yaml::read_yaml("../Config/pbd_sim.yaml")
+
 if (!dir.exists(name)) {
   dir.create(name)
 }
 
 setwd(name)
+
+dists <- params$dists
+within_ranges <- params$within_ranges
+nrep <- params$nrep
+age <- params$age
+proportion <- params$proportion
+nworkers_sim <- params$nworkers_sim
+nworkers_mle <- params$nworkers_mle
+
+future::plan("multicore", workers = nworkers_sim)
+
+pbd_free_tes_list <- future.apply::future_replicate(nrep, eveGNN::randomized_pbd_fixed_age(dists, age = age), simplify = FALSE)
+
+# Split list into training/testging data and validation (out-of-sample) data
+pbd_list_all <- eveGNN::extract_by_range(tree_list = pbd_free_tes_list, ranges = within_ranges)
 
 if (!dir.exists("PBD_FREE_TES")) {
   dir.create("PBD_FREE_TES")
@@ -14,26 +31,36 @@ if (!dir.exists("PBD_FREE_TES")) {
 
 setwd("PBD_FREE_TES")
 
-dists <- list(
-  list(distribution = "uniform", n = 1, min = 0.6, max = 1.2),
-  list(distribution = "uniform", n = 1, min = 0.6, max = 1.0),
-  list(distribution = "uniform", n = 1, min = 0.0, max = 0.3),
-  list(distribution = "uniform", n = 1, min = 0.0, max = 0.3),
-  list(distribution = "uniform", n = 1, min = 0.0, max = 0.3)
-)
+print("Exporting Training/Testing TES Data to GNN")
 
-future::plan("multicore", workers = 16)
+eveGNN::export_to_gnn_with_params_pbd(pbd_list_all$within_range, "tes", undirected = FALSE)
 
-pbd_free_tes_list <- future.apply::future_replicate(50000, eveGNN::randomized_pbd_fixed_age(dists, age = 10), simplify = FALSE)
-pbd_free_tes_list <- purrr::transpose(pbd_free_tes_list)
+setwd("..")
 
-eveGNN::export_to_gnn_with_params_pbd(pbd_free_tes_list, "tes", undirected = FALSE)
+if (!dir.exists("PBD_VAL_TES")) {
+  dir.create("PBD_VAL_TES")
+}
 
-# pbd_free_tes_list_test <- eveGNN::get_test_data(pbd_free_tes_list, 0.005)
-#
-# if (!dir.exists("MLE")) {
-#   dir.create("MLE")
-# }
-#
-# setwd("MLE")
-#
+setwd("PBD_VAL_TES")
+
+print("Exporting Validation TES Data to GNN")
+
+eveGNN::export_to_gnn_with_params_pbd(pbd_list_all$outside_range, "tes", undirected = FALSE)
+
+setwd("..")
+
+num_elements_to_sample <- ceiling(length(pbd_free_tes_list) * proportion)
+
+pbd_mle_list <- sample(pbd_free_tes_list, num_elements_to_sample)
+
+pbd_mle_list <- purrr::transpose(pbd_mle_list)
+
+if (!dir.exists("PBD_MLE_TES")) {
+  dir.create("PBD_MLE_TES")
+}
+
+setwd("PBD_MLE_TES")
+
+print("Computing MLE for TES")
+
+pbd_mle_diffs_tes <- eveGNN::compute_accuracy_pbd_ml_free(pbd_mle_list, strategy = "sequential", workers = 1)
