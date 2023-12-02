@@ -494,21 +494,28 @@ def main():
                     data.adj.shape != torch.Size([max_nodes, max_nodes]) or \
                     data.mask.shape != torch.Size([max_nodes]):
                 incorrect_shapes.append(i)  # Add index to the list if any shape is incorrect
-                print(f"Index: {i}, x shape: {data.x.shape}, y shape: {data.y.shape}, edge_index shape: {data.edge_index.shape}")
-                incorrect_graph = {"x": data.x, "y": data.y, "edge_index": data.edge_index}
-                pyreadr.write_rds(os.path.join(name, task_type, f"incorrect_graph_{i}.rds"), incorrect_graph)
+                print(f"Index: {i}, x shape: {data.x.shape}, y shape: {data.y.shape}")
+                export_data = data.x.numpy()
+                export_df = pd.DataFrame(export_data, columns=["x1", "x2", "x3"])
+                pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_incorrect_shapes_{i}.rds"), export_df)
 
         # Print the indices of incorrect data elements or a message if all shapes are correct
         if incorrect_shapes:
             print(f"Incorrect shapes found at indices: {incorrect_shapes}")
         else:
             print("No incorrect shapes found.")
+        return incorrect_shapes
 
     # Check the shapes of the training and testing datasets
     # Be aware that ToDense will pad the data with zeros to the max_nodes value
     # However, ToDense may create malformed data.y when the number of nodes is 3 (2 tips)
-    shape_check(training_dataset, max_nodes)
-    shape_check(testing_dataset, max_nodes)
+    print("Removing graphs with incorrect shapes...")
+    incorrect_training_graph = shape_check(training_dataset, max_nodes)
+    incorrect_testing_graph =  shape_check(testing_dataset, max_nodes)
+
+    # Remove incorrect graphs from training and testing datasets
+    training_dataset = [data for i, data in enumerate(training_dataset) if i not in incorrect_training_graph]
+    testing_dataset = [data for i, data in enumerate(testing_dataset) if i not in incorrect_testing_graph]
 
     train_loader = DenseDataLoader(training_dataset, batch_size=train_batch_size_adjusted, shuffle=False)
     test_loader = DenseDataLoader(testing_dataset, batch_size=test_batch_size_adjusted, shuffle=False)
