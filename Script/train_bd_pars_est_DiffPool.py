@@ -565,7 +565,7 @@ def main():
     torch.save(model.state_dict(), os.path.join(name, task_type, f"{task_type}_model_diffpool.pt"))
 
     # After the loop, create a dictionary to hold the data
-    data_dict = {"lambda_diff": [], "mu_diff": [], "cap_diff": []}
+    data_dict = {"lambda_diff": [], "mu_diff": []}
     # Iterate through test_mean_diffs_history
     for array in test_mean_diffs_history:
         # It's assumed that the order of elements in the array corresponds to the keys in data_dict
