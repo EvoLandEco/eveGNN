@@ -12,10 +12,12 @@ import yaml
 import optuna
 import gc
 import torch.cuda as cuda
+import time
 from math import ceil
 from torch_geometric.data import InMemoryDataset, Data
 from torch_geometric.loader import DenseDataLoader
 from torch_geometric.nn import DenseGCNConv as GCNConv, dense_diff_pool
+from pynvml import nvmlInit, nvmlDeviceGetHandleByIndex, nvmlDeviceGetMemoryInfo
 
 
 # Load the global parameters from the config file
@@ -37,6 +39,26 @@ lin_layer2_hidden_channels = global_params["lin_layer2_hidden_channels"]
 n_predicted_values = global_params["n_predicted_values"]
 batch_size_reduce_factor = global_params["batch_size_reduce_factor"]
 # dropout_ratio = global_params["dropout_ratio"]
+min_memory_available = global_params["min_memory_available"]
+
+
+def clear_gpu_memory():
+    torch.cuda.empty_cache()
+    gc.collect()
+
+
+def wait_until_enough_gpu_memory(min_memory_available, max_retries=10, sleep_time=5):
+    nvmlInit()
+    handle = nvmlDeviceGetHandleByIndex(torch.cuda.current_device())
+
+    for _ in range(max_retries):
+        info = nvmlDeviceGetMemoryInfo(handle)
+        if info.free >= min_memory_available:
+            break
+        print(f"Waiting for {min_memory_available} bytes of free GPU memory. Retrying in {sleep_time} seconds...")
+        time.sleep(sleep_time)
+    else:
+        raise RuntimeError(f"Failed to acquire {min_memory_available} bytes of free GPU memory after {max_retries} retries.")
 
 
 def read_table(path):
@@ -498,6 +520,8 @@ def main():
     print(test_loader.dataset.transform)
 
     def objective(trial):
+        clear_gpu_memory()
+        wait_until_enough_gpu_memory(min_memory_available)
         tr_loader = train_loader
         vl_loader = test_loader
         model = DiffPool(trial).to(device)
@@ -505,6 +529,9 @@ def main():
             model.parameters(), trial.suggest_float("learning_rate", 1e-5, 1e-1, log=True)
         )
         criterion = torch.nn.MSELoss().to(device)
+        lambda_diff = 0
+        mu_diff = 0
+        cap_diff = 0
 
         for epoch in range(1, epoch_number):
             train(model, optimizer, criterion, tr_loader)
@@ -512,13 +539,8 @@ def main():
             lambda_diff = diffs[0]
             mu_diff = diffs[1]
             cap_diff = diffs[2]
-            torch.cuda.memory_summary(device=None, abbreviated=False)
-            gc.collect()
-            cuda.empty_cache()
-            torch.cuda.memory_summary(device=None, abbreviated=False)
 
-
-            return lambda_diff, mu_diff, cap_diff
+        return lambda_diff, mu_diff, cap_diff
 
     study = optuna.create_study(directions=["minimize", "minimize", "minimize"])
     study.optimize(objective, timeout=172800, gc_after_trial=True)

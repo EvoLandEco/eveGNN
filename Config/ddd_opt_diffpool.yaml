@@ -7,6 +7,7 @@ gcn_layer2_hidden_channels: 128
 gcn_layer3_hidden_channels: 64
 lin_layer1_hidden_channels: 64
 lin_layer2_hidden_channels: 32
+min_memory_available: 2147483648
 n_predicted_values: 3
 test_batch_size: 64
 train_batch_size: 64
