@@ -8,14 +8,32 @@ import functools
 import random
 import torch_geometric.transforms as T
 import torch.nn.functional as F
+import yaml
 from math import ceil
 from torch_geometric.data import InMemoryDataset, Data
 from torch_geometric.loader import DenseDataLoader
 from torch_geometric.nn import DenseGCNConv as GCNConv, dense_diff_pool
 
-# Global variables
-epoch_number = 21
-n_predicted_values = 5
+# Load the global parameters from the config file
+global_params = None
+
+with open("../Config/ddd_train_diffpool.yaml", "r") as ymlfile:
+    global_params = yaml.safe_load(ymlfile)
+
+# Set global variables
+epoch_number = global_params["epoch_number"]
+diffpool_ratio = global_params["diffpool_ratio"]
+dropout_ratio = global_params["dropout_ratio"]
+learning_rate = global_params["learning_rate"]
+train_batch_size = global_params["train_batch_size"]
+test_batch_size = global_params["test_batch_size"]
+gcn_layer1_hidden_channels = global_params["gcn_layer1_hidden_channels"]
+gcn_layer2_hidden_channels = global_params["gcn_layer2_hidden_channels"]
+gcn_layer3_hidden_channels = global_params["gcn_layer3_hidden_channels"]
+lin_layer1_hidden_channels = global_params["lin_layer1_hidden_channels"]
+lin_layer2_hidden_channels = global_params["lin_layer2_hidden_channels"]
+n_predicted_values = global_params["n_predicted_values"]
+batch_size_reduce_factor = global_params["batch_size_reduce_factor"]
 
 
 def read_table(path):
@@ -284,11 +302,45 @@ def main():
     training_dataset_list.append(current_training_data)
     testing_dataset_list.append(current_testing_data)
 
+    validation_dataset_list = []
+    val_dir = ""
+
+    train_batch_size_adjusted = None
+    test_batch_size_adjusted = None
+
+    if task_type == "PBD_FREE_TES":
+        val_dir = os.path.join(name, "PBD_VAL_TES")
+        train_batch_size_adjusted = int(train_batch_size)
+        test_batch_size_adjusted = int(test_batch_size)
+    elif task_type == "PBD_FREE_TAS":
+        val_dir = os.path.join(name, "PBD_VAL_TAS")
+        train_batch_size_adjusted = int(ceil(train_batch_size * batch_size_reduce_factor))
+        test_batch_size_adjusted = int(ceil(test_batch_size * batch_size_reduce_factor))
+    else:
+        raise ValueError("Invalid task type.")
+
+    full_val_dir_tree = os.path.join(val_dir, 'GNN', 'tree')
+    full_val_dir_el = os.path.join(val_dir, 'GNN', 'tree', 'EL')
+    val_rds_count = check_rds_files_count(full_val_dir_tree, full_val_dir_el)
+    print(f'There are: {val_rds_count} trees in the validation folder.')
+    print(f"Now reading validation data...")
+    current_val_dataset = read_rds_to_pytorch(val_dir, val_rds_count)
+    validation_dataset_list.append(current_val_dataset)
+
     sum_training_data = functools.reduce(lambda x, y: x + y, training_dataset_list)
     sum_testing_data = functools.reduce(lambda x, y: x + y, testing_dataset_list)
-    # Filtering out elements with None in edge_index
+    sum_validation_data = functools.reduce(lambda x, y: x + y, validation_dataset_list)
+
+    # Filtering out trees with only 3 nodes
+    # They might cause problems with ToDense
     filtered_training_data = [data for data in sum_training_data if data.edge_index.shape != torch.Size([2, 2])]
     filtered_testing_data = [data for data in sum_testing_data if data.edge_index.shape != torch.Size([2, 2])]
+    filtered_validation_data = [data for data in sum_validation_data if data.edge_index.shape != torch.Size([2, 2])]
+
+    # For PBD trees, there might be possibility that they only have one edge. Should filter them out.
+    filtered_training_data = [data for data in sum_training_data if data.edge_index.shape != torch.Size([2, 1])]
+    filtered_testing_data = [data for data in sum_testing_data if data.edge_index.shape != torch.Size([2, 1])]
+    filtered_validation_data = [data for data in sum_validation_data if data.edge_index.shape != torch.Size([2, 1])]
 
     class TreeData(InMemoryDataset):
         def __init__(self, root, data_list, transform=None, pre_transform=None):
@@ -303,10 +355,9 @@ def main():
 
     max_nodes_train = max([data.num_nodes for data in filtered_training_data])
     max_nodes_test = max([data.num_nodes for data in filtered_testing_data])
-    max_nodes = max(max_nodes_train, max_nodes_test)
-    # Hacking max_nodes is needed to match out-of-sample validation dataset
-    # max_nodes should actually be max(max_nodes_train, max_nodes_test, max_nodes_val)
-    # max_nodes = 2012
+    max_nodes_val = max([data.num_nodes for data in filtered_validation_data])
+    max_nodes = max(max_nodes_train, max_nodes_test, max_nodes_val)
+    print(f"Max nodes: {max_nodes} for {task_type}")
 
     training_dataset = TreeData(root=None, data_list=filtered_training_data, transform=T.ToDense(max_nodes))
     testing_dataset = TreeData(root=None, data_list=filtered_testing_data, transform=T.ToDense(max_nodes))
@@ -341,18 +392,18 @@ def main():
         def __init__(self):
             super(DiffPool, self).__init__()
 
-            num_nodes = ceil(0.25 * max_nodes)
-            self.gnn1_pool = GNN(training_dataset.num_node_features, 256, num_nodes)
-            self.gnn1_embed = GNN(training_dataset.num_node_features, 256, 256)
+            num_nodes = ceil(diffpool_ratio * max_nodes)
+            self.gnn1_pool = GNN(training_dataset.num_node_features, gcn_layer1_hidden_channels, num_nodes)
+            self.gnn1_embed = GNN(training_dataset.num_node_features, gcn_layer1_hidden_channels, gcn_layer2_hidden_channels)
 
-            num_nodes = ceil(0.25 * num_nodes)
-            self.gnn2_pool = GNN(256, 256, num_nodes)
-            self.gnn2_embed = GNN(256, 256, 256, lin=False)
+            num_nodes = ceil(diffpool_ratio * num_nodes)
+            self.gnn2_pool = GNN(gcn_layer2_hidden_channels, gcn_layer2_hidden_channels, num_nodes)
+            self.gnn2_embed = GNN(gcn_layer2_hidden_channels, gcn_layer2_hidden_channels, gcn_layer3_hidden_channels, lin=False)
 
-            self.gnn3_embed = GNN(256, 128, 128, lin=False)
+            self.gnn3_embed = GNN(gcn_layer3_hidden_channels, gcn_layer3_hidden_channels, lin_layer1_hidden_channels, lin=False)
 
-            self.lin1 = torch.nn.Linear(128, 64)
-            self.lin2 = torch.nn.Linear(64, n_predicted_values)
+            self.lin1 = torch.nn.Linear(lin_layer1_hidden_channels, lin_layer2_hidden_channels)
+            self.lin2 = torch.nn.Linear(lin_layer2_hidden_channels, n_predicted_values)
 
         def forward(self, x, adj, mask=None):
             s = self.gnn1_pool(x, adj, mask)
@@ -369,10 +420,10 @@ def main():
 
             x = x.mean(dim=1)
 
-            x = F.dropout(x, p=0.5, training=self.training)
+            x = F.dropout(x, p=dropout_ratio, training=self.training)
             x = self.lin1(x)
             x = F.relu(x)
-            x = F.dropout(x, p=0.5, training=self.training)
+            x = F.dropout(x, p=dropout_ratio, training=self.training)
             x = self.lin2(x)
             return x, l1 + l2, e1 + e2
 
@@ -396,6 +447,8 @@ def main():
         model.eval()
 
         diffs_all = torch.tensor([], dtype=torch.float, device=device)
+        outputs_all = torch.tensor([], dtype=torch.float, device=device)  # To store all outputs
+        y_all = torch.tensor([], dtype=torch.float, device=device)  # To store all y
         nodes_all = torch.tensor([], dtype=torch.long, device=device)
 
         for data in loader:
@@ -403,11 +456,13 @@ def main():
             out, _, _ = model(data.x, data.adj, data.mask)
             diffs = torch.abs(out - data.y.view(data.num_nodes.__len__(), n_predicted_values))
             diffs_all = torch.cat((diffs_all, diffs), dim=0)
+            outputs_all = torch.cat((outputs_all, out), dim=0)
+            y_all = torch.cat((y_all, data.y.view(data.num_nodes.__len__(), n_predicted_values)), dim=0)
             nodes_all = torch.cat((nodes_all, data.num_nodes), dim=0)
 
         print(f"diffs_all length: {len(diffs_all)}; test_loader.dataset length: {len(test_loader.dataset)}; Equal: {len(diffs_all) == len(test_loader.dataset)}")
         mean_diffs = torch.sum(diffs_all, dim=0) / len(test_loader.dataset)
-        return mean_diffs.cpu().detach().numpy(), diffs_all.cpu().detach().numpy(), nodes_all.cpu().detach().numpy()
+        return mean_diffs.cpu().detach().numpy(), diffs_all.cpu().detach().numpy(), outputs_all.cpu().detach().numpy(), y_all.cpu().detach().numpy(), nodes_all.cpu().detach().numpy()
 
     @torch.no_grad()
     def compute_validation_loss():
@@ -426,7 +481,7 @@ def main():
 
     model = DiffPool()
     model = model.to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     criterion = torch.nn.MSELoss().to(device)
 
     def shape_check(dataset, max_nodes):
@@ -452,8 +507,8 @@ def main():
     shape_check(training_dataset, max_nodes)
     shape_check(testing_dataset, max_nodes)
 
-    train_loader = DenseDataLoader(training_dataset, batch_size=64, shuffle=False)
-    test_loader = DenseDataLoader(testing_dataset, batch_size=64, shuffle=False)
+    train_loader = DenseDataLoader(training_dataset, batch_size=train_batch_size_adjusted, shuffle=False)
+    test_loader = DenseDataLoader(testing_dataset, batch_size=test_batch_size_adjusted, shuffle=False)
     print(f"Training dataset length: {len(train_loader.dataset)}")
     print(f"Testing dataset length: {len(test_loader.dataset)}")
     print(train_loader.dataset.transform)
@@ -465,6 +520,8 @@ def main():
     train_loss_history = []
     test_loss_history = []
     final_test_diffs = []
+    final_test_predictions = []
+    final_test_y = []
     final_test_nodes = []
 
     train_dir = os.path.join(name, task_type, "training")
@@ -479,7 +536,7 @@ def main():
     for epoch in range(1, epoch_number):
         train_loss_all = train()
         test_loss_all = compute_validation_loss()
-        test_mean_diffs, test_diffs_all, test_nodes_all = test_diff(test_loader)
+        test_mean_diffs, test_diffs_all, test_predictions, test_y, test_nodes_all = test_diff(test_loader)
         print(f'Epoch: {epoch:03d}, Par 1 Mean Diff: {test_mean_diffs[0]:.4f}, Par 2 Mean Diff: {test_mean_diffs[1]:.4f}, Par 3 Mean Diff: {test_mean_diffs[2]:.4f}, Par 4 Mean Diff: {test_mean_diffs[3]:.4f}, Par 5 Mean Diff: {test_mean_diffs[4]:.4f}, Train Loss: {train_loss_all:.4f}, Test Loss: {test_loss_all:.4f}')
 
         # Record the values
@@ -487,21 +544,26 @@ def main():
         train_loss_history.append(train_loss_all)
         test_loss_history.append(test_loss_all)
         final_test_diffs = test_diffs_all
+        final_test_predictions = test_predictions
+        final_test_y = test_y
         final_test_nodes = test_nodes_all
         print(f"Final test diffs length: {len(final_test_diffs)}")
+        print(f"Final predictions length: {len(final_test_predictions)}")
+        print(f"Final y length: {len(final_test_y)}")
+        print(f"Final nodes length: {len(final_test_nodes)}")
 
     # Save the model
     print(f"Saving model to {os.path.join(name, task_type, f'{task_type}_model_diffpool.pt')}")
     torch.save(model.state_dict(), os.path.join(name, task_type, f"{task_type}_model_diffpool.pt"))
 
     # After the loop, create a dictionary to hold the data
-    data_dict = {"la1_diff": [], "la2_diff": [], "la3_diff": [], "mu1_diff": [], "mu2_diff": []}
+    data_dict = {"lambda1_diff": [], "lambda2_diff": [], "lambda3_diff": [], "mu1_diff": [], "mu2_diff": []}
     # Iterate through test_mean_diffs_history
     for array in test_mean_diffs_history:
         # It's assumed that the order of elements in the array corresponds to the keys in data_dict
-        data_dict["la1_diff"].append(array[0])
-        data_dict["la2_diff"].append(array[1])
-        data_dict["la3_diff"].append(array[2])
+        data_dict["lambda1_diff"].append(array[0])
+        data_dict["lambda2_diff"].append(array[1])
+        data_dict["lambda3_diff"].append(array[2])
         data_dict["mu1_diff"].append(array[3])
         data_dict["mu2_diff"].append(array[4])
     data_dict["Epoch"] = list(range(1, epoch_number))
@@ -510,11 +572,15 @@ def main():
 
     # Convert the dictionary to a pandas DataFrame
     model_performance = pd.DataFrame(data_dict)
-    final_differences = pd.DataFrame(final_test_diffs, columns=["la1_diff", "la2_diff", "la3_diff", "mu1_diff", "mu2_diff"])
+    final_differences = pd.DataFrame(final_test_diffs, columns=["lambda1_diff", "lambda2_diff", "lambda3_diff", "mu1_diff", "mu2_diff"])
+    final_predictions = pd.DataFrame(final_test_predictions, columns=["lambda1_pred", "lambda2_pred", "lambda3_pred", "mu1_pred", "mu2_pred"])
+    final_y = pd.DataFrame(final_test_y, columns=["lambda1", "lambda2", "lambda3", "mu1", "mu2"])
     final_differences["num_nodes"] = final_test_nodes
     # Save the data to a file using pyreadr
     pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_diffpool.rds"), model_performance)
     pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_diffs_diffpool.rds"), final_differences)
+    pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_predictions_diffpool.rds"), final_predictions)
+    pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_y_diffpool.rds"), final_y)
 
 
 if __name__ == '__main__':
