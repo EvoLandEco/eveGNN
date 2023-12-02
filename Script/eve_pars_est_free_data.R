@@ -10,29 +10,33 @@ if (!dir.exists(name)) {
 
 setwd(name)
 
-dists <- params$dists
-within_ranges <- params$within_ranges
+dists_pd <- params$dists_pd
+dists_ed <- params$dists_ed
+dists_nnd <- params$dists_nnd
+within_ranges_pd <- params$within_ranges_pd
+within_ranges_ed <- params$within_ranges_ed
+within_ranges_nnd <- params$within_ranges_nnd
 nrep <- params$nrep
 age <- params$age
 nworkers_sim <- params$nworkers_sim
 
 future::plan("multicore", workers = nworkers_sim)
 
-eve_free_pd_list <- future.apply::future_replicate(nrep, eveGNN::randomized_eve_fixed_age(dists, age = age,
+eve_free_pd_list <- future.apply::future_replicate(nrep, eveGNN::randomized_eve_fixed_age(dists_pd, age = age,
                                                                          model = "dsce2",
                                                                          metric = "pd", offset = "simtime"), simplify = FALSE)
 
-eve_free_ed_list <- future.apply::future_replicate(nrep, eveGNN::randomized_eve_fixed_age(dists, age = age,
+eve_free_ed_list <- future.apply::future_replicate(nrep, eveGNN::randomized_eve_fixed_age(dists_ed, age = age,
                                                                          model = "dsce2",
                                                                          metric = "ed", offset = "none"), simplify = FALSE)
 
-eve_free_nnd_list <- future.apply::future_replicate(nrep, eveGNN::randomized_eve_fixed_age(dists, age = age,
+eve_free_nnd_list <- future.apply::future_replicate(nrep, eveGNN::randomized_eve_fixed_age(dists_nnd, age = age,
                                                                           model = "dsce2",
                                                                           metric = "nnd", offset = "none"), simplify = FALSE)
 
-eve_pd_list_all <- eveGNN::extract_by_range(tree_list = eve_free_pd_list, ranges = within_ranges)
-eve_ed_list_all <- eveGNN::extract_by_range(tree_list = eve_free_ed_list, ranges = within_ranges)
-eve_nnd_list_all <- eveGNN::extract_by_range(tree_list = eve_free_nnd_list, ranges = within_ranges)
+eve_pd_list_all <- eveGNN::extract_by_range(tree_list = eve_free_pd_list, ranges = within_ranges_pd)
+eve_ed_list_all <- eveGNN::extract_by_range(tree_list = eve_free_ed_list, ranges = within_ranges_ed)
+eve_nnd_list_all <- eveGNN::extract_by_range(tree_list = eve_free_nnd_list, ranges = within_ranges_nnd)
 
 if (!dir.exists("EVE_FREE_TES")) {
   dir.create("EVE_FREE_TES")
