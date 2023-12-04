@@ -270,15 +270,16 @@ def export_to_rds(embeddings, epoch, name, task_type, which_set):
 
 
 def main():
-    if len(sys.argv) != 3:
-        print(f"Usage: {sys.argv[0]} <name> <task_type>")
+    if len(sys.argv) != 4:
+        print(f"Usage: {sys.argv[0]} <name> <task_type> <gnn_depth>")
         sys.exit(1)
 
     name = sys.argv[1]
     task_type = sys.argv[2]
+    gnn_depth = int(sys.argv[3])
 
     # Now you can use the variables name and set_i in your code
-    print(f'Name: {name}, Task Type: {task_type}')
+    print(f'Name: {name}, Task Type: {task_type}, GNN Depth: {gnn_depth}')
 
     training_dataset_list = []
     testing_dataset_list = []
@@ -338,9 +339,9 @@ def main():
     filtered_validation_data = [data for data in sum_validation_data if data.edge_index.shape != torch.Size([2, 2])]
 
     # For PBD trees, there might be possibility that they only have one edge. Should filter them out.
-    filtered_training_data = [data for data in sum_training_data if data.edge_index.shape != torch.Size([2, 1])]
-    filtered_testing_data = [data for data in sum_testing_data if data.edge_index.shape != torch.Size([2, 1])]
-    filtered_validation_data = [data for data in sum_validation_data if data.edge_index.shape != torch.Size([2, 1])]
+    filtered_training_data = [data for data in filtered_training_data if data.edge_index.shape != torch.Size([2, 1])]
+    filtered_testing_data = [data for data in filtered_testing_data if data.edge_index.shape != torch.Size([2, 1])]
+    filtered_validation_data = [data for data in filtered_validation_data if data.edge_index.shape != torch.Size([2, 1])]
 
     class TreeData(InMemoryDataset):
         def __init__(self, root, data_list, transform=None, pre_transform=None):
@@ -370,14 +371,23 @@ def main():
             self.convs = torch.nn.ModuleList()
             self.bns = torch.nn.ModuleList()
 
-            self.convs.append(GCNConv(in_channels, hidden_channels, normalize))
-            self.bns.append(torch.nn.BatchNorm1d(hidden_channels))
+            for i in range(gnn_depth):
+                first_index = 0
+                last_index = gnn_depth - 1
 
-            self.convs.append(GCNConv(hidden_channels, hidden_channels, normalize))
-            self.bns.append(torch.nn.BatchNorm1d(hidden_channels))
-
-            self.convs.append(GCNConv(hidden_channels, out_channels, normalize))
-            self.bns.append(torch.nn.BatchNorm1d(out_channels))
+                if gnn_depth == 1:
+                    self.convs.append(GCNConv(in_channels, out_channels, normalize))
+                    self.bns.append(torch.nn.BatchNorm1d(out_channels))
+                else:
+                    if i == first_index:
+                        self.convs.append(GCNConv(in_channels, hidden_channels, normalize))
+                        self.bns.append(torch.nn.BatchNorm1d(hidden_channels))
+                    elif i == last_index:
+                        self.convs.append(GCNConv(hidden_channels, out_channels, normalize))
+                        self.bns.append(torch.nn.BatchNorm1d(out_channels))
+                    else:
+                        self.convs.append(GCNConv(hidden_channels, hidden_channels, normalize))
+                        self.bns.append(torch.nn.BatchNorm1d(hidden_channels))
 
         def forward(self, x, adj, mask=None):
             for step in range(len(self.convs)):
@@ -584,8 +594,8 @@ def main():
         print(f"Final nodes length: {len(final_test_nodes)}")
 
     # Save the model
-    print(f"Saving model to {os.path.join(name, task_type, f'{task_type}_model_diffpool.pt')}")
-    torch.save(model.state_dict(), os.path.join(name, task_type, f"{task_type}_model_diffpool.pt"))
+    print(f"Saving model to {os.path.join(name, task_type, f'{task_type}_model_diffpool_{gnn_depth}.pt')}")
+    torch.save(model.state_dict(), os.path.join(name, task_type, f"{task_type}_model_diffpool_{gnn_depth}.pt"))
 
     # After the loop, create a dictionary to hold the data
     data_dict = {"lambda1_diff": [], "lambda2_diff": [], "lambda3_diff": [], "mu1_diff": [], "mu2_diff": []}
@@ -608,10 +618,10 @@ def main():
     final_y = pd.DataFrame(final_test_y, columns=["lambda1", "lambda2", "lambda3", "mu1", "mu2"])
     final_differences["num_nodes"] = final_test_nodes
     # Save the data to a file using pyreadr
-    pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_diffpool.rds"), model_performance)
-    pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_diffs_diffpool.rds"), final_differences)
-    pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_predictions_diffpool.rds"), final_predictions)
-    pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_y_diffpool.rds"), final_y)
+    pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_diffpool_{gnn_depth}.rds"), model_performance)
+    pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_diffs_diffpool_{gnn_depth}.rds"), final_differences)
+    pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_predictions_diffpool_{gnn_depth}.rds"), final_predictions)
+    pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_y_diffpool_{gnn_depth}.rds"), final_y)
 
 
 if __name__ == '__main__':

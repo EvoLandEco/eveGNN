@@ -6,9 +6,9 @@ gcn_layer1_hidden_channels: 128
 gcn_layer2_hidden_channels: 128
 gcn_layer3_hidden_channels: 64
 learning_rate: 0.001
-max_gnn_depth: 6
 lin_layer1_hidden_channels: 64
 lin_layer2_hidden_channels: 32
+max_gnn_depth: 6
 n_predicted_values: 2
 test_batch_size: 64
 train_batch_size: 64
