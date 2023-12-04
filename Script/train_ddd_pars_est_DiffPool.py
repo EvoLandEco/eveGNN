@@ -275,8 +275,8 @@ def export_to_rds(embeddings, epoch, name, task_type, which_set):
 
 
 def main():
-    if len(sys.argv) != 3:
-        print(f"Usage: {sys.argv[0]} <name> <task_type>")
+    if len(sys.argv) != 4:
+        print(f"Usage: {sys.argv[0]} <name> <task_type> <gnn_depth>")
         sys.exit(1)
 
     name = sys.argv[1]
@@ -284,7 +284,7 @@ def main():
     gnn_depth = int(sys.argv[3])
 
     # Now you can use the variables name and set_i in your code
-    print(f'Name: {name}, Task Type: {task_type}')
+    print(f'Name: {name}, Task Type: {task_type}', f'GNN Depth: {gnn_depth}')
 
     training_dataset_list = []
     testing_dataset_list = []
