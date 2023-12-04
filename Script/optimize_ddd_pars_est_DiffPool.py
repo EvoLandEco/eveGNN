@@ -539,9 +539,6 @@ def main():
             lambda_diff = diffs[0]
             mu_diff = diffs[1]
             cap_diff = diffs[2]
-            # Handle pruning based on the intermediate value.
-            if trial.should_prune():
-                raise optuna.exceptions.TrialPruned()
 
         return lambda_diff, mu_diff, cap_diff
 
@@ -558,13 +555,8 @@ def main():
         study = optuna.create_study(study_name=opt_study_name, storage=storage_name, directions=["minimize", "minimize", "minimize"])
         study.optimize(objective, n_trials=n_trials_per_loop, gc_after_trial=True)
 
-    pruned_trials = study.get_trials(deepcopy=False, states=[TrialState.PRUNED])
-    complete_trials = study.get_trials(deepcopy=False, states=[TrialState.COMPLETE])
-
     print("Study statistics: ")
     print("  Number of finished trials: ", len(study.trials))
-    print("  Number of pruned trials: ", len(pruned_trials))
-    print("  Number of complete trials: ", len(complete_trials))
 
     print("Best trial:")
     trial = study.best_trial
