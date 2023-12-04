@@ -6,27 +6,30 @@ import torch
 import glob
 import functools
 import random
+import yaml
 import torch_geometric.transforms as T
 import torch.nn.functional as F
-import yaml
 from math import ceil
 from torch_geometric.data import InMemoryDataset, Data
 from torch_geometric.loader import DenseDataLoader
 from torch_geometric.nn import DenseGCNConv as GCNConv, dense_diff_pool
 
-# Load the global parameters from the config file
-global_params = None
 
-with open("../Config/pbd_train_diffpool.yaml", "r") as ymlfile:
+global_params = None
+global_params_train = None
+
+with open("../Config/bd_val_diffpool.yaml", "r") as ymlfile:
     global_params = yaml.safe_load(ymlfile)
+
+with open("../Config/bd_train_diffpool.yaml", "r") as ymlfile:
+    global_params_train = yaml.safe_load(ymlfile)
 
 # Set global variables
 epoch_number = global_params["epoch_number"]
 diffpool_ratio = global_params["diffpool_ratio"]
 dropout_ratio = global_params["dropout_ratio"]
 learning_rate = global_params["learning_rate"]
-train_batch_size = global_params["train_batch_size"]
-test_batch_size = global_params["test_batch_size"]
+val_batch_size = global_params["val_batch_size"]
 gcn_layer1_hidden_channels = global_params["gcn_layer1_hidden_channels"]
 gcn_layer2_hidden_channels = global_params["gcn_layer2_hidden_channels"]
 gcn_layer3_hidden_channels = global_params["gcn_layer3_hidden_channels"]
@@ -34,6 +37,9 @@ lin_layer1_hidden_channels = global_params["lin_layer1_hidden_channels"]
 lin_layer2_hidden_channels = global_params["lin_layer2_hidden_channels"]
 n_predicted_values = global_params["n_predicted_values"]
 batch_size_reduce_factor = global_params["batch_size_reduce_factor"]
+
+# Set global variables from training configuration
+max_gnn_depth = int(global_params_train["max_gnn_depth"])
 
 
 def read_table(path):
@@ -200,6 +206,10 @@ def read_rds_to_pytorch(path, count):
         params = get_params(filename)
         params_list.append(params)
 
+    # Normalize carrying capacity by dividing by 1000
+    for vector in params_list:
+        vector[2] = vector[2] / 1000
+
     check_list_count(count, data_list, length_list, params_list)
 
     # List to hold the Data objects
@@ -219,7 +229,7 @@ def read_rds_to_pytorch(path, count):
 
         params_current = params_list[i]
 
-        params_current_tensor = torch.tensor(params_current[0:n_predicted_values], dtype=torch.float)
+        params_current_tensor = torch.tensor(params_current[0:3], dtype=torch.float)
 
         # Create a Data object with the edge index, number of nodes, and category value
         data = Data(x=edge_length_tensor,
@@ -270,22 +280,39 @@ def export_to_rds(embeddings, epoch, name, task_type, which_set):
 
 
 def main():
-    if len(sys.argv) != 4:
-        print(f"Usage: {sys.argv[0]} <name> <task_type> <gnn_depth>")
+    if len(sys.argv) != 3:
+        print(f"Usage: {sys.argv[0]} <name> <task_type>")
         sys.exit(1)
 
     name = sys.argv[1]
     task_type = sys.argv[2]
-    gnn_depth = int(sys.argv[3])
 
     # Now you can use the variables name and set_i in your code
-    print(f'Name: {name}, Task Type: {task_type}, GNN Depth: {gnn_depth}')
+    print(f'Name: {name}, Task Type: {task_type}')
 
     training_dataset_list = []
     testing_dataset_list = []
 
+    full_dir = ""
+    val_dir = ""
+    model_type = ""
+
+    val_batch_size_adjusted = None
+
+    if task_type == "BD_VAL_TES":
+        full_dir = os.path.join(name, "BD_FREE_TES")
+        val_dir = os.path.join(name, "BD_VAL_TES")
+        model_type = "BD_FREE_TES"
+        val_batch_size_adjusted = int(val_batch_size)
+    elif task_type == "BD_VAL_TAS":
+        full_dir = os.path.join(name, "BD_FREE_TAS")
+        val_dir = os.path.join(name, "BD_VAL_TAS")
+        model_type = "BD_FREE_TAS"
+        val_batch_size_adjusted = int(ceil(val_batch_size * batch_size_reduce_factor))
+    else:
+        raise ValueError("Invalid task type.")
+
     # Concatenate the base directory path with the set_i folder name
-    full_dir = os.path.join(name, task_type)
     full_dir_tree = os.path.join(full_dir, 'GNN', 'tree')
     full_dir_el = os.path.join(full_dir, 'GNN', 'tree', 'EL')
     # Call read_rds_to_pytorch with the full directory path
@@ -304,21 +331,6 @@ def main():
     testing_dataset_list.append(current_testing_data)
 
     validation_dataset_list = []
-    val_dir = ""
-
-    train_batch_size_adjusted = None
-    test_batch_size_adjusted = None
-
-    if task_type == "PBD_FREE_TES":
-        val_dir = os.path.join(name, "PBD_VAL_TES")
-        train_batch_size_adjusted = int(train_batch_size)
-        test_batch_size_adjusted = int(test_batch_size)
-    elif task_type == "PBD_FREE_TAS":
-        val_dir = os.path.join(name, "PBD_VAL_TAS")
-        train_batch_size_adjusted = int(ceil(train_batch_size * batch_size_reduce_factor))
-        test_batch_size_adjusted = int(ceil(test_batch_size * batch_size_reduce_factor))
-    else:
-        raise ValueError("Invalid task type.")
 
     full_val_dir_tree = os.path.join(val_dir, 'GNN', 'tree')
     full_val_dir_el = os.path.join(val_dir, 'GNN', 'tree', 'EL')
@@ -338,7 +350,7 @@ def main():
     filtered_testing_data = [data for data in sum_testing_data if data.edge_index.shape != torch.Size([2, 2])]
     filtered_validation_data = [data for data in sum_validation_data if data.edge_index.shape != torch.Size([2, 2])]
 
-    # For PBD trees, there might be possibility that they only have one edge. Should filter them out.
+    # For BD trees, there might be possibility that they only have one edge. Should filter them out.
     filtered_training_data = [data for data in filtered_training_data if data.edge_index.shape != torch.Size([2, 1])]
     filtered_testing_data = [data for data in filtered_testing_data if data.edge_index.shape != torch.Size([2, 1])]
     filtered_validation_data = [data for data in filtered_validation_data if data.edge_index.shape != torch.Size([2, 1])]
@@ -359,13 +371,11 @@ def main():
     max_nodes_val = max([data.num_nodes for data in filtered_validation_data])
     max_nodes = max(max_nodes_train, max_nodes_test, max_nodes_val)
     print(f"Max nodes: {max_nodes} for {task_type}")
-
-    training_dataset = TreeData(root=None, data_list=filtered_training_data, transform=T.ToDense(max_nodes))
-    testing_dataset = TreeData(root=None, data_list=filtered_testing_data, transform=T.ToDense(max_nodes))
+    validation_dataset = TreeData(root=None, data_list=filtered_validation_data, transform=T.ToDense(max_nodes))
 
     class GNN(torch.nn.Module):
         def __init__(self, in_channels, hidden_channels, out_channels,
-                     normalize=False, lin=True):
+                     normalize=False, gnn_depth=1):
             super(GNN, self).__init__()
 
             self.convs = torch.nn.ModuleList()
@@ -399,18 +409,18 @@ def main():
             return x
 
     class DiffPool(torch.nn.Module):
-        def __init__(self):
+        def __init__(self, gnn_depth=1):
             super(DiffPool, self).__init__()
 
             num_nodes = ceil(diffpool_ratio * max_nodes)
-            self.gnn1_pool = GNN(training_dataset.num_node_features, gcn_layer1_hidden_channels, num_nodes)
-            self.gnn1_embed = GNN(training_dataset.num_node_features, gcn_layer1_hidden_channels, gcn_layer2_hidden_channels)
+            self.gnn1_pool = GNN(validation_dataset.num_node_features, gcn_layer1_hidden_channels, num_nodes, gnn_depth=gnn_depth)
+            self.gnn1_embed = GNN(validation_dataset.num_node_features, gcn_layer1_hidden_channels, gcn_layer2_hidden_channels, gnn_depth=gnn_depth)
 
             num_nodes = ceil(diffpool_ratio * num_nodes)
-            self.gnn2_pool = GNN(gcn_layer2_hidden_channels, gcn_layer2_hidden_channels, num_nodes)
-            self.gnn2_embed = GNN(gcn_layer2_hidden_channels, gcn_layer2_hidden_channels, gcn_layer3_hidden_channels, lin=False)
+            self.gnn2_pool = GNN(gcn_layer2_hidden_channels, gcn_layer2_hidden_channels, num_nodes, gnn_depth=gnn_depth)
+            self.gnn2_embed = GNN(gcn_layer2_hidden_channels, gcn_layer2_hidden_channels, gcn_layer3_hidden_channels, gnn_depth=gnn_depth)
 
-            self.gnn3_embed = GNN(gcn_layer3_hidden_channels, gcn_layer3_hidden_channels, lin_layer1_hidden_channels, lin=False)
+            self.gnn3_embed = GNN(gcn_layer3_hidden_channels, gcn_layer3_hidden_channels, lin_layer1_hidden_channels, gnn_depth=gnn_depth)
 
             self.lin1 = torch.nn.Linear(lin_layer1_hidden_channels, lin_layer2_hidden_channels)
             self.lin2 = torch.nn.Linear(lin_layer2_hidden_channels, n_predicted_values)
@@ -437,21 +447,6 @@ def main():
             x = self.lin2(x)
             return x, l1 + l2, e1 + e2
 
-    def train():
-        model.train()
-
-        loss_all = 0  # Keep track of the loss
-        for data in train_loader:
-            data.to(device)
-            optimizer.zero_grad()
-            out, _, _ = model(data.x, data.adj, data.mask)
-            loss = criterion(out, data.y.view(data.num_nodes.__len__(), n_predicted_values))
-            loss.backward()
-            loss_all += loss.item() * data.num_nodes.__len__()
-            optimizer.step()
-
-        return loss_all / len(train_loader.dataset)
-
     @torch.no_grad()
     def test_diff(loader):
         model.eval()
@@ -470,158 +465,39 @@ def main():
             y_all = torch.cat((y_all, data.y.view(data.num_nodes.__len__(), n_predicted_values)), dim=0)
             nodes_all = torch.cat((nodes_all, data.num_nodes), dim=0)
 
-        print(f"diffs_all length: {len(diffs_all)}; test_loader.dataset length: {len(test_loader.dataset)}; Equal: {len(diffs_all) == len(test_loader.dataset)}")
-        mean_diffs = torch.sum(diffs_all, dim=0) / len(test_loader.dataset)
+        print(f"diffs_all length: {len(diffs_all)}; test_loader.dataset length: {len(loader.dataset)}; Equal: {len(diffs_all) == len(loader.dataset)}")
+        mean_diffs = torch.sum(diffs_all, dim=0) / len(loader.dataset)
         return mean_diffs.cpu().detach().numpy(), diffs_all.cpu().detach().numpy(), outputs_all.cpu().detach().numpy(), y_all.cpu().detach().numpy(), nodes_all.cpu().detach().numpy()
 
-    @torch.no_grad()
-    def compute_validation_loss():
-        model.eval()  # Set the model to evaluation mode
-        loss_all = 0  # Keep track of the loss
-        for data in test_loader:
-            data.to(device)
-            out, _, _ = model(data.x, data.adj, data.mask)
-            loss = criterion(out, data.y.view(data.num_nodes.__len__(), n_predicted_values))
-            loss_all += loss.item() * data.num_nodes.__len__()
-
-        return loss_all / len(train_loader.dataset)
-
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    print(f"Training using {device}")
+    print(f"Validation using {device}")
 
-    model = DiffPool()
-    model = model.to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-    criterion = torch.nn.MSELoss().to(device)
+    for i in range(1, max_gnn_depth + 1):
+        model = DiffPool(gnn_depth=i)
+        path_to_saved_model = os.path.join(name, model_type, f"{model_type}_model_diffpool_{i}.pt")
+        model.load_state_dict(torch.load(path_to_saved_model))
 
-    def shape_check(dataset, max_nodes):
-        incorrect_shapes = []  # List to store indices of data elements with incorrect shapes
-        for i in range(len(dataset)):
-            data = dataset[i]
-            # Check the shapes of data.x, data.adj, and data.mask
-            if data.x.shape != torch.Size([max_nodes, 3]) or \
-                    data.y.shape != torch.Size([n_predicted_values]) or \
-                    data.adj.shape != torch.Size([max_nodes, max_nodes]) or \
-                    data.mask.shape != torch.Size([max_nodes]):
-                incorrect_shapes.append(i)  # Add index to the list if any shape is incorrect
-                print(f"Index: {i}, x shape: {data.x.shape}, y shape: {data.y.shape}")
-                export_data = data.x.numpy()
-                export_df = pd.DataFrame(export_data, columns=["x1", "x2", "x3"])
-                pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_incorrect_shapes_{gnn_depth}_{i}.rds"), export_df)
+        model = model.to(device)
 
-        # Print the indices of incorrect data elements or a message if all shapes are correct
-        if incorrect_shapes:
-            print(f"Incorrect shapes found at indices: {incorrect_shapes}")
-        else:
-            print("No incorrect shapes found.")
-        return incorrect_shapes
+        val_loader = DenseDataLoader(validation_dataset, batch_size=val_batch_size_adjusted, shuffle=False)
+        print(f"Validation dataset length: {len(val_loader.dataset)}")
+        print(val_loader.dataset.transform)
 
-    # Check the shapes of the training and testing datasets
-    # Be aware that ToDense will pad the data with zeros to the max_nodes value
-    # However, ToDense may create malformed data.y when the number of nodes is 3 (2 tips)
-    print("Removing graphs with incorrect shapes...")
-    incorrect_training_graph = shape_check(training_dataset, max_nodes)
-    incorrect_testing_graph = shape_check(testing_dataset, max_nodes)
-    if incorrect_training_graph:
-        # Remove incorrect graphs from training and testing datasets
-        for index in sorted(incorrect_training_graph, reverse=True):
-            del filtered_training_data[index]
-        print(f"Removed {len(incorrect_training_graph)} graphs from training dataset.")
-        print("Checking shapes again...")
-        training_dataset = TreeData(root=None, data_list=filtered_training_data, transform=T.ToDense(max_nodes))
-        incorrect_training_graph = shape_check(training_dataset, max_nodes)
-        if incorrect_training_graph:
-            raise ValueError("Incorrect shapes found in training dataset after removing incorrect graphs.")
-        else:
-            print("Successfully removed incorrect shapes in training dataset.")
+        print(model)
 
-    if incorrect_testing_graph:
-        # Remove incorrect graphs from training and testing datasets
-        for index in sorted(incorrect_testing_graph, reverse=True):
-            del filtered_testing_data[index]
-        print(f"Removed {len(incorrect_testing_graph)} graphs from testing dataset.")
-        print("Checking shapes again...")
-        testing_dataset = TreeData(root=None, data_list=filtered_testing_data, transform=T.ToDense(max_nodes))
-        incorrect_testing_graph = shape_check(testing_dataset, max_nodes)
-        if incorrect_testing_graph:
-            raise ValueError("Incorrect shapes found in testing dataset after removing incorrect graphs.")
-        else:
-            print("Successfully removed incorrect shapes in training dataset.")
+        test_mean_diffs, test_diffs_all, test_predictions, test_y, test_nodes_all = test_diff(val_loader)
+        print(f'Par 1 Mean Diff: {test_mean_diffs[0]:.4f}, Par 2 Mean Diff: {test_mean_diffs[1]:.4f}')
+        print(f"Final test diffs length: {len(test_diffs_all)}")
 
-    train_loader = DenseDataLoader(training_dataset, batch_size=train_batch_size_adjusted, shuffle=False)
-    test_loader = DenseDataLoader(testing_dataset, batch_size=test_batch_size_adjusted, shuffle=False)
-    print(f"Training dataset length: {len(train_loader.dataset)}")
-    print(f"Testing dataset length: {len(test_loader.dataset)}")
-    print(train_loader.dataset.transform)
-    print(test_loader.dataset.transform)
-
-    print(model)
-
-    test_mean_diffs_history = []
-    train_loss_history = []
-    test_loss_history = []
-    final_test_diffs = []
-    final_test_predictions = []
-    final_test_y = []
-    final_test_nodes = []
-
-    train_dir = os.path.join(name, task_type, "training")
-    test_dir = os.path.join(name, task_type, "testing")
-
-    # Check and create directories if not exist
-    if not os.path.exists(train_dir):
-        os.makedirs(train_dir)
-    if not os.path.exists(test_dir):
-        os.makedirs(test_dir)
-
-    for epoch in range(1, epoch_number):
-        train_loss_all = train()
-        test_loss_all = compute_validation_loss()
-        test_mean_diffs, test_diffs_all, test_predictions, test_y, test_nodes_all = test_diff(test_loader)
-        print(f'Epoch: {epoch:03d}, Par 1 Mean Diff: {test_mean_diffs[0]:.4f}, Par 2 Mean Diff: {test_mean_diffs[1]:.4f}, Par 3 Mean Diff: {test_mean_diffs[2]:.4f}, Par 4 Mean Diff: {test_mean_diffs[3]:.4f}, Par 5 Mean Diff: {test_mean_diffs[4]:.4f}, Train Loss: {train_loss_all:.4f}, Test Loss: {test_loss_all:.4f}')
-
-        # Record the values
-        test_mean_diffs_history.append(test_mean_diffs)
-        train_loss_history.append(train_loss_all)
-        test_loss_history.append(test_loss_all)
-        final_test_diffs = test_diffs_all
-        final_test_predictions = test_predictions
-        final_test_y = test_y
-        final_test_nodes = test_nodes_all
-        print(f"Final test diffs length: {len(final_test_diffs)}")
-        print(f"Final predictions length: {len(final_test_predictions)}")
-        print(f"Final y length: {len(final_test_y)}")
-        print(f"Final nodes length: {len(final_test_nodes)}")
-
-    # Save the model
-    print(f"Saving model to {os.path.join(name, task_type, f'{task_type}_model_diffpool_{gnn_depth}.pt')}")
-    torch.save(model.state_dict(), os.path.join(name, task_type, f"{task_type}_model_diffpool_{gnn_depth}.pt"))
-
-    # After the loop, create a dictionary to hold the data
-    data_dict = {"lambda1_diff": [], "lambda2_diff": [], "lambda3_diff": [], "mu1_diff": [], "mu2_diff": []}
-    # Iterate through test_mean_diffs_history
-    for array in test_mean_diffs_history:
-        # It's assumed that the order of elements in the array corresponds to the keys in data_dict
-        data_dict["lambda1_diff"].append(array[0])
-        data_dict["lambda2_diff"].append(array[1])
-        data_dict["lambda3_diff"].append(array[2])
-        data_dict["mu1_diff"].append(array[3])
-        data_dict["mu2_diff"].append(array[4])
-    data_dict["Epoch"] = list(range(1, epoch_number))
-    data_dict["Train_Loss"] = train_loss_history
-    data_dict["Test_Loss"] = test_loss_history
-
-    # Convert the dictionary to a pandas DataFrame
-    model_performance = pd.DataFrame(data_dict)
-    final_differences = pd.DataFrame(final_test_diffs, columns=["lambda1_diff", "lambda2_diff", "lambda3_diff", "mu1_diff", "mu2_diff"])
-    final_predictions = pd.DataFrame(final_test_predictions, columns=["lambda1_pred", "lambda2_pred", "lambda3_pred", "mu1_pred", "mu2_pred"])
-    final_y = pd.DataFrame(final_test_y, columns=["lambda1", "lambda2", "lambda3", "mu1", "mu2"])
-    final_differences["num_nodes"] = final_test_nodes
-    # Save the data to a file using pyreadr
-    pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_diffpool_{gnn_depth}.rds"), model_performance)
-    pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_diffs_diffpool_{gnn_depth}.rds"), final_differences)
-    pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_predictions_diffpool_{gnn_depth}.rds"), final_predictions)
-    pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_y_diffpool_{gnn_depth}.rds"), final_y)
+        # Convert the dictionary to a pandas DataFrame
+        final_differences = pd.DataFrame(test_diffs_all, columns=["lambda_diff", "mu_diff"])
+        final_predictions = pd.DataFrame(test_predictions, columns=["lambda_pred", "mu_pred"])
+        final_y = pd.DataFrame(test_y, columns=["lambda", "mu"])
+        final_differences["nodes"] = test_nodes_all
+        # Save the data to a file using pyreadr
+        pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_diffs_diffpool_{i}.rds"), final_differences)
+        pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_predictions_diffpool_{i}.rds"), final_predictions)
+        pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_y_diffpool_{i}.rds"), final_y)
 
 
 if __name__ == '__main__':
