@@ -5,12 +5,35 @@ import pyreadr
 import torch
 import glob
 import functools
+import random
+import yaml
 import torch_geometric.transforms as T
 import torch.nn.functional as F
 from math import ceil
 from torch_geometric.data import InMemoryDataset, Data
 from torch_geometric.loader import DenseDataLoader
 from torch_geometric.nn import DenseGCNConv as GCNConv, dense_diff_pool
+
+
+global_params = None
+
+with open("../Config/ddd_val_diffpool.yaml", "r") as ymlfile:
+    global_params = yaml.safe_load(ymlfile)
+
+# Set global variables
+cap_norm_factor = global_params["cap_norm_factor"]
+epoch_number = global_params["epoch_number"]
+diffpool_ratio = global_params["diffpool_ratio"]
+dropout_ratio = global_params["dropout_ratio"]
+learning_rate = global_params["learning_rate"]
+val_batch_size = global_params["val_batch_size"]
+gcn_layer1_hidden_channels = global_params["gcn_layer1_hidden_channels"]
+gcn_layer2_hidden_channels = global_params["gcn_layer2_hidden_channels"]
+gcn_layer3_hidden_channels = global_params["gcn_layer3_hidden_channels"]
+lin_layer1_hidden_channels = global_params["lin_layer1_hidden_channels"]
+lin_layer2_hidden_channels = global_params["lin_layer2_hidden_channels"]
+n_predicted_values = global_params["n_predicted_values"]
+batch_size_reduce_factor = global_params["batch_size_reduce_factor"]
 
 
 def read_table(path):
@@ -230,6 +253,14 @@ def get_testing_data(data_list):
     return testing_data
 
 
+def shuffle_data(data_list):
+    # Create a copy of the data list to shuffle
+    shuffled_list = data_list.copy()
+    # Shuffle the copied list in place
+    random.shuffle(shuffled_list)
+    return shuffled_list
+
+
 def export_to_rds(embeddings, epoch, name, task_type, which_set):
     # Convert to DataFrame
     df = pd.DataFrame(embeddings, columns=[f"dim_{i}" for i in range(embeddings.shape[1])])
@@ -253,10 +284,29 @@ def main():
     # Now you can use the variables name and set_i in your code
     print(f'Name: {name}, Task Type: {task_type}')
 
-    validation_dataset_list = []
+    training_dataset_list = []
+    testing_dataset_list = []
+
+    full_dir = ""
+    val_dir = ""
+    model_type = ""
+
+    val_batch_size_adjusted = None
+
+    if task_type == "DDD_VAL_TES":
+        full_dir = os.path.join(name, "DDD_FREE_TES")
+        val_dir = os.path.join(name, "DDD_VAL_TES")
+        model_type = "DDD_FREE_TES"
+        val_batch_size_adjusted = int(val_batch_size)
+    elif task_type == "DDD_VAL_TAS":
+        full_dir = os.path.join(name, "DDD_FREE_TAS")
+        val_dir = os.path.join(name, "DDD_VAL_TAS")
+        model_type = "DDD_FREE_TAS"
+        val_batch_size_adjusted = int(ceil(val_batch_size * batch_size_reduce_factor))
+    else:
+        raise ValueError("Invalid task type.")
 
     # Concatenate the base directory path with the set_i folder name
-    full_dir = os.path.join(name, task_type)
     full_dir_tree = os.path.join(full_dir, 'GNN', 'tree')
     full_dir_el = os.path.join(full_dir, 'GNN', 'tree', 'EL')
     # Call read_rds_to_pytorch with the full directory path
@@ -267,10 +317,31 @@ def main():
     print(f"Now reading {task_type}...")
     # Read the .rds files into a list of PyTorch Geometric Data objects
     current_dataset = read_rds_to_pytorch(full_dir, rds_count)
-    validation_dataset_list.append(current_dataset)
+    # Shuffle the data
+    current_dataset = shuffle_data(current_dataset)
+    current_training_data = get_training_data(current_dataset)
+    current_testing_data = get_testing_data(current_dataset)
+    training_dataset_list.append(current_training_data)
+    testing_dataset_list.append(current_testing_data)
 
+    validation_dataset_list = []
+
+    full_val_dir_tree = os.path.join(val_dir, 'GNN', 'tree')
+    full_val_dir_el = os.path.join(val_dir, 'GNN', 'tree', 'EL')
+    val_rds_count = check_rds_files_count(full_val_dir_tree, full_val_dir_el)
+    print(f'There are: {val_rds_count} trees in the validation folder.')
+    print(f"Now reading validation data...")
+    current_val_dataset = read_rds_to_pytorch(val_dir, val_rds_count)
+    validation_dataset_list.append(current_val_dataset)
+
+    sum_training_data = functools.reduce(lambda x, y: x + y, training_dataset_list)
+    sum_testing_data = functools.reduce(lambda x, y: x + y, testing_dataset_list)
     sum_validation_data = functools.reduce(lambda x, y: x + y, validation_dataset_list)
-    # Filtering out elements with None in edge_index
+
+    # Filtering out trees with only 3 nodes
+    # They might cause problems with ToDense
+    filtered_training_data = [data for data in sum_training_data if data.edge_index.shape != torch.Size([2, 2])]
+    filtered_testing_data = [data for data in sum_testing_data if data.edge_index.shape != torch.Size([2, 2])]
     filtered_validation_data = [data for data in sum_validation_data if data.edge_index.shape != torch.Size([2, 2])]
 
     class TreeData(InMemoryDataset):
@@ -284,7 +355,11 @@ def main():
         def _process(self):
             pass  # No processing required
 
-    max_nodes = 2012
+    max_nodes_train = max([data.num_nodes for data in filtered_training_data])
+    max_nodes_test = max([data.num_nodes for data in filtered_testing_data])
+    max_nodes_val = max([data.num_nodes for data in filtered_validation_data])
+    max_nodes = max(max_nodes_train, max_nodes_test, max_nodes_val)
+    print(f"Max nodes: {max_nodes} for {task_type}")
     validation_dataset = TreeData(root=None, data_list=filtered_validation_data, transform=T.ToDense(max_nodes))
 
     class GNN(torch.nn.Module):
@@ -305,8 +380,6 @@ def main():
             self.bns.append(torch.nn.BatchNorm1d(out_channels))
 
         def forward(self, x, adj, mask=None):
-            batch_size, num_nodes, in_channels = x.size()
-
             for step in range(len(self.convs)):
                 x = F.relu(self.convs[step](x, adj, mask))
                 x = torch.permute(x, (0, 2, 1))
@@ -319,18 +392,18 @@ def main():
         def __init__(self):
             super(DiffPool, self).__init__()
 
-            num_nodes = ceil(0.25 * max_nodes)
-            self.gnn1_pool = GNN(validation_dataset.num_node_features, 256, num_nodes)
-            self.gnn1_embed = GNN(validation_dataset.num_node_features, 256, 256)
+            num_nodes = ceil(diffpool_ratio * max_nodes)
+            self.gnn1_pool = GNN(validation_dataset.num_node_features, gcn_layer1_hidden_channels, num_nodes)
+            self.gnn1_embed = GNN(validation_dataset.num_node_features, gcn_layer1_hidden_channels, gcn_layer2_hidden_channels)
 
-            num_nodes = ceil(0.25 * num_nodes)
-            self.gnn2_pool = GNN(256, 256, num_nodes)
-            self.gnn2_embed = GNN(256, 256, 256, lin=False)
+            num_nodes = ceil(diffpool_ratio * num_nodes)
+            self.gnn2_pool = GNN(gcn_layer2_hidden_channels, gcn_layer2_hidden_channels, num_nodes)
+            self.gnn2_embed = GNN(gcn_layer2_hidden_channels, gcn_layer2_hidden_channels, gcn_layer3_hidden_channels, lin=False)
 
-            self.gnn3_embed = GNN(256, 128, 128, lin=False)
+            self.gnn3_embed = GNN(gcn_layer3_hidden_channels, gcn_layer3_hidden_channels, lin_layer1_hidden_channels, lin=False)
 
-            self.lin1 = torch.nn.Linear(128, 64)
-            self.lin2 = torch.nn.Linear(64, 3)
+            self.lin1 = torch.nn.Linear(lin_layer1_hidden_channels, lin_layer2_hidden_channels)
+            self.lin2 = torch.nn.Linear(lin_layer2_hidden_channels, n_predicted_values)
 
         def forward(self, x, adj, mask=None):
             s = self.gnn1_pool(x, adj, mask)
@@ -347,10 +420,10 @@ def main():
 
             x = x.mean(dim=1)
 
-            x = F.dropout(x, p=0.5, training=self.training)
+            x = F.dropout(x, p=dropout_ratio, training=self.training)
             x = self.lin1(x)
             x = F.relu(x)
-            x = F.dropout(x, p=0.5, training=self.training)
+            x = F.dropout(x, p=dropout_ratio, training=self.training)
             x = self.lin2(x)
             return x, l1 + l2, e1 + e2
 
@@ -359,40 +432,51 @@ def main():
         model.eval()
 
         diffs_all = torch.tensor([], dtype=torch.float, device=device)
+        outputs_all = torch.tensor([], dtype=torch.float, device=device)  # To store all outputs
+        y_all = torch.tensor([], dtype=torch.float, device=device)  # To store all y
+        nodes_all = torch.tensor([], dtype=torch.long, device=device)
 
         for data in loader:
             data.to(device)
             out, _, _ = model(data.x, data.adj, data.mask)
-            diffs = torch.abs(out - data.y.view(data.num_nodes.__len__(), 3))
+            diffs = torch.abs(out - data.y.view(data.num_nodes.__len__(), n_predicted_values))
             diffs_all = torch.cat((diffs_all, diffs), dim=0)
+            outputs_all = torch.cat((outputs_all, out), dim=0)
+            y_all = torch.cat((y_all, data.y.view(data.num_nodes.__len__(), n_predicted_values)), dim=0)
+            nodes_all = torch.cat((nodes_all, data.num_nodes), dim=0)
 
-        print(f"diffs_all length: {len(diffs_all)}; test_loader.dataset length: {len(val_loader.dataset)}; Equal: {len(diffs_all) == len(val_loader.dataset)}")
+        print(f"diffs_all length: {len(diffs_all)}; test_loader.dataset length: {len(loader.dataset)}; Equal: {len(diffs_all) == len(loader.dataset)}")
         mean_diffs = torch.sum(diffs_all, dim=0) / len(loader.dataset)
-        return mean_diffs.cpu().detach().numpy(), diffs_all.cpu().detach().numpy()
+        return mean_diffs.cpu().detach().numpy(), diffs_all.cpu().detach().numpy(), outputs_all.cpu().detach().numpy(), y_all.cpu().detach().numpy(), nodes_all.cpu().detach().numpy()
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Validation using {device}")
 
     model = DiffPool()
-    path_to_saved_model = os.path.join(name, task_type, f"{task_type}_model_diffpool.pt")
+    path_to_saved_model = os.path.join(name, model_type, f"{model_type}_model_diffpool.pt")
     model.load_state_dict(torch.load(path_to_saved_model))
 
     model = model.to(device)
 
-    val_loader = DenseDataLoader(validation_dataset, batch_size=64, shuffle=False)
+    val_loader = DenseDataLoader(validation_dataset, batch_size=val_batch_size_adjusted, shuffle=False)
     print(f"Validation dataset length: {len(val_loader.dataset)}")
     print(val_loader.dataset.transform)
 
     print(model)
 
-    test_mean_diffs, test_diffs_all = test_diff(val_loader)
+    test_mean_diffs, test_diffs_all, test_predictions, test_y, test_nodes_all = test_diff(val_loader)
     print(f'Par 1 Mean Diff: {test_mean_diffs[0]:.4f}, Par 2 Mean Diff: {test_mean_diffs[1]:.4f}, Par 3 Mean Diff: {test_mean_diffs[2]:.4f}')
     print(f"Final test diffs length: {len(test_diffs_all)}")
 
     # Convert the dictionary to a pandas DataFrame
     final_differences = pd.DataFrame(test_diffs_all, columns=["lambda_diff", "mu_diff", "cap_diff"])
+    final_predictions = pd.DataFrame(test_predictions, columns=["lambda_pred", "mu_pred", "cap_pred"])
+    final_y = pd.DataFrame(test_y, columns=["lambda", "mu", "cap"])
+    final_differences["nodes"] = test_nodes_all
     # Save the data to a file using pyreadr
     pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_diffs_diffpool.rds"), final_differences)
+    pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_predictions_diffpool.rds"), final_predictions)
+    pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_y_diffpool.rds"), final_y)
 
 
 if __name__ == '__main__':
