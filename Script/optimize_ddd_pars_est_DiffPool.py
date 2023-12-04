@@ -11,13 +11,14 @@ import torch.nn.functional as F
 import yaml
 import optuna
 import gc
-import torch.cuda as cuda
 import time
+import logging
 from math import ceil
 from torch_geometric.data import InMemoryDataset, Data
 from torch_geometric.loader import DenseDataLoader
 from torch_geometric.nn import DenseGCNConv as GCNConv, dense_diff_pool
 from pynvml import nvmlInit, nvmlDeviceGetHandleByIndex, nvmlDeviceGetMemoryInfo
+from optuna.trial import TrialState
 
 
 # Load the global parameters from the config file
@@ -38,8 +39,9 @@ lin_layer1_hidden_channels = global_params["lin_layer1_hidden_channels"]
 lin_layer2_hidden_channels = global_params["lin_layer2_hidden_channels"]
 n_predicted_values = global_params["n_predicted_values"]
 batch_size_reduce_factor = global_params["batch_size_reduce_factor"]
-# dropout_ratio = global_params["dropout_ratio"]
 min_memory_available = global_params["min_memory_available"]
+n_optimization_loops = global_params["n_optimization_loops"]
+n_trials_per_loop = global_params["n_trials_per_loop"]
 
 
 def clear_gpu_memory():
@@ -520,8 +522,6 @@ def main():
     print(test_loader.dataset.transform)
 
     def objective(trial):
-        clear_gpu_memory()
-        wait_until_enough_gpu_memory(min_memory_available)
         tr_loader = train_loader
         vl_loader = test_loader
         model = DiffPool(trial).to(device)
@@ -539,12 +539,42 @@ def main():
             lambda_diff = diffs[0]
             mu_diff = diffs[1]
             cap_diff = diffs[2]
+            # Handle pruning based on the intermediate value.
+            if trial.should_prune():
+                raise optuna.exceptions.TrialPruned()
 
         return lambda_diff, mu_diff, cap_diff
 
-    study = optuna.create_study(directions=["minimize", "minimize", "minimize"])
-    study.optimize(objective, timeout=172800, gc_after_trial=True)
-    print("Number of finished trials: ", len(study.trials))
+    opt_study_name = f"{name}_{task_type}_diffpool_opt"
+    storage_name = "sqlite:///{}.db".format(opt_study_name)
+    optuna.logging.get_logger("optuna").addHandler(logging.StreamHandler(sys.stdout))
+    study = None
+
+    for i in range(n_optimization_loops):
+        del study
+        clear_gpu_memory()
+        wait_until_enough_gpu_memory(min_memory_available)
+        print(f"Optimization loop {i+1} of {n_optimization_loops}")
+        study = optuna.create_study(study_name=opt_study_name, storage=storage_name, directions=["minimize", "minimize", "minimize"])
+        study.optimize(objective, n_trials=n_trials_per_loop, gc_after_trial=True)
+
+    pruned_trials = study.get_trials(deepcopy=False, states=[TrialState.PRUNED])
+    complete_trials = study.get_trials(deepcopy=False, states=[TrialState.COMPLETE])
+
+    print("Study statistics: ")
+    print("  Number of finished trials: ", len(study.trials))
+    print("  Number of pruned trials: ", len(pruned_trials))
+    print("  Number of complete trials: ", len(complete_trials))
+
+    print("Best trial:")
+    trial = study.best_trial
+
+    print("  Value: ", trial.value)
+
+    print("  Params: ")
+    for key, value in trial.params.items():
+        print("    {}: {}".format(key, value))
+
     trials_df = study.trials_dataframe()
     print("Saving trials dataframe to CSV...")
     trials_df.to_csv(os.path.join(name, task_type, f"{task_type}_diffpool_opt_trials.csv"), index=False)
