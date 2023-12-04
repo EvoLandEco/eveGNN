@@ -497,10 +497,15 @@ main_menu() {
                                             if [ -e "../Config/bd_train_diffpool.yaml" ]; then
                                                 echo -e "${Blue}Training model on Birth-Death Trees...${NC}"
                                                 # Logic for Birth-Death Trees
-                                                echo "Submitting job for TES"
-                                                sbatch submit_bd_pars_est_model_training_diffpool.sh "$name" "BD_FREE_TES"
-                                                echo "Submitting job for TAS"
-                                                sbatch submit_bd_pars_est_model_training_diffpool.sh "$name" "BD_FREE_TAS"
+                                                local max_gnn_depth
+                                                max_gnn_depth=$(grep 'max_gnn_depth:' ../Config/bd_train_diffpool.yaml | awk '{print $2}')
+                                                echo "Max GNN depth: $max_gnn_depth"
+                                                for (( i=1; i<=max_gnn_depth; i++ )); do
+                                                    echo "Submitting job for TES with GNN depth $i"
+                                                    sbatch submit_bd_pars_est_model_training_diffpool.sh "$name" "BD_FREE_TES" "$i"
+                                                    echo "Submitting job for TAS with GNN depth $i"
+                                                    sbatch submit_bd_pars_est_model_training_diffpool.sh "$name" "BD_FREE_TAS" "$i"
+                                                done
                                             else
                                                 echo
                                                 echo -e "${Red}ERROR: ${NC}Missing configuration file for Birth-Death DiffPool model."
@@ -510,10 +515,15 @@ main_menu() {
                                             if [ -e "../Config/ddd_train_diffpool.yaml" ]; then
                                                 echo -e "${Blue}Training model on Diversity-Dependent-Diversification Trees...${NC}"
                                                 # Logic for Diversity-Dependent-Diversification Trees
-                                                echo "Submitting job for TES"
-                                                sbatch submit_ddd_pars_est_model_training_diffpool.sh "$name" "DDD_FREE_TES"
-                                                echo "Submitting job for TAS"
-                                                sbatch submit_ddd_pars_est_model_training_diffpool.sh "$name" "DDD_FREE_TAS"
+                                                local max_gnn_depth
+                                                max_gnn_depth=$(grep 'max_gnn_depth:' ../Config/ddd_train_diffpool.yaml | awk '{print $2}')
+                                                echo "Max GNN depth: $max_gnn_depth"
+                                                for (( i=1; i<=max_gnn_depth; i++ )); do
+                                                    echo "Submitting job for TES with GNN depth $i"
+                                                    sbatch submit_ddd_pars_est_model_training_diffpool.sh "$name" "DDD_FREE_TES" "$i"
+                                                    echo "Submitting job for TAS with GNN depth $i"
+                                                    sbatch submit_ddd_pars_est_model_training_diffpool.sh "$name" "DDD_FREE_TAS" "$i"
+                                                done
                                             else
                                                 echo
                                                 echo -e "${Red}ERROR: ${NC}Missing configuration file for Diversity-Dependent-Diversification DiffPool model."
@@ -523,10 +533,15 @@ main_menu() {
                                             if [ -e "../Config/pbd_train_diffpool.yaml" ]; then
                                                 echo -e "${Blue}Training model on Protracted Birth-Death Trees...${NC}"
                                                 # Logic for Protracted Birth-Death Trees
-                                                echo "Submitting job for TES"
-                                                sbatch submit_pbd_pars_est_model_training_diffpool.sh "$name" "PBD_FREE_TES"
-                                                echo "Submitting job for TAS"
-                                                sbatch submit_pbd_pars_est_model_training_diffpool.sh "$name" "PBD_FREE_TAS"
+                                                local max_gnn_depth
+                                                max_gnn_depth=$(grep 'max_gnn_depth:' ../Config/pbd_train_diffpool.yaml | awk '{print $2}')
+                                                echo "Max GNN depth: $max_gnn_depth"
+                                                for (( i=1; i<=max_gnn_depth; i++ )); do
+                                                    echo "Submitting job for TES with GNN depth $i"
+                                                    sbatch submit_pbd_pars_est_model_training_diffpool.sh "$name" "PBD_FREE_TES" "$i"
+                                                    echo "Submitting job for TAS with GNN depth $i"
+                                                    sbatch submit_pbd_pars_est_model_training_diffpool.sh "$name" "PBD_FREE_TAS" "$i"
+                                                done
                                             else
                                                 echo
                                                 echo -e "${Red}ERROR: ${NC}Missing configuration file for Protracted Birth-Death DiffPool model."
@@ -536,20 +551,25 @@ main_menu() {
                                             if [ -e "../Config/eve_train_diffpool.yaml" ]; then
                                                 echo -e "${Blue}Training model on Evolutionary-Relatedness-Dependent Trees...${NC}"
                                                 # Logic for Evolutionary-Relatedness-Dependent Trees
-                                                echo "Submitting job for TES"
-                                                echo "Submitting PD"
-                                                sbatch submit_eve_pars_est_model_training_diffpool_reg.sh "$name" "EVE_FREE_TES" "pd"
-                                                echo "Submitting ED"
-                                                sbatch submit_eve_pars_est_model_training_diffpool_reg.sh "$name" "EVE_FREE_TES" "ed"
-                                                echo "Submitting NND"
-                                                sbatch submit_eve_pars_est_model_training_diffpool_reg.sh "$name" "EVE_FREE_TES" "nnd"
-                                                echo "Submitting job for TAS"
-                                                echo "Submitting PD"
-                                                sbatch submit_eve_pars_est_model_training_diffpool_reg.sh "$name" "EVE_FREE_TAS" "pd"
-                                                echo "Submitting ED"
-                                                sbatch submit_eve_pars_est_model_training_diffpool_reg.sh "$name" "EVE_FREE_TAS" "ed"
-                                                echo "Submitting NND"
-                                                sbatch submit_eve_pars_est_model_training_diffpool_reg.sh "$name" "EVE_FREE_TAS" "nnd"
+                                                local max_gnn_depth
+                                                max_gnn_depth=$(grep 'max_gnn_depth:' ../Config/eve_train_diffpool.yaml | awk '{print $2}')
+                                                echo "Max GNN depth: $max_gnn_depth"
+                                                for (( i=1; i<=max_gnn_depth; i++ )); do
+                                                    echo "Submitting jobs for TES with GNN depth $i"
+                                                    echo "Submitting PD"
+                                                    sbatch submit_eve_pars_est_model_training_diffpool.sh "$name" "EVE_FREE_TES" "pd" "$i"
+                                                    echo "Submitting ED"
+                                                    sbatch submit_eve_pars_est_model_training_diffpool.sh "$name" "EVE_FREE_TES" "ed" "$i"
+                                                    echo "Submitting NND"
+                                                    sbatch submit_eve_pars_est_model_training_diffpool.sh "$name" "EVE_FREE_TES" "nnd" "$i"
+                                                    echo "Submitting job for TAS with GNN depth $i"
+                                                    echo "Submitting PD"
+                                                    sbatch submit_eve_pars_est_model_training_diffpool.sh "$name" "EVE_FREE_TAS" "pd" "$i"
+                                                    echo "Submitting ED"
+                                                    sbatch submit_eve_pars_est_model_training_diffpool.sh "$name" "EVE_FREE_TAS" "ed" "$i"
+                                                    echo "Submitting NND"
+                                                    sbatch submit_eve_pars_est_model_training_diffpool.sh "$name" "EVE_FREE_TAS" "nnd" "$i"
+                                                done
                                             else
                                                 echo
                                                 echo -e "${Red}ERROR: ${NC}Missing configuration file for Evolutionary-Relatedness-Dependent DiffPool model."
