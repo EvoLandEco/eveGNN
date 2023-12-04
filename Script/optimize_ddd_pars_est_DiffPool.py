@@ -18,7 +18,6 @@ from torch_geometric.data import InMemoryDataset, Data
 from torch_geometric.loader import DenseDataLoader
 from torch_geometric.nn import DenseGCNConv as GCNConv, dense_diff_pool
 from pynvml import nvmlInit, nvmlDeviceGetHandleByIndex, nvmlDeviceGetMemoryInfo
-from optuna.trial import TrialState
 
 
 # Load the global parameters from the config file
@@ -552,7 +551,7 @@ def main():
         clear_gpu_memory()
         wait_until_enough_gpu_memory(min_memory_available)
         print(f"Optimization loop {i+1} of {n_optimization_loops}")
-        study = optuna.create_study(study_name=opt_study_name, storage=storage_name, directions=["minimize", "minimize", "minimize"])
+        study = optuna.create_study(study_name=opt_study_name, storage=storage_name, directions=["minimize", "minimize", "minimize"], load_if_exists=True)
         study.optimize(objective, n_trials=n_trials_per_loop, gc_after_trial=True)
 
     print("Study statistics: ")
