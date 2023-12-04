@@ -16,9 +16,13 @@ from torch_geometric.nn import DenseGCNConv as GCNConv, dense_diff_pool
 
 
 global_params = None
+global_params_train = None
 
 with open("../Config/ddd_val_diffpool.yaml", "r") as ymlfile:
     global_params = yaml.safe_load(ymlfile)
+
+with open("../Config/ddd_train_diffpool.yaml", "r") as ymlfile:
+    global_params_train = yaml.safe_load(ymlfile)
 
 # Set global variables
 cap_norm_factor = global_params["cap_norm_factor"]
@@ -34,6 +38,9 @@ lin_layer1_hidden_channels = global_params["lin_layer1_hidden_channels"]
 lin_layer2_hidden_channels = global_params["lin_layer2_hidden_channels"]
 n_predicted_values = global_params["n_predicted_values"]
 batch_size_reduce_factor = global_params["batch_size_reduce_factor"]
+
+# Set global variables from training configuration
+max_gnn_depth = int(global_params_train["max_gnn_depth"])
 
 
 def read_table(path):
@@ -364,20 +371,29 @@ def main():
 
     class GNN(torch.nn.Module):
         def __init__(self, in_channels, hidden_channels, out_channels,
-                     normalize=False, lin=True):
+                     normalize=False, gnn_depth=1):
             super(GNN, self).__init__()
 
             self.convs = torch.nn.ModuleList()
             self.bns = torch.nn.ModuleList()
 
-            self.convs.append(GCNConv(in_channels, hidden_channels, normalize))
-            self.bns.append(torch.nn.BatchNorm1d(hidden_channels))
+            for i in range(gnn_depth):
+                first_index = 0
+                last_index = gnn_depth - 1
 
-            self.convs.append(GCNConv(hidden_channels, hidden_channels, normalize))
-            self.bns.append(torch.nn.BatchNorm1d(hidden_channels))
-
-            self.convs.append(GCNConv(hidden_channels, out_channels, normalize))
-            self.bns.append(torch.nn.BatchNorm1d(out_channels))
+                if gnn_depth == 1:
+                    self.convs.append(GCNConv(in_channels, out_channels, normalize))
+                    self.bns.append(torch.nn.BatchNorm1d(out_channels))
+                else:
+                    if i == first_index:
+                        self.convs.append(GCNConv(in_channels, hidden_channels, normalize))
+                        self.bns.append(torch.nn.BatchNorm1d(hidden_channels))
+                    elif i == last_index:
+                        self.convs.append(GCNConv(hidden_channels, out_channels, normalize))
+                        self.bns.append(torch.nn.BatchNorm1d(out_channels))
+                    else:
+                        self.convs.append(GCNConv(hidden_channels, hidden_channels, normalize))
+                        self.bns.append(torch.nn.BatchNorm1d(hidden_channels))
 
         def forward(self, x, adj, mask=None):
             for step in range(len(self.convs)):
@@ -389,18 +405,18 @@ def main():
             return x
 
     class DiffPool(torch.nn.Module):
-        def __init__(self):
+        def __init__(self, gnn_depth=1):
             super(DiffPool, self).__init__()
 
             num_nodes = ceil(diffpool_ratio * max_nodes)
-            self.gnn1_pool = GNN(validation_dataset.num_node_features, gcn_layer1_hidden_channels, num_nodes)
-            self.gnn1_embed = GNN(validation_dataset.num_node_features, gcn_layer1_hidden_channels, gcn_layer2_hidden_channels)
+            self.gnn1_pool = GNN(validation_dataset.num_node_features, gcn_layer1_hidden_channels, num_nodes, gnn_depth=gnn_depth)
+            self.gnn1_embed = GNN(validation_dataset.num_node_features, gcn_layer1_hidden_channels, gcn_layer2_hidden_channels, gnn_depth=gnn_depth)
 
             num_nodes = ceil(diffpool_ratio * num_nodes)
-            self.gnn2_pool = GNN(gcn_layer2_hidden_channels, gcn_layer2_hidden_channels, num_nodes)
-            self.gnn2_embed = GNN(gcn_layer2_hidden_channels, gcn_layer2_hidden_channels, gcn_layer3_hidden_channels, lin=False)
+            self.gnn2_pool = GNN(gcn_layer2_hidden_channels, gcn_layer2_hidden_channels, num_nodes, gnn_depth=gnn_depth)
+            self.gnn2_embed = GNN(gcn_layer2_hidden_channels, gcn_layer2_hidden_channels, gcn_layer3_hidden_channels, gnn_depth=gnn_depth)
 
-            self.gnn3_embed = GNN(gcn_layer3_hidden_channels, gcn_layer3_hidden_channels, lin_layer1_hidden_channels, lin=False)
+            self.gnn3_embed = GNN(gcn_layer3_hidden_channels, gcn_layer3_hidden_channels, lin_layer1_hidden_channels, gnn_depth=gnn_depth)
 
             self.lin1 = torch.nn.Linear(lin_layer1_hidden_channels, lin_layer2_hidden_channels)
             self.lin2 = torch.nn.Linear(lin_layer2_hidden_channels, n_predicted_values)
@@ -452,31 +468,32 @@ def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Validation using {device}")
 
-    model = DiffPool()
-    path_to_saved_model = os.path.join(name, model_type, f"{model_type}_model_diffpool.pt")
-    model.load_state_dict(torch.load(path_to_saved_model))
+    for i in range(1, max_gnn_depth + 1):
+        model = DiffPool(gnn_depth=i)
+        path_to_saved_model = os.path.join(name, model_type, f"{model_type}_model_diffpool_{i}.pt")
+        model.load_state_dict(torch.load(path_to_saved_model))
 
-    model = model.to(device)
+        model = model.to(device)
 
-    val_loader = DenseDataLoader(validation_dataset, batch_size=val_batch_size_adjusted, shuffle=False)
-    print(f"Validation dataset length: {len(val_loader.dataset)}")
-    print(val_loader.dataset.transform)
+        val_loader = DenseDataLoader(validation_dataset, batch_size=val_batch_size_adjusted, shuffle=False)
+        print(f"Validation dataset length: {len(val_loader.dataset)}")
+        print(val_loader.dataset.transform)
 
-    print(model)
+        print(model)
 
-    test_mean_diffs, test_diffs_all, test_predictions, test_y, test_nodes_all = test_diff(val_loader)
-    print(f'Par 1 Mean Diff: {test_mean_diffs[0]:.4f}, Par 2 Mean Diff: {test_mean_diffs[1]:.4f}, Par 3 Mean Diff: {test_mean_diffs[2]:.4f}')
-    print(f"Final test diffs length: {len(test_diffs_all)}")
+        test_mean_diffs, test_diffs_all, test_predictions, test_y, test_nodes_all = test_diff(val_loader)
+        print(f'Par 1 Mean Diff: {test_mean_diffs[0]:.4f}, Par 2 Mean Diff: {test_mean_diffs[1]:.4f}, Par 3 Mean Diff: {test_mean_diffs[2]:.4f}')
+        print(f"Final test diffs length: {len(test_diffs_all)}")
 
-    # Convert the dictionary to a pandas DataFrame
-    final_differences = pd.DataFrame(test_diffs_all, columns=["lambda_diff", "mu_diff", "cap_diff"])
-    final_predictions = pd.DataFrame(test_predictions, columns=["lambda_pred", "mu_pred", "cap_pred"])
-    final_y = pd.DataFrame(test_y, columns=["lambda", "mu", "cap"])
-    final_differences["nodes"] = test_nodes_all
-    # Save the data to a file using pyreadr
-    pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_diffs_diffpool.rds"), final_differences)
-    pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_predictions_diffpool.rds"), final_predictions)
-    pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_y_diffpool.rds"), final_y)
+        # Convert the dictionary to a pandas DataFrame
+        final_differences = pd.DataFrame(test_diffs_all, columns=["lambda_diff", "mu_diff", "cap_diff"])
+        final_predictions = pd.DataFrame(test_predictions, columns=["lambda_pred", "mu_pred", "cap_pred"])
+        final_y = pd.DataFrame(test_y, columns=["lambda", "mu", "cap"])
+        final_differences["nodes"] = test_nodes_all
+        # Save the data to a file using pyreadr
+        pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_diffs_diffpool_{i}.rds"), final_differences)
+        pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_predictions_diffpool_{i}.rds"), final_predictions)
+        pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_y_diffpool_{i}.rds"), final_y)
 
 
 if __name__ == '__main__':
