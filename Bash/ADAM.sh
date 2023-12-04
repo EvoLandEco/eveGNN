@@ -1115,24 +1115,108 @@ main_menu() {
                                 # Validation logic here based on folder type
                                 case $folder_type in
                                     "Birth-Death")
-                                        echo
-                                        echo -e "${Blue}Performing validation on Birth-Death Trees...${NC}"
-                                        # Logic for Birth-Death Trees
+                                        if [ -e "../Config/bd_val_gnn.yaml" ]; then
+                                          echo -e "${Blue}Performing simple GNN validation on Birth-Death Trees...${NC}"
+                                          sbatch submit_bd_pars_est_val.sh "$name" "BD_VAL_TES"
+                                          sbatch submit_bd_pars_est_val.sh "$name" "BD_VAL_TAS"
+                                        else
+                                          echo
+                                          echo -e "${Red}ERROR: ${NC}Missing configuration file for Birth-Death simple GNN model."
+                                        fi
+                                        if [ -e "../Config/bd_val_diffpool.yaml" ]; then
+                                          echo -e "${Blue}Performing DiffPool validation on Birth-Death Trees...${NC}"
+                                          sbatch submit_bd_pars_est_val_diffpool.sh "$name" "BD_VAL_TES"
+                                          sbatch submit_bd_pars_est_val_diffpool.sh "$name" "BD_VAL_TAS"
+                                        else
+                                          echo
+                                          echo -e "${Red}ERROR: ${NC}Missing configuration file for Birth-Death DiffPool model."
+                                        fi
+                                        if [ -e "../Config/bd_val_gps.yaml" ]; then
+                                          echo -e "${Blue}Performing Graph Transformer validation on Birth-Death Trees...${NC}"
+                                          sbatch submit_bd_pars_est_val_gps.sh "$name" "BD_VAL_TES"
+                                          sbatch submit_bd_pars_est_val_gps.sh "$name" "BD_VAL_TAS"
+                                        else
+                                          echo
+                                          echo -e "${Red}ERROR: ${NC}Missing configuration file for Birth-Death Graph Transformer model."
+                                        fi
                                         ;;
                                     "Diversity-Dependent-Diversification")
-                                        echo
-                                        echo -e "${Blue}Performing validation on Diversity-Dependent-Diversification Trees...${NC}"
-                                        # Logic for Diversity-Dependent-Diversification Trees
+                                        if [ -e "../Config/ddd_val_gnn.yaml" ]; then
+                                          echo -e "${Blue}Performing simple GNN validation on Diversity-Dependent-Diversification Trees...${NC}"
+                                          sbatch submit_ddd_pars_est_val.sh "$name" "DDD_VAL_TES"
+                                          sbatch submit_ddd_pars_est_val.sh "$name" "DDD_VAL_TAS"
+                                        else
+                                          echo
+                                          echo -e "${Red}ERROR: ${NC}Missing configuration file for Diversity-Dependent-Diversification simple GNN model."
+                                        fi
+                                        if [ -e "../Config/ddd_val_diffpool.yaml" ]; then
+                                          echo -e "${Blue}Performing DiffPool validation on Diversity-Dependent-Diversification Trees...${NC}"
+                                          sbatch submit_ddd_pars_est_val_diffpool.sh "$name" "DDD_VAL_TES"
+                                          sbatch submit_ddd_pars_est_val_diffpool.sh "$name" "DDD_VAL_TAS"
+                                        else
+                                          echo
+                                          echo -e "${Red}ERROR: ${NC}Missing configuration file for Diversity-Dependent-Diversification DiffPool model."
+                                        fi
+                                        if [ -e "../Config/ddd_val_gps.yaml" ]; then
+                                          echo -e "${Blue}Performing Graph Transformer validation on Diversity-Dependent-Diversification Trees...${NC}"
+                                          sbatch submit_ddd_pars_est_val_gps.sh "$name" "DDD_VAL_TES"
+                                          sbatch submit_ddd_pars_est_val_gps.sh "$name" "DDD_VAL_TAS"
+                                        else
+                                          echo
+                                          echo -e "${Red}ERROR: ${NC}Missing configuration file for Diversity-Dependent-Diversification Graph Transformer model."
+                                        fi
                                         ;;
                                     "Protracted Birth-Death")
-                                        echo
-                                        echo -e "${Blue}Performing validation on Protracted Birth-Death Trees...${NC}"
-                                        # Logic for Protracted Birth-Death Trees
+                                        if [ -e "../Config/pbd_val_gnn.yaml" ]; then
+                                          echo -e "${Blue}Performing simple GNN validation on Protracted Birth-Death Trees...${NC}"
+                                          sbatch submit_pbd_pars_est_val.sh "$name" "PBD_VAL_TES"
+                                          sbatch submit_pbd_pars_est_val.sh "$name" "PBD_VAL_TAS"
+                                        else
+                                          echo
+                                          echo -e "${Red}ERROR: ${NC}Missing configuration file for Protracted Birth-Death simple GNN model."
+                                        fi
+                                        if [ -e "../Config/pbd_val_diffpool.yaml" ]; then
+                                          echo -e "${Blue}Performing DiffPool validation on Protracted Birth-Death Trees...${NC}"
+                                          sbatch submit_pbd_pars_est_val_diffpool.sh "$name" "PBD_VAL_TES"
+                                          sbatch submit_pbd_pars_est_val_diffpool.sh "$name" "PBD_VAL_TAS"
+                                        else
+                                          echo
+                                          echo -e "${Red}ERROR: ${NC}Missing configuration file for Protracted Birth-Death DiffPool model."
+                                        fi
+                                        if [ -e "../Config/pbd_val_gps.yaml" ]; then
+                                          echo -e "${Blue}Performing Graph Transformer validation on Protracted Birth-Death Trees...${NC}"
+                                          sbatch submit_pbd_pars_est_val_gps.sh "$name" "PBD_VAL_TES"
+                                          sbatch submit_pbd_pars_est_val_gps.sh "$name" "PBD_VAL_TAS"
+                                        else
+                                          echo
+                                          echo -e "${Red}ERROR: ${NC}Missing configuration file for Protracted Birth-Death Graph Transformer model."
+                                        fi
                                         ;;
                                     "Evolutionary-Relatedness-Dependent")
-                                        echo
-                                        echo -e "${Blue}Performing validation on Evolutionary-Relatedness-Dependent Trees...${NC}"
-                                        # Logic for Evolutionary-Relatedness-Dependent Trees
+                                        if [ -e "../Config/eve_val_gnn.yaml" ]; then
+                                          echo -e "${Blue}Performing simple GNN validation on Evolutionary-Relatedness-Dependent Trees...${NC}"
+                                          sbatch submit_eve_pars_est_val.sh "$name" "EVE_VAL_TES"
+                                          sbatch submit_eve_pars_est_val.sh "$name" "EVE_VAL_TAS"
+                                        else
+                                          echo
+                                          echo -e "${Red}ERROR: ${NC}Missing configuration file for Evolutionary-Relatedness-Dependent simple GNN model."
+                                        fi
+                                        if [ -e "../Config/eve_val_diffpool.yaml" ]; then
+                                          echo -e "${Blue}Performing DiffPool validation on Evolutionary-Relatedness-Dependent Trees...${NC}"
+                                          sbatch submit_eve_pars_est_val_diffpool.sh "$name" "EVE_VAL_TES"
+                                          sbatch submit_eve_pars_est_val_diffpool.sh "$name" "EVE_VAL_TAS"
+                                        else
+                                          echo
+                                          echo -e "${Red}ERROR: ${NC}Missing configuration file for Evolutionary-Relatedness-Dependent DiffPool model."
+                                        fi
+                                        if [ -e "../Config/eve_val_gps.yaml" ]; then
+                                          echo -e "${Blue}Performing Graph Transformer validation on Evolutionary-Relatedness-Dependent Trees...${NC}"
+                                          sbatch submit_eve_pars_est_val_gps.sh "$name" "EVE_VAL_TES"
+                                          sbatch submit_eve_pars_est_val_gps.sh "$name" "EVE_VAL_TAS"
+                                        else
+                                          echo
+                                          echo -e "${Red}ERROR: ${NC}Missing configuration file for Evolutionary-Relatedness-Dependent Graph Transformer model."
+                                        fi
                                         ;;
                                 esac
                             done
