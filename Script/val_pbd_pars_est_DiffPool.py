@@ -229,7 +229,7 @@ def read_rds_to_pytorch(path, count):
 
         params_current = params_list[i]
 
-        params_current_tensor = torch.tensor(params_current[0:3], dtype=torch.float)
+        params_current_tensor = torch.tensor(params_current[0:n_predicted_values], dtype=torch.float)
 
         # Create a Data object with the edge index, number of nodes, and category value
         data = Data(x=edge_length_tensor,
