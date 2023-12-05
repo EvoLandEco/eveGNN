@@ -460,6 +460,8 @@ def main():
             data.to(device)
             out, _, _ = model(data.x, data.adj, data.mask)
             diffs = torch.abs(out - data.y.view(data.num_nodes.__len__(), n_predicted_values))
+            print(out.shape)
+            print(data.y.view(data.num_nodes.__len__(), n_predicted_values).shape)
             diffs_all = torch.cat((diffs_all, diffs), dim=0)
             outputs_all = torch.cat((outputs_all, out), dim=0)
             y_all = torch.cat((y_all, data.y.view(data.num_nodes.__len__(), n_predicted_values)), dim=0)
