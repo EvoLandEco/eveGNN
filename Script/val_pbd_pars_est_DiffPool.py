@@ -373,6 +373,41 @@ def main():
     print(f"Max nodes: {max_nodes} for {task_type}")
     validation_dataset = TreeData(root=None, data_list=filtered_validation_data, transform=T.ToDense(max_nodes))
 
+    def shape_check(dataset, max_nodes):
+        incorrect_shapes = []  # List to store indices of data elements with incorrect shapes
+        for i in range(len(dataset)):
+            data = dataset[i]
+            # Check the shapes of data.x, data.adj, and data.mask
+            if data.x.shape != torch.Size([max_nodes, 3]) or \
+                    data.y.shape != torch.Size([n_predicted_values]) or \
+                    data.adj.shape != torch.Size([max_nodes, max_nodes]) or \
+                    data.mask.shape != torch.Size([max_nodes]):
+                incorrect_shapes.append(i)  # Add index to the list if any shape is incorrect
+                print(f"Index: {i}, x shape: {data.x.shape}, y shape: {data.y.shape}")
+
+        # Print the indices of incorrect data elements or a message if all shapes are correct
+        if incorrect_shapes:
+            print(f"Incorrect shapes found at indices: {incorrect_shapes}")
+        else:
+            print("No incorrect shapes found.")
+        return incorrect_shapes
+
+    print("Removing graphs with incorrect shapes...")
+    incorrect_validation_graph = shape_check(validation_dataset, max_nodes)
+
+    if incorrect_validation_graph:
+        # Remove incorrect graphs from validation dataset
+        for index in sorted(incorrect_validation_graph, reverse=True):
+            del filtered_validation_data[index]
+        print(f"Removed {len(incorrect_validation_graph)} graphs from validation dataset.")
+        print("Checking shapes again...")
+        validation_dataset = TreeData(root=None, data_list=filtered_validation_data, transform=T.ToDense(max_nodes))
+        incorrect_validation_graph = shape_check(validation_dataset, max_nodes)
+        if incorrect_validation_graph:
+            raise ValueError("Incorrect shapes found in validation dataset after removing incorrect graphs.")
+        else:
+            print("Successfully removed incorrect shapes in validation dataset.")
+
     class GNN(torch.nn.Module):
         def __init__(self, in_channels, hidden_channels, out_channels,
                      normalize=False, gnn_depth=1):
