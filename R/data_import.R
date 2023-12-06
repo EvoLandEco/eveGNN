@@ -245,3 +245,157 @@ find_unique_combinations <- function(dataset, ...) {
 
   return(unique_combinations)
 }
+
+
+load_performance_data <- function(path, task_type, model_type, max_depth) {
+  performances <- list()
+
+  # construct filenames
+  for (depth in seq_len(max_depth)) {
+    file_name <- paste0(task_type, "_", model_type, "_", depth, ".rds")
+    file_path <- file.path(path, task_type, file_name)
+    performances[[length(performances) + 1]] <- readRDS(file_path)
+  }
+
+  for (i in seq_len(max_depth)) {
+    performances[[i]]$Depth <- i
+    performances[[i]]$Model <- model_type
+    performances[[i]]$Task <- task_type
+  }
+
+  performances <- dplyr::bind_rows(performances)
+  rownames(performances) <- NULL
+  performances$Epoch <- as.integer(performances$Epoch)
+  performances$Depth <- as.integer(performances$Depth)
+  performances <- as.data.frame(performances)
+
+  return(performances)
+}
+
+
+load_final_difference <- function(path, task_type, model_type, max_depth) {
+  final_differences <- list()
+  final_predictions <- list()
+  final_true_values <- list()
+  differences <- list()
+  # construct filenames
+  for (depth in seq_len(max_depth)) {
+      file_name <- paste0(task_type, "_", "final_diffs", "_", model_type, "_", depth, ".rds")
+      file_path <- file.path(path, task_type, file_name)
+      final_differences[[length(final_differences) + 1]] <- readRDS(file_path)
+  }
+  for (depth in seq_len(max_depth)) {
+    file_name <- paste0(task_type, "_", "final_predictions", "_", model_type, "_", depth, ".rds")
+    file_path <- file.path(path, task_type, file_name)
+    final_predictions[[length(final_predictions) + 1]] <- readRDS(file_path)
+  }
+  for (depth in seq_len(max_depth)) {
+    file_name <- paste0(task_type, "_", "final_y", "_", model_type, "_", depth, ".rds")
+    file_path <- file.path(path, task_type, file_name)
+    final_true_values[[length(final_true_values) + 1]] <- readRDS(file_path)
+  }
+
+  for (i in seq_len(max_depth)) {
+    differences[[i]] <- cbind(final_differences[[i]], final_predictions[[i]], final_true_values[[i]])
+    differences[[i]] <- dplyr::mutate_all(differences[[i]], as.numeric)
+    differences[[i]]$Depth <- i
+    differences[[i]]$Model <- model_type
+    differences[[i]]$Task <- task_type
+    differences[[i]] <- as.data.frame(differences[[i]])
+
+    if (task_type != "PBD_FREE_TES" && task_type != "PBD_FREE_TAS" && task_type != "PBD_VAL_TES" && task_type != "PBD_VAL_TAS") {
+      # compute lambda relative difference
+      differences[[i]]$lambda_r_diff <- (differences[[i]]$lambda - differences[[i]]$lambda_pred) / differences[[i]]$lambda * 100
+      # compute mu relative difference
+      differences[[i]]$mu_r_diff <- (differences[[i]]$mu - differences[[i]]$mu_pred) / differences[[i]]$mu * 100
+    }
+
+    if (task_type == "DDD_FREE_TES" || task_type == "DDD_FREE_TAS" || task_type == "DDD_VAL_TES" || task_type == "DDD_VAL_TAS") {
+      # compute cap relative difference
+      differences[[i]]$cap_r_diff <- (differences[[i]]$cap - differences[[i]]$cap_pred) / differences[[i]]$cap * 100
+    }
+
+    if (task_type == "EVE_FREE_TES" || task_type == "EVE_FREE_TAS" || task_type == "EVE_VAL_TES" || task_type == "EVE_VAL_TAS") {
+      # compute beta_n relative difference
+      differences[[i]]$beta_n_r_diff <- (differences[[i]]$beta_n - differences[[i]]$beta_n_pred) / differences[[i]]$beta_n * 100
+      # compute beta_phi relative difference
+      differences[[i]]$beta_phi_r_diff <- (differences[[i]]$beta_phi - differences[[i]]$beta_phi_pred) / differences[[i]]$beta_phi * 100
+    }
+
+    if (task_type == "PBD_FREE_TES" || task_type == "PBD_FREE_TAS" || task_type == "PBD_VAL_TES" || task_type == "PBD_VAL_TAS") {
+      # compute lambda1 relative difference
+      differences[[i]]$lambda1_r_diff <- (differences[[i]]$lambda1 - differences[[i]]$lambda1_pred) / differences[[i]]$lambda1 * 100
+      # compute lambda2 relative difference
+      differences[[i]]$lambda2_r_diff <- (differences[[i]]$lambda2 - differences[[i]]$lambda2_pred) / differences[[i]]$lambda2 * 100
+      # compute lambda3 relative difference
+      differences[[i]]$lambda3_r_diff <- (differences[[i]]$lambda3 - differences[[i]]$lambda3_pred) / differences[[i]]$lambda3 * 100
+      # compute mu1 relative difference
+      differences[[i]]$mu1_r_diff <- (differences[[i]]$mu1 - differences[[i]]$mu1_pred) / differences[[i]]$mu1 * 100
+      # compute mu2 relative difference
+      differences[[i]]$mu2_r_diff <- (differences[[i]]$mu2 - differences[[i]]$mu2_pred) / differences[[i]]$mu2 * 100
+    }
+  }
+
+  differences <- dplyr::bind_rows(differences)
+  rownames(differences) <- NULL
+
+  return(differences)
+}
+
+
+load_full_mle_result <- function(path, task_type, model_type) {
+  # construct filenames
+  file_name <- paste0("mle_diffs", "_", task_type, ".rds")
+  file_path <- file.path(path, task_type, file_name)
+  mle_results <- readRDS(file_path)
+
+  out <- list()
+  for (i in seq_len(length(mle_results))) {
+    r_diffs <- (mle_results[[i]]$true - mle_results[[i]]$mle) / mle_results[[i]]$true * 100
+    out[[i]] <- list(
+      lambda = mle_results[[i]]$true[1],
+      mu = mle_results[[i]]$true[2],
+      lambda_r_diff = r_diffs[1],
+      mu_r_diff = r_diffs[2],
+      num_nodes = mle_results[[i]]$nnode
+    )
+  }
+
+  out <- dplyr::bind_rows(out)
+  out$Model <- model_type
+  out$Task <- task_type
+  out <- as.data.frame(out)
+
+  return(out)
+}
+
+
+#' @export load_separated_mle_result
+load_separated_mle_result <- function(path, task_type, model_type) {
+    # construct filenames
+  mle_list <- list.files(file.path(path, paste0(task_type, "_MLE_TES")), pattern = "^differences_[0-9]+\\.rds$", full.names = TRUE)
+  mle_results <- list()
+  out <- list()
+  for (i in seq_len(length(mle_list))) {
+    mle_results[[i]] <- readRDS(mle_list[i])
+  }
+  for (i in seq_len(length(mle_results))) {
+    r_diffs <- (mle_results[[i]]$true - mle_results[[i]]$mle) / mle_results[[i]]$true * 100
+    out[[i]] <- list(
+      lambda = mle_results[[i]]$true[1],
+      mu = mle_results[[i]]$true[2],
+      cap = mle_results[[i]]$true[3],
+      lambda_r_diff = r_diffs[1],
+      mu_r_diff = r_diffs[2],
+      cap_r_diff = r_diffs[3],
+      num_nodes = mle_results[[i]]$nnode
+    )
+  }
+
+  out <- dplyr::bind_rows(out)
+  out$Model <- model_type
+  out$Task <- paste0(task_type, "_MLE_TES")
+  out <- as.data.frame(out)
+
+  return(out)
+}
