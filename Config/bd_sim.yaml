@@ -15,5 +15,5 @@ within_ranges:
 nrep: 20000
 age: 10
 proportion: 0.1
-nworkers_sim: 4
-nworkers_mle: 16
+nworkers_sim: 3
+nworkers_mle: 6
