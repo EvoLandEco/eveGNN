@@ -31,8 +31,10 @@ test_batch_size = global_params["test_batch_size"]
 gcn_layer1_hidden_channels = global_params["gcn_layer1_hidden_channels"]
 gcn_layer2_hidden_channels = global_params["gcn_layer2_hidden_channels"]
 gcn_layer3_hidden_channels = global_params["gcn_layer3_hidden_channels"]
+gcn_layer4_hidden_channels = global_params["gcn_layer4_hidden_channels"]
 lin_layer1_hidden_channels = global_params["lin_layer1_hidden_channels"]
 lin_layer2_hidden_channels = global_params["lin_layer2_hidden_channels"]
+lin_layer3_hidden_channels = global_params["lin_layer3_hidden_channels"]
 n_predicted_values = global_params["n_predicted_values"]
 batch_size_reduce_factor = global_params["batch_size_reduce_factor"]
 
@@ -410,10 +412,15 @@ def main():
             self.gnn2_pool = GNN(gcn_layer2_hidden_channels, gcn_layer2_hidden_channels, num_nodes)
             self.gnn2_embed = GNN(gcn_layer2_hidden_channels, gcn_layer2_hidden_channels, gcn_layer3_hidden_channels, lin=False)
 
-            self.gnn3_embed = GNN(gcn_layer3_hidden_channels, gcn_layer3_hidden_channels, lin_layer1_hidden_channels, lin=False)
+            num_nodes = ceil(diffpool_ratio * num_nodes)
+            self.gnn3_pool = GNN(gcn_layer3_hidden_channels, gcn_layer3_hidden_channels, num_nodes)
+            self.gnn3_embed = GNN(gcn_layer3_hidden_channels, gcn_layer3_hidden_channels, gcn_layer4_hidden_channels, lin=False)
+
+            self.gnn4_embed = GNN(gcn_layer4_hidden_channels, gcn_layer4_hidden_channels, lin_layer1_hidden_channels, lin=False)
 
             self.lin1 = torch.nn.Linear(lin_layer1_hidden_channels, lin_layer2_hidden_channels)
-            self.lin2 = torch.nn.Linear(lin_layer2_hidden_channels, n_predicted_values)
+            self.lin2 = torch.nn.Linear(lin_layer2_hidden_channels, lin_layer3_hidden_channels)
+            self.lin3 = torch.nn.Linear(lin_layer3_hidden_channels, n_predicted_values)
 
         def forward(self, x, adj, mask=None):
             s = self.gnn1_pool(x, adj, mask)
@@ -426,7 +433,12 @@ def main():
 
             x, adj, l2, e2 = dense_diff_pool(x, adj, s)
 
+            s = self.gnn3_pool(x, adj)
             x = self.gnn3_embed(x, adj)
+
+            x, adj, l3, e3 = dense_diff_pool(x, adj, s)
+
+            x = self.gnn4_embed(x, adj)
 
             x = x.mean(dim=1)
 
@@ -435,6 +447,10 @@ def main():
             x = F.relu(x)
             x = F.dropout(x, p=dropout_ratio, training=self.training)
             x = self.lin2(x)
+            x = F.relu(x)
+            x = F.dropout(x, p=dropout_ratio, training=self.training)
+            x = self.lin3(x)
+
             return x, l1 + l2, e1 + e2
 
     def train():
