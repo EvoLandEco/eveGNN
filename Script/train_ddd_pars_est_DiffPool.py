@@ -438,6 +438,23 @@ def main():
 
             return x, l1 + l2, e1 + e2
 
+    class EarlyStopper:
+        def __init__(self, patience=3, min_delta=0.1):
+            self.patience = patience
+            self.min_delta = min_delta
+            self.counter = 0
+            self.min_validation_loss = float('inf')
+
+        def early_stop(self, validation_loss):
+            if validation_loss < self.min_validation_loss:
+                self.min_validation_loss = validation_loss
+                self.counter = 0
+            elif validation_loss > (self.min_validation_loss + self.min_delta):
+                self.counter += 1
+                if self.counter >= self.patience:
+                    return True
+            return False
+
     def train():
         model.train()
 
@@ -544,7 +561,13 @@ def main():
     if not os.path.exists(test_dir):
         os.makedirs(test_dir)
 
+    # Set up the early stopper
+    early_stopper = EarlyStopper(patience=3, min_delta=0.10)
+    actual_epoch = 0
+
     for epoch in range(1, epoch_number):
+
+        actual_epoch = epoch
         train_loss_all = train()
         test_loss_all = compute_test_loss()
         test_mean_diffs, test_diffs_all, test_predictions, test_y, test_nodes_all = test_diff(test_loader)
@@ -563,6 +586,10 @@ def main():
         print(f"Final y length: {len(final_test_y)}")
         print(f"Final nodes length: {len(final_test_nodes)}")
 
+        if early_stopper.early_stop(test_loss_all):
+            print(f"Early stopping at epoch {epoch}")
+            break
+
     # Save the model
     print(f"Saving model to {os.path.join(name, task_type, f'{task_type}_model_diffpool_{gnn_depth}.pt')}")
     torch.save(model.state_dict(), os.path.join(name, task_type, f"{task_type}_model_diffpool_{gnn_depth}.pt"))
@@ -575,7 +602,7 @@ def main():
         data_dict["lambda_diff"].append(array[0])
         data_dict["mu_diff"].append(array[1])
         data_dict["cap_diff"].append(array[2])
-    data_dict["Epoch"] = list(range(1, epoch_number))
+    data_dict["Epoch"] = list(range(1, actual_epoch + 1))
     data_dict["Train_Loss"] = train_loss_history
     data_dict["Test_Loss"] = test_loss_history
 
