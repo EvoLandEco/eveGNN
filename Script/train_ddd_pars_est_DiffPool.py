@@ -446,10 +446,10 @@ def main():
             self.min_validation_loss = float('inf')
 
         def early_stop(self, validation_loss):
-            if validation_loss < self.min_validation_loss:
+            if self.min_validation_loss - validation_loss >= self.min_delta:
                 self.min_validation_loss = validation_loss
                 self.counter = 0
-            elif validation_loss > (self.min_validation_loss + self.min_delta):
+            else:
                 self.counter += 1
                 if self.counter >= self.patience:
                     return True
@@ -562,14 +562,17 @@ def main():
         os.makedirs(test_dir)
 
     # Set up the early stopper
-    early_stopper = EarlyStopper(patience=3, min_delta=0.10)
+    early_stopper = EarlyStopper(patience=3, min_delta=0.05)
     actual_epoch = 0
+    # The losses are summed over each data point in the batch, thus we should normalize the losses accordingly
+    train_test_ratio = len(train_loader.dataset) / len(test_loader.dataset)
 
     for epoch in range(1, epoch_number):
 
         actual_epoch = epoch
         train_loss_all = train()
         test_loss_all = compute_test_loss()
+        test_loss_all = test_loss_all * train_test_ratio
         test_mean_diffs, test_diffs_all, test_predictions, test_y, test_nodes_all = test_diff(test_loader)
         print(f'Epoch: {epoch:03d}, Par 1 Mean Diff: {test_mean_diffs[0]:.4f}, Par 2 Mean Diff: {test_mean_diffs[1]:.4f}, Par 3 Mean Diff: {test_mean_diffs[2]:.4f}, Train Loss: {train_loss_all:.4f}, Test Loss: {test_loss_all:.4f}')
 
