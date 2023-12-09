@@ -31,10 +31,8 @@ test_batch_size = global_params["test_batch_size"]
 gcn_layer1_hidden_channels = global_params["gcn_layer1_hidden_channels"]
 gcn_layer2_hidden_channels = global_params["gcn_layer2_hidden_channels"]
 gcn_layer3_hidden_channels = global_params["gcn_layer3_hidden_channels"]
-gcn_layer4_hidden_channels = global_params["gcn_layer4_hidden_channels"]
 lin_layer1_hidden_channels = global_params["lin_layer1_hidden_channels"]
 lin_layer2_hidden_channels = global_params["lin_layer2_hidden_channels"]
-lin_layer3_hidden_channels = global_params["lin_layer3_hidden_channels"]
 n_predicted_values = global_params["n_predicted_values"]
 batch_size_reduce_factor = global_params["batch_size_reduce_factor"]
 
@@ -412,15 +410,10 @@ def main():
             self.gnn2_pool = GNN(gcn_layer2_hidden_channels, gcn_layer2_hidden_channels, num_nodes)
             self.gnn2_embed = GNN(gcn_layer2_hidden_channels, gcn_layer2_hidden_channels, gcn_layer3_hidden_channels, lin=False)
 
-            num_nodes = ceil(diffpool_ratio * num_nodes)
-            self.gnn3_pool = GNN(gcn_layer3_hidden_channels, gcn_layer3_hidden_channels, num_nodes)
-            self.gnn3_embed = GNN(gcn_layer3_hidden_channels, gcn_layer3_hidden_channels, gcn_layer4_hidden_channels, lin=False)
-
-            self.gnn4_embed = GNN(gcn_layer4_hidden_channels, gcn_layer4_hidden_channels, lin_layer1_hidden_channels, lin=False)
+            self.gnn3_embed = GNN(gcn_layer3_hidden_channels, gcn_layer3_hidden_channels, lin_layer1_hidden_channels, lin=False)
 
             self.lin1 = torch.nn.Linear(lin_layer1_hidden_channels, lin_layer2_hidden_channels)
-            self.lin2 = torch.nn.Linear(lin_layer2_hidden_channels, lin_layer3_hidden_channels)
-            self.lin3 = torch.nn.Linear(lin_layer3_hidden_channels, n_predicted_values)
+            self.lin2 = torch.nn.Linear(lin_layer2_hidden_channels, n_predicted_values)
 
         def forward(self, x, adj, mask=None):
             s = self.gnn1_pool(x, adj, mask)
@@ -433,12 +426,7 @@ def main():
 
             x, adj, l2, e2 = dense_diff_pool(x, adj, s)
 
-            s = self.gnn3_pool(x, adj)
             x = self.gnn3_embed(x, adj)
-
-            x, adj, l3, e3 = dense_diff_pool(x, adj, s)
-
-            x = self.gnn4_embed(x, adj)
 
             x = x.mean(dim=1)
 
@@ -447,11 +435,8 @@ def main():
             x = F.relu(x)
             x = F.dropout(x, p=dropout_ratio, training=self.training)
             x = self.lin2(x)
-            x = F.relu(x)
-            x = F.dropout(x, p=dropout_ratio, training=self.training)
-            x = self.lin3(x)
 
-            return x, l1 + l2 + l3, e1 + e2 + e3
+            return x, l1 + l2, e1 + e2
 
     def train():
         model.train()
@@ -491,13 +476,13 @@ def main():
         return mean_diffs.cpu().detach().numpy(), diffs_all.cpu().detach().numpy(), outputs_all.cpu().detach().numpy(), y_all.cpu().detach().numpy(), nodes_all.cpu().detach().numpy()
 
     @torch.no_grad()
-    def compute_validation_loss():
+    def compute_test_loss():
         model.eval()  # Set the model to evaluation mode
         loss_all = 0  # Keep track of the loss
         for data in test_loader:
             data.to(device)
-            out, _, _ = model(data.x, data.adj, data.mask)
-            loss = criterion(out, data.y.view(data.num_nodes.__len__(), n_predicted_values))
+            out, l, e = model(data.x, data.adj, data.mask)
+            loss = criterion(out, data.y.view(data.num_nodes.__len__(), n_predicted_values)) + l + e
             loss_all += loss.item() * data.num_nodes.__len__()
 
         return loss_all / len(train_loader.dataset)
@@ -561,7 +546,7 @@ def main():
 
     for epoch in range(1, epoch_number):
         train_loss_all = train()
-        test_loss_all = compute_validation_loss()
+        test_loss_all = compute_test_loss()
         test_mean_diffs, test_diffs_all, test_predictions, test_y, test_nodes_all = test_diff(test_loader)
         print(f'Epoch: {epoch:03d}, Par 1 Mean Diff: {test_mean_diffs[0]:.4f}, Par 2 Mean Diff: {test_mean_diffs[1]:.4f}, Par 3 Mean Diff: {test_mean_diffs[2]:.4f}, Train Loss: {train_loss_all:.4f}, Test Loss: {test_loss_all:.4f}')
 

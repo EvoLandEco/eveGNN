@@ -422,12 +422,12 @@ def main():
             s = self.gnn1_pool(x, adj, mask)
             x = self.gnn1_embed(x, adj, mask)
 
-            x, adj, _, _ = dense_diff_pool(x, adj, s, mask)
+            x, adj, l1, e1 = dense_diff_pool(x, adj, s, mask)
 
             s = self.gnn2_pool(x, adj)
             x = self.gnn2_embed(x, adj)
 
-            x, adj, _, _ = dense_diff_pool(x, adj, s)
+            x, adj, l2, e2 = dense_diff_pool(x, adj, s)
 
             x = self.gnn3_embed(x, adj)
 
@@ -438,7 +438,8 @@ def main():
             x = F.relu(x)
             x = F.dropout(x, p=dropout_ratio, training=self.training)
             x = self.lin2(x)
-            return x
+
+            return x, l1 + l2, e1 + e2
 
     def train():
         model.train()
@@ -447,8 +448,8 @@ def main():
         for data in train_loader:
             data.to(device)
             optimizer.zero_grad()
-            out = model(data.x, data.adj, data.mask)
-            loss = criterion(out, data.y.view(data.num_nodes.__len__(), n_predicted_values))
+            out, l, e = model(data.x, data.adj, data.mask)
+            loss = criterion(out, data.y.view(data.num_nodes.__len__(), n_predicted_values)) + l + e
             loss.backward()
             loss_all += loss.item() * data.num_nodes.__len__()
             optimizer.step()
@@ -478,13 +479,13 @@ def main():
         return mean_diffs.cpu().detach().numpy(), diffs_all.cpu().detach().numpy(), outputs_all.cpu().detach().numpy(), y_all.cpu().detach().numpy(), nodes_all.cpu().detach().numpy()
 
     @torch.no_grad()
-    def compute_validation_loss():
+    def compute_test_loss():
         model.eval()  # Set the model to evaluation mode
         loss_all = 0  # Keep track of the loss
         for data in test_loader:
             data.to(device)
-            out = model(data.x, data.adj, data.mask)
-            loss = criterion(out, data.y.view(data.num_nodes.__len__(), n_predicted_values))
+            out, l, e = model(data.x, data.adj, data.mask)
+            loss = criterion(out, data.y.view(data.num_nodes.__len__(), n_predicted_values)) + l + e
             loss_all += loss.item() * data.num_nodes.__len__()
 
         return loss_all / len(train_loader.dataset)
@@ -552,7 +553,7 @@ def main():
 
     for epoch in range(1, epoch_number):
         train_loss_all = train()
-        test_loss_all = compute_validation_loss()
+        test_loss_all = compute_test_loss()
         test_mean_diffs, test_diffs_all, test_predictions, test_y, test_nodes_all = test_diff(test_loader)
         print(f'Epoch: {epoch:03d}, Par 1 Mean Diff: {test_mean_diffs[0]:.4f}, Par 2 Mean Diff: {test_mean_diffs[1]:.4f}, Train Loss: {train_loss_all:.4f}, Test Loss: {test_loss_all:.4f}')
 
