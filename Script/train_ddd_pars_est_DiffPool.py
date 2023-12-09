@@ -451,7 +451,7 @@ def main():
             x = F.dropout(x, p=dropout_ratio, training=self.training)
             x = self.lin3(x)
 
-            return x, l1 + l2, e1 + e2
+            return x, l1 + l2 + l3, e1 + e2 + e3
 
     def train():
         model.train()
@@ -460,8 +460,8 @@ def main():
         for data in train_loader:
             data.to(device)
             optimizer.zero_grad()
-            out, _, _ = model(data.x, data.adj, data.mask)
-            loss = criterion(out, data.y.view(data.num_nodes.__len__(), n_predicted_values))
+            out, l, e = model(data.x, data.adj, data.mask)
+            loss = criterion(out, data.y.view(data.num_nodes.__len__(), n_predicted_values)) + l + e
             loss.backward()
             loss_all += loss.item() * data.num_nodes.__len__()
             optimizer.step()
