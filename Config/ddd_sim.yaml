@@ -1,12 +1,8 @@
 dists:
 - distribution: uniform
   'n': 1
-  min: 0.5
+  min: 0.1
   max: 1.0
-- distribution: uniform
-  'n': 1
-  min: 0.0
-  max: 0.4
 cap_range:
 - 10
 - 1000
@@ -17,7 +13,7 @@ within_ranges:
   - 0.38
 - - 100.0
   - 900.0
-nrep: 20000
+nrep: 50000
 age: 10
 ddmodel: 1
 proportion: 0.1
