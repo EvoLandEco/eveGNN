@@ -79,13 +79,14 @@ compute_accuracy_dd_ml_fix_lamu <- function(cap_range, data, strategy = "sequent
 #' @export compute_accuracy_dd_ml_free
 compute_accuracy_dd_ml_free <- function(dist_info, cap_range, data, strategy = "sequential", workers = 1) {
   eve:::check_parallel_arguments(strategy, workers)
-  mean_pars <- eveGNN::compute_expected_mean(dist_info)
+  mean_lambda <- eveGNN::compute_expected_mean(dist_info)
+  mean_mu <- mean_lambda * 0.9
   mean_cap <- mean(cap_range)
   diffs <- furrr::future_map(.x = seq_along(data$brts),
                              .f = function(i) {
                                ml <- DDD::dd_ML(
                                  brts = data$brts[[i]],
-                                 initparsopt = c(mean_pars, mean_cap),
+                                 initparsopt = c(mean_lambda, mean_mu, mean_cap),
                                  idparsopt = c(1, 2, 3),
                                  btorph = 0,
                                  soc = 2,
@@ -116,12 +117,13 @@ compute_accuracy_dd_ml_free <- function(dist_info, cap_range, data, strategy = "
 #' @export compute_accuracy_bd_ml_free
 compute_accuracy_bd_ml_free <- function(dist_info, data, strategy = "sequential", workers = 1) {
   eve:::check_parallel_arguments(strategy, workers)
-  mean_pars <- eveGNN::compute_expected_mean(dist_info)
+  mean_lambda <- eveGNN::compute_expected_mean(dist_info)
+  mean_mu <- mean_lambda * 0.9
   diffs <- furrr::future_map(.x = seq_along(data$brts),
                              .f = function(i) {
                                ml <- DDD::bd_ML(
                                  brts = data$brts[[i]],
-                                 initparsopt = c(mean_pars),
+                                 initparsopt = c(mean_lambda, mean_mu),
                                  idparsopt = c(1, 2),
                                  tdmodel = 0,
                                  btorph = 0,
