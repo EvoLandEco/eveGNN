@@ -37,7 +37,9 @@ randomized_ddd_fixed_age <- function(dists, cap_range, age, model) {
 #' @export randomized_bd_fixed_age
 randomized_bd_fixed_age <- function(dists, age) {
   params <- generate_params(dists)
-  tas <- ape::rlineage(birth = params[[1]], death = params[[2]], Tmax = age)
+  lambda <- params[[1]]
+  mu <- runif(1, min = 0, max = 0.9 * lambda)
+  tas <- ape::rlineage(birth = lambda, death = mu, Tmax = age)
   tes <- ape::drop.fossil(tas)
   result <- list()
   result$tas <- tas
