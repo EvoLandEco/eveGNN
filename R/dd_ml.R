@@ -14,9 +14,9 @@ compute_accuracy_dd_ml <- function(dist_info, data, strategy = "sequential", wor
                                    parsfix = data$pars[[i]][3],
                                    btorph = 0,
                                    soc = 2,
-                                   cond = 0,
+                                   cond = 1,
                                    ddmodel = 1,
-                                   num_cycles = 1
+                                   num_cycles = Inf
                                  )
                                },
                                  error = function(e) {
@@ -86,13 +86,13 @@ compute_accuracy_dd_ml_free <- function(dist_info, cap_range, data, strategy = "
                              .f = function(i) {
                                ml <- DDD::dd_ML(
                                  brts = data$brts[[i]],
-                                 initparsopt = c(mean_lambda, mean_mu, mean_cap),
+                                 initparsopt = data$pars[[i]],
                                  idparsopt = c(1, 2, 3),
                                  btorph = 0,
                                  soc = 2,
-                                 cond = 0,
+                                 cond = 1,
                                  ddmodel = 1,
-                                 num_cycles = 1
+                                 num_cycles = Inf
                                )
                                # If an error occurred, ml will be NA and we return NA right away.
                                if (length(ml) == 1 && is.na(ml)) {
@@ -105,6 +105,7 @@ compute_accuracy_dd_ml_free <- function(dist_info, cap_range, data, strategy = "
 
                                # Save the differences to an RDS file with a timestamp-based filename
                                timestamp <- format(Sys.time(), "%Y%m%d%H%M%S")
+                               timestamp <- paste0(timestamp, sample.int(1000, 1))
                                filename <- paste0("differences_", timestamp, ".rds")
                                saveRDS(differences, file = filename)
 
@@ -123,13 +124,13 @@ compute_accuracy_bd_ml_free <- function(dist_info, data, strategy = "sequential"
                              .f = function(i) {
                                ml <- DDD::bd_ML(
                                  brts = data$brts[[i]],
-                                 initparsopt = c(mean_lambda, mean_mu),
+                                 initparsopt = data$pars[[i]],
                                  idparsopt = c(1, 2),
                                  tdmodel = 0,
                                  btorph = 0,
                                  soc = 2,
-                                 cond = 0,
-                                 num_cycles = 1
+                                 cond = 1,
+                                 num_cycles = Inf
                                )
                                # If an error occurred, ml will be NA and we return NA right away.
                                if (length(ml) == 1 && is.na(ml)) {
@@ -142,6 +143,7 @@ compute_accuracy_bd_ml_free <- function(dist_info, data, strategy = "sequential"
 
                                # Save the differences to an RDS file with a timestamp-based filename
                                timestamp <- format(Sys.time(), "%Y%m%d%H%M%S")
+                               timestamp <- paste0(timestamp, sample.int(1000, 1))
                                filename <- paste0("differences_", timestamp, ".rds")
                                saveRDS(differences, file = filename)
 

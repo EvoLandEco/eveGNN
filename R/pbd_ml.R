@@ -5,11 +5,13 @@ compute_accuracy_pbd_ml_free <- function(data, strategy = "sequential", workers 
                              .f = function(i) {
                                ml <- PBD::pbd_ML(
                                  brts = data$brts[[i]],
-                                 idparsopt = c(1, 2, 3),
-                                 exteq = 1,
+                                 # rearrange initparsopt to match the order of the parameters required by pbd_ML
+                                 # (b, mu_1, lambda_1, mu_2)
+                                 initparsopt = c(data$pars[[i]][1], data$pars[[i]][4], data$pars[[i]][2], data$pars[[i]][5]),
+                                 idparsopt = 1:4,
+                                 exteq = 0,
                                  btorph = 0,
                                  soc = 2,
-                                 # cond = 0,
                                  verbose = FALSE
                                )
                                # If an error occurred, ml will be NA and we return NA right away.
@@ -26,6 +28,7 @@ compute_accuracy_pbd_ml_free <- function(data, strategy = "sequential", workers 
 
                                # Save the differences to an RDS file with a timestamp-based filename
                                timestamp <- format(Sys.time(), "%Y%m%d%H%M%S")
+                               timestamp <- paste0(timestamp, sample.int(1000, 1))
                                filename <- paste0("differences_", timestamp, ".rds")
                                saveRDS(differences, file = filename)
 

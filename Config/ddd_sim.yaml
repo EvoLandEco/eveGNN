@@ -14,7 +14,7 @@ within_ranges:
 - - 200.0
   - 800.0
 nrep: 60000
-age: 10
+age: 8
 ddmodel: 1
 proportion: 0.1
 nworkers_sim: 4

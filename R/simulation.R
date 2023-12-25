@@ -47,6 +47,7 @@ randomized_bd_fixed_age <- function(dists, age) {
   result$brts <- treestats::branching_times(tes)
   result$age <- age
   result$model <- "BD"
+  params <- c(lambda, mu)
   result$pars <- params
 
   return(result)

@@ -306,33 +306,57 @@ load_final_difference <- function(path, task_type, model_type, max_depth) {
     if (task_type != "PBD_FREE_TES" && task_type != "PBD_FREE_TAS" && task_type != "PBD_VAL_TES" && task_type != "PBD_VAL_TAS") {
       # compute lambda relative difference
       differences[[i]]$lambda_r_diff <- (differences[[i]]$lambda - differences[[i]]$lambda_pred) / differences[[i]]$lambda * 100
+      # compute lambda absolute difference
+      differences[[i]]$lambda_a_diff <- differences[[i]]$lambda - differences[[i]]$lambda_pred
       # compute mu relative difference
       differences[[i]]$mu_r_diff <- (differences[[i]]$mu - differences[[i]]$mu_pred) / differences[[i]]$mu * 100
+      # compute mu absolute difference
+      differences[[i]]$mu_a_diff <- differences[[i]]$mu - differences[[i]]$mu_pred
     }
 
     if (task_type == "DDD_FREE_TES" || task_type == "DDD_FREE_TAS" || task_type == "DDD_VAL_TES" || task_type == "DDD_VAL_TAS") {
+      # multiply cap by 1000
+      differences[[i]]$cap <- differences[[i]]$cap * 1000
+      # multiply cap_pred by 1000
+      differences[[i]]$cap_pred <- differences[[i]]$cap_pred * 1000
       # compute cap relative difference
       differences[[i]]$cap_r_diff <- (differences[[i]]$cap - differences[[i]]$cap_pred) / differences[[i]]$cap * 100
+      # compute cap absolute difference
+      differences[[i]]$cap_a_diff <- differences[[i]]$cap - differences[[i]]$cap_pred
     }
 
     if (task_type == "EVE_FREE_TES" || task_type == "EVE_FREE_TAS" || task_type == "EVE_VAL_TES" || task_type == "EVE_VAL_TAS") {
       # compute beta_n relative difference
       differences[[i]]$beta_n_r_diff <- (differences[[i]]$beta_n - differences[[i]]$beta_n_pred) / differences[[i]]$beta_n * 100
+      # compute beta_n absolute difference
+      differences[[i]]$beta_n_a_diff <- differences[[i]]$beta_n - differences[[i]]$beta_n_pred
       # compute beta_phi relative difference
       differences[[i]]$beta_phi_r_diff <- (differences[[i]]$beta_phi - differences[[i]]$beta_phi_pred) / differences[[i]]$beta_phi * 100
+      # compute beta_phi absolute difference
+      differences[[i]]$beta_phi_a_diff <- differences[[i]]$beta_phi - differences[[i]]$beta_phi_pred
     }
 
     if (task_type == "PBD_FREE_TES" || task_type == "PBD_FREE_TAS" || task_type == "PBD_VAL_TES" || task_type == "PBD_VAL_TAS") {
       # compute lambda1 relative difference
       differences[[i]]$lambda1_r_diff <- (differences[[i]]$lambda1 - differences[[i]]$lambda1_pred) / differences[[i]]$lambda1 * 100
+      # compute lambda1 absolute difference
+      differences[[i]]$lambda1_a_diff <- differences[[i]]$lambda1 - differences[[i]]$lambda1_pred
       # compute lambda2 relative difference
       differences[[i]]$lambda2_r_diff <- (differences[[i]]$lambda2 - differences[[i]]$lambda2_pred) / differences[[i]]$lambda2 * 100
+      # compute lambda2 absolute difference
+      differences[[i]]$lambda2_a_diff <- differences[[i]]$lambda2 - differences[[i]]$lambda2_pred
       # compute lambda3 relative difference
       differences[[i]]$lambda3_r_diff <- (differences[[i]]$lambda3 - differences[[i]]$lambda3_pred) / differences[[i]]$lambda3 * 100
+      # compute lambda3 absolute difference
+      differences[[i]]$lambda3_a_diff <- differences[[i]]$lambda3 - differences[[i]]$lambda3_pred
       # compute mu1 relative difference
       differences[[i]]$mu1_r_diff <- (differences[[i]]$mu1 - differences[[i]]$mu1_pred) / differences[[i]]$mu1 * 100
+      # compute mu1 absolute difference
+      differences[[i]]$mu1_a_diff <- differences[[i]]$mu1 - differences[[i]]$mu1_pred
       # compute mu2 relative difference
       differences[[i]]$mu2_r_diff <- (differences[[i]]$mu2 - differences[[i]]$mu2_pred) / differences[[i]]$mu2 * 100
+      # compute mu2 absolute difference
+      differences[[i]]$mu2_a_diff <- differences[[i]]$mu2 - differences[[i]]$mu2_pred
     }
   }
 
