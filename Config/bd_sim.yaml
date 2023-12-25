@@ -4,10 +4,10 @@ dists:
   min: 0.1
   max: 0.6
 within_ranges:
-- - 0.20
-  - 0.50
-- - 0.09
-  - 0.36
+- - 0.18
+  - 0.52
+- - 0.08
+  - 0.46
 nrep: 60000
 age: 8
 proportion: 0.1
