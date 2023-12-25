@@ -484,7 +484,7 @@ def main():
             xre = F.dropout(xre, p=dropout_ratio, training=self.training)
             xre = self.lin2(xre)
 
-            return xre
+            return xre, l1 + l2, e1 + e2
 
     def train():
         model.train()
@@ -494,11 +494,11 @@ def main():
         for data in train_loader:
             data.to(device)
             optimizer.zero_grad()
-            out_re = model(data.x, data.adj, data.mask)
+            out_re, l, e = model(data.x, data.adj, data.mask)
             target_re = data.y.view(data.num_nodes.__len__(), n_predicted_values).to(device)
             assert out_re.device == target_re.device, \
                 "Error: Device mismatch between output and target tensors."
-            loss = F.mse_loss(out_re, target_re)
+            loss = F.mse_loss(out_re, target_re) + l + e
             loss.backward()
             loss_all += loss.item() * data.num_nodes.__len__()
             optimizer.step()
@@ -518,7 +518,7 @@ def main():
 
         for data in loader:
             data.to(device)
-            out_re = model(data.x, data.adj, data.mask)
+            out_re, _, _ = model(data.x, data.adj, data.mask)
             diffs = torch.abs(out_re - data.y.view(data.num_nodes.__len__(), n_predicted_values))
             diffs_all = torch.cat((diffs_all, diffs), dim=0)
             outputs_all = torch.cat((outputs_all, out_re), dim=0)  # Concatenate the outputs

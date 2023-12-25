@@ -467,7 +467,7 @@ def main():
 
         for data in loader:
             data.to(device)
-            out = model(data.x, data.adj, data.mask)
+            out, _, _ = model(data.x, data.adj, data.mask)
             diffs = torch.abs(out - data.y.view(data.num_nodes.__len__(), n_predicted_values))
             diffs_all = torch.cat((diffs_all, diffs), dim=0)
             outputs_all = torch.cat((outputs_all, out), dim=0)
