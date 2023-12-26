@@ -37,6 +37,7 @@ lin_layer1_hidden_channels = global_params["lin_layer1_hidden_channels"]
 lin_layer2_hidden_channels = global_params["lin_layer2_hidden_channels"]
 n_predicted_values = global_params["n_predicted_values"]
 batch_size_reduce_factor = global_params["batch_size_reduce_factor"]
+max_nodes_limit = global_params["max_nodes_limit"]
 
 # Check if metric_to_category is a dictionary with string keys and integer values
 assert isinstance(metric_to_category, dict), "metric_to_category should be a dictionary"
@@ -399,6 +400,11 @@ def main():
     filtered_testing_data = [data for data in sum_testing_data if data.edge_index.shape != torch.Size([2, 2])]
     filtered_validation_data = [data for data in sum_validation_data if data.edge_index.shape != torch.Size([2, 2])]
 
+    # Filtering out trees with more than 3000 nodes
+    filtered_training_data = [data for data in filtered_training_data if data.num_nodes <= max_nodes_limit]
+    filtered_testing_data = [data for data in filtered_testing_data if data.num_nodes <= max_nodes_limit]
+    filtered_validation_data = [data for data in filtered_validation_data if data.num_nodes <= max_nodes_limit]
+
     class TreeData(InMemoryDataset):
         def __init__(self, root, data_list, transform=None, pre_transform=None):
             super(TreeData, self).__init__(root, transform, pre_transform)
@@ -494,11 +500,11 @@ def main():
         for data in train_loader:
             data.to(device)
             optimizer.zero_grad()
-            out_re, l, e = model(data.x, data.adj, data.mask)
+            out_re, _, _ = model(data.x, data.adj, data.mask)
             target_re = data.y.view(data.num_nodes.__len__(), n_predicted_values).to(device)
             assert out_re.device == target_re.device, \
                 "Error: Device mismatch between output and target tensors."
-            loss = F.mse_loss(out_re, target_re) + l + e
+            loss = F.mse_loss(out_re, target_re)
             loss.backward()
             loss_all += loss.item() * data.num_nodes.__len__()
             optimizer.step()
@@ -529,6 +535,19 @@ def main():
         mean_diffs = torch.sum(diffs_all, dim=0) / len(test_loader.dataset)
 
         return mean_diffs.cpu().detach().numpy(), diffs_all.cpu().detach().numpy(), outputs_all.cpu().detach().numpy(), y_all.cpu().detach().numpy(), nodes_all.cpu().detach().numpy()
+
+    @torch.no_grad()
+    def compute_test_loss():
+        model.eval()  # Set the model to evaluation mode
+        loss_all = 0  # Keep track of the loss
+        for data in test_loader:
+            data.to(device)
+            out_re, _, _ = model(data.x, data.adj, data.mask)
+            target_re = data.y.view(data.num_nodes.__len__(), n_predicted_values).to(device)
+            loss = F.mse_loss(out_re, target_re)
+            loss_all += loss.item() * data.num_nodes.__len__()
+
+        return loss_all / len(train_loader.dataset)
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Training using {device}")
@@ -569,7 +588,8 @@ def main():
 
     print(model)
 
-    train_loss_all_history = []
+    train_loss_history = []
+    test_loss_history = []
     test_mean_diffs_history = []
     final_test_diffs = []
     final_test_predictions = []
@@ -586,17 +606,22 @@ def main():
     if not os.path.exists(test_dir):
         os.makedirs(test_dir)
 
+    train_test_ratio = len(train_loader.dataset) / len(test_loader.dataset)
+
     # Training loop
     for epoch in range(1, epoch_number):
         train_loss_all = train()
+        test_loss_all = compute_test_loss()
+        test_loss_all = test_loss_all * train_test_ratio
         test_mean_diffs, test_diffs_all, test_predictions, test_y, test_nodes_all = test_diff(test_loader)
         test_mean_diffs[2] = test_mean_diffs[2] / beta_n_norm_factor
         test_mean_diffs[3] = test_mean_diffs[3] / beta_phi_norm_factor
         print(f'Epoch: {epoch:03d}, Par 1 Mean Diff: {test_mean_diffs[0]:.4f}, Par 2 Mean Diff: {test_mean_diffs[1]:.4f}, Par 3 Mean Diff: {test_mean_diffs[2]:.4f}, Par 4 Mean Diff: {test_mean_diffs[3]:.4f}')
-        print(f'Epoch: {epoch:03d}, Training Loss: {train_loss_all:.4f}')
+        print(f'Epoch: {epoch:03d}, Training Loss: {train_loss_all:.4f}, Testing Loss: {test_loss_all:.4f}')
 
         # Record the values
-        train_loss_all_history.append(train_loss_all)
+        train_loss_history.append(train_loss_all)
+        test_loss_history.append(test_loss_all)
         test_mean_diffs_history.append(test_mean_diffs)
         final_test_diffs = test_diffs_all
         final_test_predictions = test_predictions
@@ -638,7 +663,8 @@ def main():
 
     # Similarly, ensure that the other lists are on the CPU before assigning to the dictionary
     data_dict["Epoch"] = list(range(1, epoch_number))
-    data_dict["Train_Loss_All"] = [move_to_cpu(item, var_name="Train_Loss_All") for item in train_loss_all_history]
+    data_dict["Train_Loss_All"] = [move_to_cpu(item, var_name="Train_Loss_All") for item in train_loss_history]
+    data_dict["Test_Loss_All"] = [move_to_cpu(item, var_name="Test_Loss_All") for item in test_loss_history]
 
     def check_col_lengths(data_dict):
         # Get the lengths of all columns

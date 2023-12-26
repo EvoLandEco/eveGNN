@@ -38,6 +38,7 @@ lin_layer1_hidden_channels = global_params["lin_layer1_hidden_channels"]
 lin_layer2_hidden_channels = global_params["lin_layer2_hidden_channels"]
 n_predicted_values = global_params["n_predicted_values"]
 batch_size_reduce_factor = global_params["batch_size_reduce_factor"]
+max_nodes_limit = global_params["max_nodes_limit"]
 
 # Set global variables from training configuration
 max_gnn_depth = int(global_params_train["max_gnn_depth"])
@@ -350,6 +351,11 @@ def main():
     filtered_training_data = [data for data in sum_training_data if data.edge_index.shape != torch.Size([2, 2])]
     filtered_testing_data = [data for data in sum_testing_data if data.edge_index.shape != torch.Size([2, 2])]
     filtered_validation_data = [data for data in sum_validation_data if data.edge_index.shape != torch.Size([2, 2])]
+
+    # Filtering out trees with more than 3000 nodes
+    filtered_training_data = [data for data in filtered_training_data if data.num_nodes <= max_nodes_limit]
+    filtered_testing_data = [data for data in filtered_testing_data if data.num_nodes <= max_nodes_limit]
+    filtered_validation_data = [data for data in filtered_validation_data if data.num_nodes <= max_nodes_limit]
 
     class TreeData(InMemoryDataset):
         def __init__(self, root, data_list, transform=None, pre_transform=None):

@@ -35,6 +35,7 @@ lin_layer1_hidden_channels = global_params["lin_layer1_hidden_channels"]
 lin_layer2_hidden_channels = global_params["lin_layer2_hidden_channels"]
 n_predicted_values = global_params["n_predicted_values"]
 batch_size_reduce_factor = global_params["batch_size_reduce_factor"]
+max_nodes_limit = global_params["max_nodes_limit"]
 
 
 def read_table(path):
@@ -343,6 +344,11 @@ def main():
     filtered_testing_data = [data for data in sum_testing_data if data.edge_index.shape != torch.Size([2, 2])]
     filtered_validation_data = [data for data in sum_validation_data if data.edge_index.shape != torch.Size([2, 2])]
 
+    # Filtering out trees with more than 3000 nodes
+    filtered_training_data = [data for data in filtered_training_data if data.num_nodes <= max_nodes_limit]
+    filtered_testing_data = [data for data in filtered_testing_data if data.num_nodes <= max_nodes_limit]
+    filtered_validation_data = [data for data in filtered_validation_data if data.num_nodes <= max_nodes_limit]
+
     class TreeData(InMemoryDataset):
         def __init__(self, root, data_list, transform=None, pre_transform=None):
             super(TreeData, self).__init__(root, transform, pre_transform)
@@ -462,8 +468,8 @@ def main():
         for data in train_loader:
             data.to(device)
             optimizer.zero_grad()
-            out, l, e = model(data.x, data.adj, data.mask)
-            loss = criterion(out, data.y.view(data.num_nodes.__len__(), n_predicted_values)) + l + e
+            out, _, _ = model(data.x, data.adj, data.mask)
+            loss = criterion(out, data.y.view(data.num_nodes.__len__(), n_predicted_values))
             loss.backward()
             loss_all += loss.item() * data.num_nodes.__len__()
             optimizer.step()
@@ -498,8 +504,8 @@ def main():
         loss_all = 0  # Keep track of the loss
         for data in test_loader:
             data.to(device)
-            out, l, e = model(data.x, data.adj, data.mask)
-            loss = criterion(out, data.y.view(data.num_nodes.__len__(), n_predicted_values)) + l + e
+            out, _, _ = model(data.x, data.adj, data.mask)
+            loss = criterion(out, data.y.view(data.num_nodes.__len__(), n_predicted_values))
             loss_all += loss.item() * data.num_nodes.__len__()
 
         return loss_all / len(train_loader.dataset)
@@ -562,18 +568,19 @@ def main():
         os.makedirs(test_dir)
 
     # Set up the early stopper
-    early_stopper = EarlyStopper(patience=3, min_delta=0.05)
-    actual_epoch = 0
+    # early_stopper = EarlyStopper(patience=3, min_delta=0.05)
+    # actual_epoch = 0
     # The losses are summed over each data point in the batch, thus we should normalize the losses accordingly
     train_test_ratio = len(train_loader.dataset) / len(test_loader.dataset)
 
     for epoch in range(1, epoch_number):
 
-        actual_epoch = epoch
+        # actual_epoch = epoch
         train_loss_all = train()
         test_loss_all = compute_test_loss()
         test_loss_all = test_loss_all * train_test_ratio
         test_mean_diffs, test_diffs_all, test_predictions, test_y, test_nodes_all = test_diff(test_loader)
+        test_mean_diffs[2] = test_mean_diffs[2] * cap_norm_factor
         print(f'Epoch: {epoch:03d}, Par 1 Mean Diff: {test_mean_diffs[0]:.4f}, Par 2 Mean Diff: {test_mean_diffs[1]:.4f}, Par 3 Mean Diff: {test_mean_diffs[2]:.4f}, Train Loss: {train_loss_all:.4f}, Test Loss: {test_loss_all:.4f}')
 
         # Record the values
@@ -589,9 +596,9 @@ def main():
         print(f"Final y length: {len(final_test_y)}")
         print(f"Final nodes length: {len(final_test_nodes)}")
 
-        if early_stopper.early_stop(test_loss_all):
-            print(f"Early stopping at epoch {epoch}")
-            break
+        #  if early_stopper.early_stop(test_loss_all):
+        #      print(f"Early stopping at epoch {epoch}")
+        #      break
 
     # Save the model
     print(f"Saving model to {os.path.join(name, task_type, f'{task_type}_model_diffpool_{gnn_depth}.pt')}")
