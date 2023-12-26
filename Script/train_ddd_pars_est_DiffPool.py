@@ -569,13 +569,13 @@ def main():
 
     # Set up the early stopper
     # early_stopper = EarlyStopper(patience=3, min_delta=0.05)
-    # actual_epoch = 0
+    actual_epoch = 0
     # The losses are summed over each data point in the batch, thus we should normalize the losses accordingly
     train_test_ratio = len(train_loader.dataset) / len(test_loader.dataset)
 
     for epoch in range(1, epoch_number):
 
-        # actual_epoch = epoch
+        actual_epoch = epoch
         train_loss_all = train()
         test_loss_all = compute_test_loss()
         test_loss_all = test_loss_all * train_test_ratio
