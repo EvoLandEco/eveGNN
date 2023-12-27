@@ -17,5 +17,5 @@ nrep: 60000
 age: 10
 ddmodel: 1
 proportion: 0.1
-nworkers_sim: 4
-nworkers_mle: 16
+nworkers_sim: 6
+nworkers_mle: 32
