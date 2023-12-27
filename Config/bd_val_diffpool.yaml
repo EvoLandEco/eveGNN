@@ -8,6 +8,6 @@ gcn_layer3_hidden_channels: 64
 learning_rate: 0.001
 lin_layer1_hidden_channels: 64
 lin_layer2_hidden_channels: 32
-max_nodes_limit: 3000
+max_nodes_limit: 2500
 n_predicted_values: 2
 val_batch_size: 64
