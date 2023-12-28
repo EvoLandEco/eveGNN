@@ -207,10 +207,6 @@ def read_rds_to_pytorch(path, count):
         params = get_params(filename)
         params_list.append(params)
 
-    # Normalize carrying capacity by dividing by 1000
-    for vector in params_list:
-        vector[2] = vector[2] / 1000
-
     check_list_count(count, data_list, length_list, params_list)
 
     # List to hold the Data objects
