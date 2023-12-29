@@ -511,9 +511,6 @@ def main():
                     data.mask.shape != torch.Size([max_nodes]):
                 incorrect_shapes.append(i)  # Add index to the list if any shape is incorrect
                 print(f"Index: {i}, x shape: {data.x.shape}, y shape: {data.y.shape}")
-                export_data = data.x.numpy()
-                export_df = pd.DataFrame(export_data, columns=["x1", "x2", "x3"])
-                pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_incorrect_shapes_{gnn_depth}_{i}.rds"), export_df)
 
         # Print the indices of incorrect data elements or a message if all shapes are correct
         if incorrect_shapes:
