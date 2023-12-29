@@ -367,6 +367,90 @@ load_final_difference <- function(path, task_type, model_type, max_depth) {
 }
 
 
+load_final_difference_by_layer <- function(path, task_type, model_type, depth) {
+  # construct filenames
+  file_name <- paste0(task_type, "_", "final_diffs", "_", model_type, "_", depth, ".rds")
+  file_path <- file.path(path, task_type, file_name)
+  final_difference <- readRDS(file_path)
+
+  file_name <- paste0(task_type, "_", "final_predictions", "_", model_type, "_", depth, ".rds")
+  file_path <- file.path(path, task_type, file_name)
+  final_prediction <- readRDS(file_path)
+
+
+  file_name <- paste0(task_type, "_", "final_y", "_", model_type, "_", depth, ".rds")
+  file_path <- file.path(path, task_type, file_name)
+  final_true_value <- readRDS(file_path)
+
+  differences <- cbind(final_difference, final_prediction, final_true_value)
+  differences <- dplyr::mutate_all(differences, as.numeric)
+  differences$Depth <- depth
+  differences$Model <- model_type
+  differences$Task <- task_type
+  differences <- as.data.frame(differences)
+
+  if (task_type != "PBD_FREE_TES" && task_type != "PBD_FREE_TAS" && task_type != "PBD_VAL_TES" && task_type != "PBD_VAL_TAS") {
+    # compute lambda relative difference
+    differences$lambda_r_diff <- (differences$lambda - differences$lambda_pred) / differences$lambda * 100
+    # compute lambda absolute difference
+    differences$lambda_a_diff <- differences$lambda - differences$lambda_pred
+    # compute mu relative difference
+    differences$mu_r_diff <- (differences$mu - differences$mu_pred) / differences$mu * 100
+    # compute mu absolute difference
+    differences$mu_a_diff <- differences$mu - differences$mu_pred
+  }
+
+  if (task_type == "DDD_FREE_TES" || task_type == "DDD_FREE_TAS" || task_type == "DDD_VAL_TES" || task_type == "DDD_VAL_TAS") {
+    # multiply cap by 1000
+    differences$cap <- differences$cap * 1000
+    # multiply cap_pred by 1000
+    differences$cap_pred <- differences$cap_pred * 1000
+    # compute cap relative difference
+    differences$cap_r_diff <- (differences$cap - differences$cap_pred) / differences$cap * 100
+    # compute cap absolute difference
+    differences$cap_a_diff <- differences$cap - differences$cap_pred
+  }
+
+  if (task_type == "EVE_FREE_TES" || task_type == "EVE_FREE_TAS" || task_type == "EVE_VAL_TES" || task_type == "EVE_VAL_TAS") {
+    # compute beta_n relative difference
+    differences$beta_n_r_diff <- (differences$beta_n - differences$beta_n_pred) / differences$beta_n * 100
+    # compute beta_n absolute difference
+    differences$beta_n_a_diff <- differences$beta_n - differences$beta_n_pred
+    # compute beta_phi relative difference
+    differences$beta_phi_r_diff <- (differences$beta_phi - differences$beta_phi_pred) / differences$beta_phi * 100
+    # compute beta_phi absolute difference
+    differences$beta_phi_a_diff <- differences$beta_phi - differences$beta_phi_pred
+  }
+
+  if (task_type == "PBD_FREE_TES" || task_type == "PBD_FREE_TAS" || task_type == "PBD_VAL_TES" || task_type == "PBD_VAL_TAS") {
+    # compute lambda1 relative difference
+    differences$lambda1_r_diff <- (differences$lambda1 - differences$lambda1_pred) / differences$lambda1 * 100
+    # compute lambda1 absolute difference
+    differences$lambda1_a_diff <- differences$lambda1 - differences$lambda1_pred
+    # compute lambda2 relative difference
+    differences$lambda2_r_diff <- (differences$lambda2 - differences$lambda2_pred) / differences$lambda2 * 100
+    # compute lambda2 absolute difference
+    differences$lambda2_a_diff <- differences$lambda2 - differences$lambda2_pred
+    # compute lambda3 relative difference
+    differences$lambda3_r_diff <- (differences$lambda3 - differences$lambda3_pred) / differences$lambda3 * 100
+    # compute lambda3 absolute difference
+    differences$lambda3_a_diff <- differences$lambda3 - differences$lambda3_pred
+    # compute mu1 relative difference
+    differences$mu1_r_diff <- (differences$mu1 - differences$mu1_pred) / differences$mu1 * 100
+    # compute mu1 absolute difference
+    differences$mu1_a_diff <- differences$mu1 - differences$mu1_pred
+    # compute mu2 relative difference
+    differences$mu2_r_diff <- (differences$mu2 - differences$mu2_pred) / differences$mu2 * 100
+    # compute mu2 absolute difference
+    differences$mu2_a_diff <- differences$mu2 - differences$mu2_pred
+  }
+
+  rownames(differences) <- NULL
+
+  return(differences)
+}
+
+
 load_full_mle_result <- function(path, task_type, model_type) {
   # construct filenames
   file_name <- paste0("mle_diffs", "_", task_type, ".rds")
@@ -403,17 +487,50 @@ load_separated_mle_result <- function(path, task_type, model_type) {
   for (i in seq_len(length(mle_list))) {
     mle_results[[i]] <- readRDS(mle_list[i])
   }
-  for (i in seq_len(length(mle_results))) {
-    r_diffs <- (mle_results[[i]]$true - mle_results[[i]]$mle) / mle_results[[i]]$true * 100
-    out[[i]] <- list(
-      lambda = mle_results[[i]]$true[1],
-      mu = mle_results[[i]]$true[2],
-      cap = mle_results[[i]]$true[3],
-      lambda_r_diff = r_diffs[1],
-      mu_r_diff = r_diffs[2],
-      cap_r_diff = r_diffs[3],
-      num_nodes = mle_results[[i]]$nnode
-    )
+  if (task_type == "DDD") {
+    for (i in seq_len(length(mle_results))) {
+      r_diffs <- (mle_results[[i]]$true - mle_results[[i]]$mle) / mle_results[[i]]$true * 100
+      a_diffs <- mle_results[[i]]$true - mle_results[[i]]$mle
+      out[[i]] <- list(
+        lambda = mle_results[[i]]$true[1],
+        mu = mle_results[[i]]$true[2],
+        cap = mle_results[[i]]$true[3],
+        lambda_r_diff = r_diffs[1],
+        mu_r_diff = r_diffs[2],
+        cap_r_diff = r_diffs[3],
+        lambda_a_diff = a_diffs[1],
+        mu_a_diff = a_diffs[2],
+        cap_a_diff = a_diffs[3],
+        num_nodes = mle_results[[i]]$nnode
+      )
+    }
+  } else if (task_type == "PBD") {
+    for (i in seq_len(length(mle_results))) {
+      r_diffs <- (mle_results[[i]]$true - mle_results[[i]]$mle) / mle_results[[i]]$true * 100
+      a_diffs <- mle_results[[i]]$true - mle_results[[i]]$mle
+      out[[i]] <- list(
+        lambda1 = mle_results[[i]]$true[1],
+        lambda2 = mle_results[[i]]$true[2],
+        lambda3 = mle_results[[i]]$true[3],
+        mu1 = mle_results[[i]]$true[4],
+        mu2 = mle_results[[i]]$true[5],
+        lambda1_r_diff = r_diffs[1],
+        lambda2_r_diff = r_diffs[2],
+        lambda3_r_diff = r_diffs[3],
+        mu1_r_diff = r_diffs[4],
+        mu2_r_diff = r_diffs[5],
+        lambda1_a_diff = a_diffs[1],
+        lambda2_a_diff = a_diffs[2],
+        lambda3_a_diff = a_diffs[3],
+        mu1_a_diff = a_diffs[4],
+        mu2_a_diff = a_diffs[5],
+        num_nodes = mle_results[[i]]$nnode
+      )
+    }
+  } else if (task_type == "EVE") {
+    stop("Not implemented yet.")
+  } else {
+    stop("Unknown task type: ", task_type)
   }
 
   out <- dplyr::bind_rows(out)
