@@ -92,7 +92,7 @@ compute_accuracy_dd_ml_free <- function(dist_info, cap_range, data, strategy = "
                                  soc = 2,
                                  cond = 1,
                                  ddmodel = 1,
-                                 num_cycles = Inf
+                                 num_cycles = 3
                                )
                                # If an error occurred, ml will be NA and we return NA right away.
                                if (length(ml) == 1 && is.na(ml)) {
