@@ -25,6 +25,7 @@ compute_accuracy_pbd_ml_free <- function(data, strategy = "sequential", workers 
                                                  as.numeric(ml$mu_1),
                                                  as.numeric(ml$mu_2))
                                differences <- eveGNN::all_differences(reordered_ml, data$pars[[i]])
+                               differences$nnode <- data$tes[[i]]$Nnode
 
                                # Save the differences to an RDS file with a timestamp-based filename
                                timestamp <- format(Sys.time(), "%Y%m%d%H%M%S")
