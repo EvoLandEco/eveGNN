@@ -398,6 +398,20 @@ load_final_difference_by_layer <- function(path, task_type, model_type, depth) {
     differences$mu_r_diff <- (differences$mu - differences$mu_pred) / differences$mu * 100
     # compute mu absolute difference
     differences$mu_a_diff <- differences$mu - differences$mu_pred
+
+    # correct bias
+    cor_coef <- correct_bias_coef(differences, task = "BD")
+    differences$lambda_pred_corrected <- differences$lambda_pred + differences$lambda * cor_coef$lambda[2] + cor_coef$lambda[1]
+    differences$mu_pred_corrected <- differences$mu_pred + differences$mu * cor_coef$mu[2] + cor_coef$mu[1]
+
+    # compute corrected lambda relative difference
+    differences$lambda_r_diff_corrected <- (differences$lambda - differences$lambda_pred_corrected) / differences$lambda * 100
+    # compute corrected lambda absolute difference
+    differences$lambda_a_diff_corrected <- differences$lambda - differences$lambda_pred_corrected
+    # compute corrected mu relative difference
+    differences$mu_r_diff_corrected <- (differences$mu - differences$mu_pred_corrected) / differences$mu * 100
+    # compute corrected mu absolute difference
+    differences$mu_a_diff_corrected <- differences$mu - differences$mu_pred_corrected
   }
 
   if (task_type == "DDD_FREE_TES" || task_type == "DDD_FREE_TAS" || task_type == "DDD_VAL_TES" || task_type == "DDD_VAL_TAS") {
@@ -409,9 +423,19 @@ load_final_difference_by_layer <- function(path, task_type, model_type, depth) {
     differences$cap_r_diff <- (differences$cap - differences$cap_pred) / differences$cap * 100
     # compute cap absolute difference
     differences$cap_a_diff <- differences$cap - differences$cap_pred
+
+    # correct bias
+    cor_coef <- correct_bias_coef(differences, task = "DDD")
+    differences$cap_pred_corrected <- differences$cap_pred + differences$cap * cor_coef$cap[2] + cor_coef$cap[1]
+
+    # compute corrected cap relative difference
+    differences$cap_r_diff_corrected <- (differences$cap - differences$cap_pred_corrected) / differences$cap * 100
+    # compute corrected cap absolute difference
+    differences$cap_a_diff_corrected <- differences$cap - differences$cap_pred_corrected
   }
 
   if (task_type == "EVE_FREE_TES" || task_type == "EVE_FREE_TAS" || task_type == "EVE_VAL_TES" || task_type == "EVE_VAL_TAS") {
+    stop("EVE not implemented yet")
     # compute beta_n relative difference
     differences$beta_n_r_diff <- (differences$beta_n - differences$beta_n_pred) / differences$beta_n * 100
     # compute beta_n absolute difference
@@ -443,6 +467,35 @@ load_final_difference_by_layer <- function(path, task_type, model_type, depth) {
     differences$mu2_r_diff <- (differences$mu2 - differences$mu2_pred) / differences$mu2 * 100
     # compute mu2 absolute difference
     differences$mu2_a_diff <- differences$mu2 - differences$mu2_pred
+
+    # correct bias
+    cor_coef <- correct_bias_coef(differences, task = "PBD")
+    differences$lambda1_pred_corrected <- differences$lambda1_pred + differences$lambda1 * cor_coef$lambda1[2] + cor_coef$lambda1[1]
+    differences$lambda2_pred_corrected <- differences$lambda2_pred + differences$lambda2 * cor_coef$lambda2[2] + cor_coef$lambda2[1]
+    differences$lambda3_pred_corrected <- differences$lambda3_pred + differences$lambda3 * cor_coef$lambda3[2] + cor_coef$lambda3[1]
+    differences$mu1_pred_corrected <- differences$mu1_pred + differences$mu1 * cor_coef$mu1[2] + cor_coef$mu1[1]
+    differences$mu2_pred_corrected <- differences$mu2_pred + differences$mu2 * cor_coef$mu2[2] + cor_coef$mu2[1]
+
+    # compute corrected lambda1 relative difference
+    differences$lambda1_r_diff_corrected <- (differences$lambda1 - differences$lambda1_pred_corrected) / differences$lambda1 * 100
+    # compute corrected lambda1 absolute difference
+    differences$lambda1_a_diff_corrected <- differences$lambda1 - differences$lambda1_pred_corrected
+    # compute corrected lambda2 relative difference
+    differences$lambda2_r_diff_corrected <- (differences$lambda2 - differences$lambda2_pred_corrected) / differences$lambda2 * 100
+    # compute corrected lambda2 absolute difference
+    differences$lambda2_a_diff_corrected <- differences$lambda2 - differences$lambda2_pred_corrected
+    # compute corrected lambda3 relative difference
+    differences$lambda3_r_diff_corrected <- (differences$lambda3 - differences$lambda3_pred_corrected) / differences$lambda3 * 100
+    # compute corrected lambda3 absolute difference
+    differences$lambda3_a_diff_corrected <- differences$lambda3 - differences$lambda3_pred_corrected
+    # compute corrected mu1 relative difference
+    differences$mu1_r_diff_corrected <- (differences$mu1 - differences$mu1_pred_corrected) / differences$mu1 * 100
+    # compute corrected mu1 absolute difference
+    differences$mu1_a_diff_corrected <- differences$mu1 - differences$mu1_pred_corrected
+    # compute corrected mu2 relative difference
+    differences$mu2_r_diff_corrected <- (differences$mu2 - differences$mu2_pred_corrected) / differences$mu2 * 100
+    # compute corrected mu2 absolute difference
+    differences$mu2_a_diff_corrected <- differences$mu2 - differences$mu2_pred_corrected
   }
 
   rownames(differences) <- NULL
