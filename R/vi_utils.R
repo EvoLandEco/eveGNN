@@ -10,15 +10,15 @@ grouping_var_to_label <- function(grouping_var) {
   } else if (grouping_var == "beta_phi") {
     return("Evolutionary relatedness effect")
   } else if (grouping_var == "lambda1") {
-    return("Speciation rate of good species")
+    return("Speciation good species")
   } else if (grouping_var == "lambda2") {
     return("Speciation-completion rate")
   } else if (grouping_var == "lambda3") {
-    return("Speciation rate of incipient species")
+    return("Speciation incipient species")
   } else if (grouping_var == "mu1") {
-    return("Extinction rate of good species")
+    return("Extinction good species")
   } else if (grouping_var == "mu2") {
-    return("Extinction rate of incipient species")
+    return("Extinction incipient species")
   } else if (grouping_var == "(lambda - mu)") {
     return("Net speciation rate")
   } else if (grouping_var == "num_nodes") {
