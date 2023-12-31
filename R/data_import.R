@@ -401,8 +401,8 @@ load_final_difference_by_layer <- function(path, task_type, model_type, depth) {
 
     # correct bias
     cor_coef <- correct_bias_coef(differences, task = "BD")
-    differences$lambda_pred_corrected <- differences$lambda_pred + differences$lambda * cor_coef$lambda[2] + cor_coef$lambda[1]
-    differences$mu_pred_corrected <- differences$mu_pred + differences$mu * cor_coef$mu[2] + cor_coef$mu[1]
+    differences$lambda_pred_corrected <- differences$lambda_pred + differences$lambda_pred * cor_coef$lambda[2] + cor_coef$lambda[1]
+    differences$mu_pred_corrected <- differences$mu_pred + differences$mu_pred * cor_coef$mu[2] + cor_coef$mu[1]
 
     # compute corrected lambda relative difference
     differences$lambda_r_diff_corrected <- (differences$lambda - differences$lambda_pred_corrected) / differences$lambda * 100
@@ -426,7 +426,7 @@ load_final_difference_by_layer <- function(path, task_type, model_type, depth) {
 
     # correct bias
     cor_coef <- correct_bias_coef(differences, task = "DDD")
-    differences$cap_pred_corrected <- differences$cap_pred + differences$cap * cor_coef$cap[2] + cor_coef$cap[1]
+    differences$cap_pred_corrected <- differences$cap_pred + differences$cap_pred * cor_coef$cap[2] + cor_coef$cap[1]
 
     # compute corrected cap relative difference
     differences$cap_r_diff_corrected <- (differences$cap - differences$cap_pred_corrected) / differences$cap * 100
@@ -470,11 +470,11 @@ load_final_difference_by_layer <- function(path, task_type, model_type, depth) {
 
     # correct bias
     cor_coef <- correct_bias_coef(differences, task = "PBD")
-    differences$lambda1_pred_corrected <- differences$lambda1_pred + differences$lambda1 * cor_coef$lambda1[2] + cor_coef$lambda1[1]
-    differences$lambda2_pred_corrected <- differences$lambda2_pred + differences$lambda2 * cor_coef$lambda2[2] + cor_coef$lambda2[1]
-    differences$lambda3_pred_corrected <- differences$lambda3_pred + differences$lambda3 * cor_coef$lambda3[2] + cor_coef$lambda3[1]
-    differences$mu1_pred_corrected <- differences$mu1_pred + differences$mu1 * cor_coef$mu1[2] + cor_coef$mu1[1]
-    differences$mu2_pred_corrected <- differences$mu2_pred + differences$mu2 * cor_coef$mu2[2] + cor_coef$mu2[1]
+    differences$lambda1_pred_corrected <- differences$lambda1_pred + differences$lambda1_pred * cor_coef$lambda1[2] + cor_coef$lambda1[1]
+    differences$lambda2_pred_corrected <- differences$lambda2_pred + differences$lambda2_pred * cor_coef$lambda2[2] + cor_coef$lambda2[1]
+    differences$lambda3_pred_corrected <- differences$lambda3_pred + differences$lambda3_pred * cor_coef$lambda3[2] + cor_coef$lambda3[1]
+    differences$mu1_pred_corrected <- differences$mu1_pred + differences$mu1_pred * cor_coef$mu1[2] + cor_coef$mu1[1]
+    differences$mu2_pred_corrected <- differences$mu2_pred + differences$mu2_pred * cor_coef$mu2[2] + cor_coef$mu2[1]
 
     # compute corrected lambda1 relative difference
     differences$lambda1_r_diff_corrected <- (differences$lambda1 - differences$lambda1_pred_corrected) / differences$lambda1 * 100
