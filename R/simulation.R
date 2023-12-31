@@ -70,21 +70,28 @@ randomized_pbd_fixed_age <- function(dists, age) {
 #' @export randomized_eve_fixed_age
 randomized_eve_fixed_age <- function(dists, age, model, metric, offset) {
   ntip <- 0
-  params <- list()
+  pars_list <- NULL
   result <- list()
 
   while (ntip < 10) {
     params <- generate_params(dists)
-    result <- eve::edd_sim(unlist(params), age = age,
+    lambda <- params[[1]]
+    mu <- runif(1, min = 0, max = 0.8 * lambda)
+    beta_n <- params[[2]]
+    beta_phi <- params[[3]]
+
+    pars_list <- c(lambda, mu, beta_n, beta_phi)
+
+    result <- eve::edd_sim(pars_list, age = age,
                            model = model,
                            metric = metric,
                            offset = offset,
                            history = FALSE,
-                           size_limit = 2200)
+                           size_limit = 1000)
     ntip <- result$tes$Nnode + 1
   }
 
-  result[["pars"]] <- unlist(params)
+  result[["pars"]] <- pars_list
   result[["age"]] <- age
   result[["model"]] <- model
   result[["metric"]] <- metric
