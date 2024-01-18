@@ -82,35 +82,46 @@ compute_accuracy_dd_ml_free <- function(dist_info, cap_range, data, strategy = "
   mean_lambda <- eveGNN::compute_expected_mean(dist_info)
   mean_mu <- mean_lambda * 0.9
   mean_cap <- mean(cap_range)
-  diffs <- furrr::future_map(.x = seq_along(data$brts),
-                             .f = function(i) {
-                               ml <- DDD::dd_ML(
-                                 brts = data$brts[[i]],
-                                 initparsopt = data$pars[[i]],
-                                 idparsopt = c(1, 2, 3),
-                                 btorph = 0,
-                                 soc = 2,
-                                 cond = 1,
-                                 ddmodel = 1,
-                                 num_cycles = 1
-                               )
-                               # If an error occurred, ml will be NA and we return NA right away.
-                               if (length(ml) == 1 && is.na(ml)) {
-                                 return(NA)
-                               }
-                               # If no error occurred, proceed as before.
-                               names(ml) <- NULL
-                               differences <- eveGNN::all_differences(as.numeric(ml[1:3]), data$pars[[i]])
-                               differences$nnode <- data$tes[[i]]$Nnode
 
-                               # Save the differences to an RDS file with a timestamp-based filename
-                               timestamp <- format(Sys.time(), "%Y%m%d%H%M%S")
-                               timestamp <- paste0(timestamp, sample.int(1000, 1))
-                               filename <- paste0("differences_", timestamp, ".rds")
-                               saveRDS(differences, file = filename)
+  diffs <- furrr::future_map(
+    .x = seq_along(data$brts),
+    .f = function(i) {
+      tryCatch(
+        R.utils::withTimeout({
+          ml <- DDD::dd_ML(
+            brts = data$brts[[i]],
+            initparsopt = data$pars[[i]],
+            idparsopt = c(1, 2, 3),
+            btorph = 0,
+            soc = 2,
+            cond = 1,
+            ddmodel = 1,
+            num_cycles = 1
+          )
+          # If an error occurred, ml will be NA and we return NA right away.
+          if (length(ml) == 1 && is.na(ml)) {
+            return(NA)
+          }
+          # If no error occurred, proceed as before.
+          names(ml) <- NULL
+          differences <- eveGNN::all_differences(as.numeric(ml[1:3]), data$pars[[i]])
+          differences$nnode <- data$tes[[i]]$Nnode
 
-                               return(differences)
-                             })
+          # Save the differences to an RDS file with a timestamp-based filename
+          timestamp <- format(Sys.time(), "%Y%m%d%H%M%S")
+          timestamp <- paste0(timestamp, sample.int(1000, 1))
+          filename <- paste0("differences_", timestamp, ".rds")
+          saveRDS(differences, file = filename)
+
+          return(differences)
+        }, timeout = 600),  # 10 minutes in seconds
+        TimeoutException = function(ex) {
+          return(NA)  # Return NA or some other indication of timeout
+        }
+      )
+    }
+  )
+
   return(diffs)
 }
 
