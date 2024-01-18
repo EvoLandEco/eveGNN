@@ -5,8 +5,8 @@ dists:
     max: 0.8
   - distribution: uniform
     'n': 1
-    min: 0.5
-    max: 1.0
+    min: 0.001
+    max: 10
   - distribution: uniform
     'n': 1
     min: 0.1
@@ -14,8 +14,8 @@ dists:
 within_ranges:
   - - 0.18
     - 0.72
-  - - 0.55
-    - 0.95
+  - - 0.002
+    - 5
   - - 0.18
     - 0.72
   - - 0.060

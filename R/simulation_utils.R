@@ -72,44 +72,49 @@ generate_params <- function(dist_info) {
     n <- info$n  # Number of random values to generate
 
     # Validate and generate random values based on distribution type
-    if(distribution == "uniform") {
+    if (distribution == "uniform") {
       if(!all(c("min", "max") %in% names(info))) {
         stop("Missing required fields 'min' or 'max' for uniform distribution.")
       }
       min <- info$min
       max <- info$max
       params[[i]] <- runif(n, min, max)
-
-    } else if(distribution == "normal") {
+    } else if (distribution == "normal") {
       if(!all(c("mean", "sd") %in% names(info))) {
         stop("Missing required fields 'mean' or 'sd' for normal distribution.")
       }
       mean <- info$mean
       sd <- info$sd
       params[[i]] <- rnorm(n, mean, sd)
-
-    } else if(distribution == "binomial") {
+    } else if (distribution == "binomial") {
       if(!all(c("size", "prob") %in% names(info))) {
         stop("Missing required fields 'size' or 'prob' for binomial distribution.")
       }
       size <- info$size
       prob <- info$prob
       params[[i]] <- rbinom(n, size, prob)
-
-    } else if(distribution == "poisson") {
+    } else if (distribution == "poisson") {
       if(!"lambda" %in% names(info)) {
         stop("Missing required field 'lambda' for poisson distribution.")
       }
       lambda <- info$lambda
       params[[i]] <- rpois(n, lambda)
-
-    } else if(distribution == "exponential") {
+    } else if (distribution == "exponential") {
       if(!"rate" %in% names(info)) {
         stop("Missing required field 'rate' for exponential distribution.")
       }
       rate <- info$rate
       params[[i]] <- rexp(n, rate)
-
+    } else if (distribution == "log10") {
+      if(!all(c("min", "max") %in% names(info))) {
+        stop("Missing required fields 'min' or 'max' for log10 scale uniform distribution.")
+      }
+      min <- info$min
+      max <- info$max
+      log_min <- log10(min)
+      log_max <- log10(max)
+      sampled_value <- runif(n, log_min, log_max)
+      params[[i]] <- 10^sampled_value
     } else {
       stop(paste("Unknown distribution:", distribution))
     }
