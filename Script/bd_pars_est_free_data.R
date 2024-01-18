@@ -87,6 +87,6 @@ setwd("BD_MLE_TES")
 
 print("Computing MLE for TES")
 
-bd_mle_diffs_tes <- eveGNN::compute_accuracy_bd_ml_free(dists, bd_mle_list, strategy = "multicore", workers = nworkers_mle)
+bd_mle_diffs_tes <- eveGNN::compute_accuracy_bd_ml_free(bd_mle_list, strategy = "multicore", workers = nworkers_mle)
 
 saveRDS(bd_mle_diffs_tes, "mle_diffs_BD_FREE_TES.rds")

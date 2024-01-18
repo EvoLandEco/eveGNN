@@ -77,11 +77,8 @@ compute_accuracy_dd_ml_fix_lamu <- function(cap_range, data, strategy = "sequent
 
 
 #' @export compute_accuracy_dd_ml_free
-compute_accuracy_dd_ml_free <- function(dist_info, cap_range, data, strategy = "sequential", workers = 1) {
+compute_accuracy_dd_ml_free <- function(data, strategy = "sequential", workers = 1) {
   eve:::check_parallel_arguments(strategy, workers)
-  mean_lambda <- eveGNN::compute_expected_mean(dist_info)
-  mean_mu <- mean_lambda * 0.9
-  mean_cap <- mean(cap_range)
 
   diffs <- furrr::future_map(
     .x = seq_along(data$brts),
@@ -127,10 +124,9 @@ compute_accuracy_dd_ml_free <- function(dist_info, cap_range, data, strategy = "
 
 
 #' @export compute_accuracy_bd_ml_free
-compute_accuracy_bd_ml_free <- function(dist_info, data, strategy = "sequential", workers = 1) {
+compute_accuracy_bd_ml_free <- function(data, strategy = "sequential", workers = 1) {
   eve:::check_parallel_arguments(strategy, workers)
-  mean_lambda <- eveGNN::compute_expected_mean(dist_info)
-  mean_mu <- mean_lambda * 0.9
+
   diffs <- furrr::future_map(.x = seq_along(data$brts),
                              .f = function(i) {
                                ml <- DDD::bd_ML(

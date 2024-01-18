@@ -3,7 +3,7 @@ dists:
     'n': 1
     min: 0.1
     max: 0.8
-  - distribution: uniform
+  - distribution: log10
     'n': 1
     min: 0.001
     max: 10
