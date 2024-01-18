@@ -33,9 +33,6 @@ gcn_layer2_hidden_channels = global_params["gcn_layer2_hidden_channels"]
 gcn_layer3_hidden_channels = global_params["gcn_layer3_hidden_channels"]
 lin_layer1_hidden_channels = global_params["lin_layer1_hidden_channels"]
 lin_layer2_hidden_channels = global_params["lin_layer2_hidden_channels"]
-lin_layer3_hidden_channels = global_params["lin_layer3_hidden_channels"]
-lin_layer4_hidden_channels = global_params["lin_layer4_hidden_channels"]
-lin_layer5_hidden_channels = global_params["lin_layer5_hidden_channels"]
 n_predicted_values = global_params["n_predicted_values"]
 batch_size_reduce_factor = global_params["batch_size_reduce_factor"]
 max_nodes_limit = global_params["max_nodes_limit"]
@@ -422,10 +419,7 @@ def main():
             self.gnn3_embed = GNN(gcn_layer3_hidden_channels, gcn_layer3_hidden_channels, lin_layer1_hidden_channels, lin=False)
 
             self.lin1 = torch.nn.Linear(lin_layer1_hidden_channels, lin_layer2_hidden_channels)
-            self.lin2 = torch.nn.Linear(lin_layer2_hidden_channels, lin_layer3_hidden_channels)
-            self.lin3 = torch.nn.Linear(lin_layer3_hidden_channels, lin_layer4_hidden_channels)
-            self.lin4 = torch.nn.Linear(lin_layer4_hidden_channels, lin_layer5_hidden_channels)
-            self.lin5 = torch.nn.Linear(lin_layer5_hidden_channels, n_predicted_values)
+            self.lin2 = torch.nn.Linear(lin_layer2_hidden_channels, n_predicted_values)
 
         def forward(self, x, adj, mask=None):
             s = self.gnn1_pool(x, adj, mask)
@@ -447,15 +441,6 @@ def main():
             x = F.relu(x)
             x = F.dropout(x, p=dropout_ratio, training=self.training)
             x = self.lin2(x)
-            x = F.relu(x)
-            x = F.dropout(x, p=dropout_ratio, training=self.training)
-            x = self.lin3(x)
-            x = F.relu(x)
-            x = F.dropout(x, p=dropout_ratio, training=self.training)
-            x = self.lin4(x)
-            x = F.relu(x)
-            x = F.dropout(x, p=dropout_ratio, training=self.training)
-            x = self.lin5(x)
 
             return x, l1 + l2, e1 + e2
 
