@@ -92,6 +92,8 @@ setwd("DDD_MLE_TES")
 
 print("Computing MLE for TES")
 
+options(future.globals.maxSize= 891289600)
+
 ddd_mle_diffs_tes <- eveGNN::compute_accuracy_dd_ml_free(ddd_mle_list, strategy = "multicore", workers = nworkers_mle)
 
 saveRDS(ddd_mle_diffs_tes, "mle_diffs_DDD_FREE_TES.rds")
