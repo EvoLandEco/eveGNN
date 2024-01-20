@@ -12,6 +12,7 @@ setwd(name)
 
 dists <- params$dists
 cap_range <- params$cap_range
+max_mu <- params$max_mu
 within_ranges <- params$within_ranges
 nrep <- params$nrep
 age <- params$age
@@ -24,6 +25,7 @@ future::plan("multicore", workers = nworkers_sim)
 
 ddd_free_tes_list <- future.apply::future_replicate(nrep, eveGNN::randomized_ddd_fixed_age(dists,
                                                                         cap_range = cap_range,
+                                                                        max_mu = max_mu,
                                                                         age = age,
                                                                         model = ddmodel), simplify = FALSE)
 
@@ -92,8 +94,12 @@ setwd("DDD_MLE_TES")
 
 print("Computing MLE for TES")
 
-options(future.globals.maxSize= 891289600)
+if (!dir.exists("MLE_DATA")) {
+  dir.create("MLE_DATA")
+}
 
-ddd_mle_diffs_tes <- eveGNN::compute_accuracy_dd_ml_free(ddd_mle_list, strategy = "multicore", workers = nworkers_mle)
+saveRDS(ddd_mle_list, paste0("MLE_DATA/ddd_mle.rds"))
 
-saveRDS(ddd_mle_diffs_tes, "mle_diffs_DDD_FREE_TES.rds")
+for (i in 1:num_elements_to_sample) {
+  system(paste0("sbatch ../../Bash/submit_ddd_pars_est_free_mle.sh ", i))
+}
