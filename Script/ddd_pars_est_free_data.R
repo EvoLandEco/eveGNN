@@ -100,6 +100,8 @@ if (!dir.exists("MLE_DATA")) {
 
 saveRDS(ddd_mle_list, paste0("MLE_DATA/ddd_mle.rds"))
 
+setwd("../../")
+
 for (i in 1:num_elements_to_sample) {
-  system(paste0("sbatch ../../Bash/submit_ddd_pars_est_free_mle.sh ", i))
+  system(paste0("sbatch submit_ddd_pars_est_free_mle.sh ", i))
 }
