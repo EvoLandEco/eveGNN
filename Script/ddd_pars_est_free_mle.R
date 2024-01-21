@@ -1,8 +1,9 @@
 args <- commandArgs(TRUE)
 
 i <- as.numeric(args[1])
+name <- as.character(args[2])
 
-data <- readRDS(paste0("MLE_DATA/ddd_mle.rds"))
+data <- readRDS(file.path(name, "DDD_MLE_TES/MLE_DATA/ddd_mle.rds"))
 
 tryCatch(
   R.utils::withTimeout({

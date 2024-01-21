@@ -9,6 +9,7 @@
 #SBATCH --partition=regular
 
 index=${1}
+name=${2}
 
 ml R
-Rscript ../Script/ddd_pars_est_free_mle.R ${index}
+Rscript ../Script/ddd_pars_est_free_mle.R ${index} ${name}
