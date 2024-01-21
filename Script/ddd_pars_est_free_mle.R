@@ -5,6 +5,9 @@ name <- as.character(args[2])
 
 data <- readRDS(file.path(name, "DDD_MLE_TES/MLE_DATA/ddd_mle.rds"))
 
+setwd(name)
+setwd("DDD_MLE_TES")
+
 tryCatch(
   R.utils::withTimeout({
     ml <- DDD::dd_ML(
