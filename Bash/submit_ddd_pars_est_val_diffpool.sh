@@ -7,6 +7,7 @@
 #SBATCH --output=logs/gnn_ddd_pars_est_val_diffpool-%j.log
 #SBATCH --mem=64GB
 #SBATCH --partition=gpu
+#SBATCH --exclude=v100gpu24
 
 module --ignore_cache load "Python/3.8.16-GCCcore-11.2.0"
 source $HOME/venvs/eve/bin/activate
