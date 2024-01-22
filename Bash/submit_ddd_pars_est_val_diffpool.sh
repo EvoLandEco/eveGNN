@@ -8,7 +8,7 @@
 #SBATCH --mem=64GB
 #SBATCH --partition=gpu
 
-ml Python/3.8.16-GCCcore-11.2.0
+module --ignore_cache load "Python/3.8.16-GCCcore-11.2.0"
 source $HOME/venvs/eve/bin/activate
 
 # Check if the correct number of arguments is provided
