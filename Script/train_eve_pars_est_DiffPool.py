@@ -428,6 +428,7 @@ def main():
             xre = F.relu(xre)
             xre = F.dropout(xre, p=0.5, training=self.training)
             xre = self.lin2re(xre)
+            xre = F.relu(xre)
 
             xcl = F.dropout(x, p=0.5, training=self.training)
             xcl = self.lin1cl(xcl)

@@ -489,6 +489,7 @@ def main():
             xre = F.relu(xre)
             xre = F.dropout(xre, p=dropout_ratio, training=self.training)
             xre = self.lin2(xre)
+            xre = F.relu(xre)
 
             return xre, l1 + l2, e1 + e2
 

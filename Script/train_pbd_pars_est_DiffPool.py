@@ -441,6 +441,8 @@ def main():
             x = F.relu(x)
             x = F.dropout(x, p=dropout_ratio, training=self.training)
             x = self.lin2(x)
+            x = F.relu(x)
+
             return x, l1 + l2, e1 + e2
 
     def train():
