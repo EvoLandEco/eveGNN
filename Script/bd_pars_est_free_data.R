@@ -90,3 +90,15 @@ print("Computing MLE for TES")
 bd_mle_diffs_tes <- eveGNN::compute_accuracy_bd_ml_free(bd_mle_list, strategy = "multicore", workers = nworkers_mle)
 
 saveRDS(bd_mle_diffs_tes, "mle_diffs_BD_FREE_TES.rds")
+
+if (!dir.exists("NO_INIT")) {
+  dir.create("NO_INIT")
+}
+
+setwd("NO_INIT")
+
+print("Computing MLE for TES without initial parameters")
+
+bd_mle_diffs_tes_no_init <- eveGNN::compute_accuracy_bd_ml_free_no_init(bd_mle_list, strategy = "multicore", workers = nworkers_mle)
+
+saveRDS(bd_mle_diffs_tes_no_init, "mle_diffs_BD_FREE_TES_NO_INIT.rds")

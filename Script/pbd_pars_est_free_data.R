@@ -63,4 +63,14 @@ setwd("PBD_MLE_TES")
 
 print("Computing MLE for TES")
 
-pbd_mle_diffs_tes <- eveGNN::compute_accuracy_pbd_ml_free(pbd_mle_list, strategy = "sequential", workers = 1)
+pbd_mle_diffs_tes <- eveGNN::compute_accuracy_pbd_ml_free(pbd_mle_list, strategy = "multicore", workers = nworkers_mle)
+
+if (!dir.exists("NO_INIT")) {
+  dir.create("NO_INIT")
+}
+
+setwd("NO_INIT")
+
+print("Computing MLE for TES without initial parameters")
+
+pbd_mle_diffs_tes_no_init <- eveGNN::compute_accuracy_pbd_ml_free_no_init(pbd_mle_list, strategy = "multicore", workers = nworkers_mle)

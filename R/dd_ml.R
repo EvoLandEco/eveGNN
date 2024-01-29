@@ -158,3 +158,39 @@ compute_accuracy_bd_ml_free <- function(data, strategy = "sequential", workers =
                              })
   return(diffs)
 }
+
+
+#' @export compute_accuracy_bd_ml_free_no_init
+compute_accuracy_bd_ml_free_no_init <- function(data, strategy = "sequential", workers = 1) {
+  eve:::check_parallel_arguments(strategy, workers)
+
+  diffs <- furrr::future_map(.x = seq_along(data$brts),
+                             .f = function(i) {
+                               ml <- DDD::bd_ML(
+                                 brts = data$brts[[i]],
+                                 idparsopt = c(1, 2),
+                                 tdmodel = 0,
+                                 btorph = 0,
+                                 soc = 2,
+                                 cond = 1,
+                                 num_cycles = Inf
+                               )
+                               # If an error occurred, ml will be NA and we return NA right away.
+                               if (length(ml) == 1 && is.na(ml)) {
+                                 return(NA)
+                               }
+                               # If no error occurred, proceed as before.
+                               names(ml) <- NULL
+                               differences <- eveGNN::all_differences(as.numeric(ml[1:2]), as.numeric(data$pars[[i]]))
+                               differences$nnode <- data$tes[[i]]$Nnode
+
+                               # Save the differences to an RDS file with a timestamp-based filename
+                               timestamp <- format(Sys.time(), "%Y%m%d%H%M%S")
+                               timestamp <- paste0(timestamp, sample.int(1000, 1))
+                               filename <- paste0("differences_", timestamp, ".rds")
+                               saveRDS(differences, file = filename)
+
+                               return(differences)
+                             })
+  return(diffs)
+}
