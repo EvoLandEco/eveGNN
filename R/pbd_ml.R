@@ -46,6 +46,9 @@ compute_accuracy_pbd_ml_free_no_init <- function(data, strategy = "sequential", 
                              .f = function(i) {
                                ml <- PBD::pbd_ML(
                                  brts = data$brts[[i]],
+                                 # rearrange initparsopt to match the order of the parameters required by pbd_ML
+                                 # (b, mu_1, lambda_1, mu_2)
+                                 initparsopt = c(0.2, 0.1, 1, 0.1),
                                  idparsopt = 1:4,
                                  exteq = 0,
                                  btorph = 0,
