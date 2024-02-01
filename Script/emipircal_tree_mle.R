@@ -1,0 +1,126 @@
+args <- commandArgs(TRUE)
+
+name <- as.character(args[1])
+
+if (!dir.exists(name)) {
+  dir.create(name)
+}
+
+setwd(name)
+
+### Condamine 2019 Ecology Letters Trees Loading
+load("EMP_DATA/FamilyAmphibiaTrees.Rdata")
+load("EMP_DATA/FamilyBirdTrees.Rdata")
+load("EMP_DATA/FamilyCrocoTurtleTrees.Rdata")
+load("EMP_DATA/Condamine2019\\FamilyMammalTrees.Rdata")
+load("EMP_DATA/Condamine2019\\FamilySquamateTrees.Rdata")
+
+condamine_tree_list <- list(Amphibia = FamilyAmphibiaTrees,
+                            Bird = FamilyBirdTrees,
+                            CrocoTurtle = FamilyCrocoTurtleTrees,
+                            Mammal = FamilyMammalTrees,
+                            Squamate = FamilySquamateTrees)
+
+if (!dir.exists("EMP_RESULT")) {
+  dir.create("EMP_RESULT")
+}
+
+setwd("EMP_RESULT")
+
+family_list <- names(condamine_tree_list)
+df_ddd_results <- data.frame()
+for (i in 1:length(family_list)) {
+  family_name <- family_list[i]
+  tree_list <- names(condamine_tree_list[[family_name]])
+  for (j in 1:length(tree_list)) {
+    tree_name <- tree_list[j]
+    meta <- c("Family" = family_name, "Tree" = tree_name)
+    tree <- condamine_tree_list[[family_name]][[tree_name]]$tree
+    tree <- eveGNN::rescale_crown_age(tree, 10)
+    tree_brts <- treestats::branching_times(tree)
+    ml <- DDD::dd_ML(
+      brts = tree_brts,
+      idparsopt = c(1, 2, 3),
+      btorph = 0,
+      soc = 2,
+      cond = 1,
+      ddmodel = 1,
+      num_cycles = 1
+    )
+    df_ddd_results <- rbind(df_ddd_results, data.frame(Family = family_name,
+                                                       Tree = tree_name,
+                                                       lambda = ml$lambda,
+                                                       mu = ml$mu,
+                                                       cap = ml$K,
+                                                       loglik=ml$loglik,
+                                                       df=ml$df,
+                                                       conv=ml$conv))
+  }
+}
+
+saveRDS(df_ddd_results, "DDD_EMP_MLE.rds")
+
+df_bd_results <- data.frame()
+for (i in 1:length(family_list)) {
+  family_name <- family_list[i]
+  tree_list <- names(condamine_tree_list[[family_name]])
+  for (j in 1:length(tree_list)) {
+    tree_name <- tree_list[j]
+    meta <- c("Family" = family_name, "Tree" = tree_name)
+    tree <- condamine_tree_list[[family_name]][[tree_name]]$tree
+    tree <- eveGNN::rescale_crown_age(tree, 10)
+    tree_brts <- treestats::branching_times(tree)
+    ml <- DDD::bd_ML(
+      brts = tree_brts,
+      idparsopt = c(1, 2),
+      tdmodel = 0,
+      btorph = 0,
+      soc = 2,
+      cond = 1,
+      num_cycles = Inf
+    )
+    df_bd_results <- rbind(df_bd_results, data.frame(Family = family_name,
+                                                     Tree = tree_name,
+                                                     lambda = ml$lambda,
+                                                     mu = ml$mu,
+                                                     loglik=ml$loglik,
+                                                     df=ml$df,
+                                                     conv=ml$conv))
+  }
+}
+
+saveRDS(df_bd_results, "BD_EMP_MLE.rds")
+
+df_pbd_results <- data.frame()
+for (i in 1:length(family_list)) {
+  family_name <- family_list[i]
+  tree_list <- names(condamine_tree_list[[family_name]])
+  for (j in 1:length(tree_list)) {
+    tree_name <- tree_list[j]
+    meta <- c("Family" = family_name, "Tree" = tree_name)
+    tree <- condamine_tree_list[[family_name]][[tree_name]]$tree
+    tree <- eveGNN::rescale_crown_age(tree, 10)
+    tree_brts <- treestats::branching_times(tree)
+    ml <- PBD::pbd_ML(
+      brts = tree_brts,
+      initparsopt = c(0.2, 0.1, 1, 0.1),
+      idparsopt = 1:4,
+      exteq = 0,
+      btorph = 0,
+      soc = 2,
+      verbose = FALSE
+    )
+    df_pbd_results <- rbind(df_pbd_results, data.frame(Family = family_name,
+                                                     Tree = tree_name,
+                                                     b1 = ml$b,
+                                                     lambda1 = ml$lambda_1,
+                                                     b2 = ml$b,
+                                                     mu1 = ml$mu_1,
+                                                     mu2 = ml$mu_2,
+                                                     loglik=ml$loglik,
+                                                     df=ml$df,
+                                                     conv=ml$conv))
+  }
+}
+
+saveRDS(df_pbd_results, "PBD_EMP_MLE.rds")
