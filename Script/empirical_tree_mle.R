@@ -27,8 +27,16 @@ if (!dir.exists("EMP_RESULT")) {
 
 setwd("EMP_RESULT")
 
+if (!dir.exists("DDD")) {
+  dir.create("DDD")
+}
+
+setwd("DDD")
+
 family_list <- names(condamine_tree_list)
+
 df_ddd_results <- data.frame()
+
 for (i in 1:length(family_list)) {
   family_name <- family_list[i]
   tree_list <- names(condamine_tree_list[[family_name]])
@@ -38,27 +46,19 @@ for (i in 1:length(family_list)) {
     tree <- condamine_tree_list[[family_name]][[tree_name]]$tree
     tree <- eveGNN::rescale_crown_age(tree, 10)
     tree_brts <- treestats::branching_times(tree)
-    ml <- DDD::dd_ML(
-      brts = tree_brts,
-      idparsopt = c(1, 2, 3),
-      btorph = 0,
-      soc = 2,
-      cond = 1,
-      ddmodel = 1,
-      num_cycles = 1
-    )
-    df_ddd_results <- rbind(df_ddd_results, data.frame(Family = family_name,
-                                                       Tree = tree_name,
-                                                       lambda = ml$lambda,
-                                                       mu = ml$mu,
-                                                       cap = ml$K,
-                                                       loglik=ml$loglik,
-                                                       df=ml$df,
-                                                       conv=ml$conv))
+    file_name <- paste0("tree_brts_", family_name, "_", tree_name, ".rds")
+    saveRDS(tree_brts, file_name)
+    system(paste0("sbatch ../../../../Bash/submit_ddd_emp_mle.sh ", paste0(file_name, " ", family_name, " ", tree_name)))
   }
 }
 
-saveRDS(df_ddd_results, "DDD_EMP_MLE.rds")
+setwd("..")
+
+if (!dir.exists("BD")) {
+  dir.create("BD")
+}
+
+setwd("BD")
 
 df_bd_results <- data.frame()
 for (i in 1:length(family_list)) {
@@ -90,6 +90,14 @@ for (i in 1:length(family_list)) {
 }
 
 saveRDS(df_bd_results, "BD_EMP_MLE.rds")
+
+setwd("..")
+
+if (!dir.exists("PBD")) {
+  dir.create("PBD")
+}
+
+setwd("PBD")
 
 df_pbd_results <- data.frame()
 for (i in 1:length(family_list)) {
