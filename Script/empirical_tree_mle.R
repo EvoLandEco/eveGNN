@@ -126,5 +126,3 @@ for (i in 1:length(family_list)) {
     saveRDS(df_pbd_results, file = paste0("PBD_EMP_MLE_", family_name, "_", tree_name, ".rds"))
   }
 }
-
-saveRDS(df_pbd_results, "PBD_EMP_MLE.rds")
