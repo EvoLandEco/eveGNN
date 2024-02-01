@@ -502,10 +502,10 @@ main_menu() {
                                                 echo "Max GNN depth: $max_gnn_depth"
                                                 for (( i=1; i<=max_gnn_depth; i++ )); do
                                                     echo "Submitting job for TES with GNN depth $i"
-                                                    sbatch submit_bd_pars_est_model_training_diffpool.sh "$name" "BD_FREE_TES" "$i"
+                                                    # sbatch submit_bd_pars_est_model_training_diffpool.sh "$name" "BD_FREE_TES" "$i"
                                                     sbatch submit_bd_pars_est_model_training_diffpool_full.sh "$name" "BD_FREE_TES" "$i"
                                                     echo "Submitting job for TAS with GNN depth $i"
-                                                    sbatch submit_bd_pars_est_model_training_diffpool.sh "$name" "BD_FREE_TAS" "$i"
+                                                    # sbatch submit_bd_pars_est_model_training_diffpool.sh "$name" "BD_FREE_TAS" "$i"
                                                     sbatch submit_bd_pars_est_model_training_diffpool_full.sh "$name" "BD_FREE_TAS" "$i"
                                                 done
                                             else
@@ -522,10 +522,10 @@ main_menu() {
                                                 echo "Max GNN depth: $max_gnn_depth"
                                                 for (( i=1; i<=max_gnn_depth; i++ )); do
                                                     echo "Submitting job for TES with GNN depth $i"
-                                                    sbatch submit_ddd_pars_est_model_training_diffpool.sh "$name" "DDD_FREE_TES" "$i"
+                                                    # sbatch submit_ddd_pars_est_model_training_diffpool.sh "$name" "DDD_FREE_TES" "$i"
                                                     sbatch submit_ddd_pars_est_model_training_diffpool_full.sh "$name" "DDD_FREE_TES" "$i"
                                                     echo "Submitting job for TAS with GNN depth $i"
-                                                    sbatch submit_ddd_pars_est_model_training_diffpool.sh "$name" "DDD_FREE_TAS" "$i"
+                                                    # sbatch submit_ddd_pars_est_model_training_diffpool.sh "$name" "DDD_FREE_TAS" "$i"
                                                     sbatch submit_ddd_pars_est_model_training_diffpool_full.sh "$name" "DDD_FREE_TAS" "$i"
                                                 done
                                             else
@@ -542,10 +542,10 @@ main_menu() {
                                                 echo "Max GNN depth: $max_gnn_depth"
                                                 for (( i=1; i<=max_gnn_depth; i++ )); do
                                                     echo "Submitting job for TES with GNN depth $i"
-                                                    sbatch submit_pbd_pars_est_model_training_diffpool.sh "$name" "PBD_FREE_TES" "$i"
+                                                    # sbatch submit_pbd_pars_est_model_training_diffpool.sh "$name" "PBD_FREE_TES" "$i"
                                                     sbatch submit_pbd_pars_est_model_training_diffpool_full.sh "$name" "PBD_FREE_TES" "$i"
                                                     echo "Submitting job for TAS with GNN depth $i"
-                                                    sbatch submit_pbd_pars_est_model_training_diffpool.sh "$name" "PBD_FREE_TAS" "$i"
+                                                    # sbatch submit_pbd_pars_est_model_training_diffpool.sh "$name" "PBD_FREE_TAS" "$i"
                                                     sbatch submit_pbd_pars_est_model_training_diffpool_full.sh "$name" "PBD_FREE_TAS" "$i"
                                                 done
                                             else
