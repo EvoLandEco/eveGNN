@@ -18,13 +18,13 @@ ml <- DDD::dd_ML(
   num_cycles = 1
 )
 
-df_ddd_results <- rbind(df_ddd_results, data.frame(Family = family_name,
-                                                   Tree = tree_name,
-                                                   lambda = ml$lambda,
-                                                   mu = ml$mu,
-                                                   cap = ml$K,
-                                                   loglik=ml$loglik,
-                                                   df=ml$df,
-                                                   conv=ml$conv))
+df_ddd_results <- data.frame(Family = family_name,
+                             Tree = tree_name,
+                             lambda = ml$lambda,
+                             mu = ml$mu,
+                             cap = ml$K,
+                             loglik=ml$loglik,
+                             df=ml$df,
+                             conv=ml$conv)
 
 saveRDS(df_ddd_results, file = paste0("DDD_EMP_MLE_", family_name, "_", tree_name, ".rds"))

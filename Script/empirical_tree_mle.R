@@ -35,8 +35,6 @@ setwd("DDD")
 
 family_list <- names(condamine_tree_list)
 
-df_ddd_results <- data.frame()
-
 for (i in 1:length(family_list)) {
   family_name <- family_list[i]
   tree_list <- names(condamine_tree_list[[family_name]])
