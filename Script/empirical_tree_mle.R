@@ -58,7 +58,6 @@ if (!dir.exists("BD")) {
 
 setwd("BD")
 
-df_bd_results <- data.frame()
 for (i in 1:length(family_list)) {
   family_name <- family_list[i]
   tree_list <- names(condamine_tree_list[[family_name]])
@@ -77,17 +76,16 @@ for (i in 1:length(family_list)) {
       cond = 1,
       num_cycles = Inf
     )
-    df_bd_results <- rbind(df_bd_results, data.frame(Family = family_name,
-                                                     Tree = tree_name,
-                                                     lambda = ml$lambda,
-                                                     mu = ml$mu,
-                                                     loglik=ml$loglik,
-                                                     df=ml$df,
-                                                     conv=ml$conv))
+    df_bd_results <- data.frame(Family = family_name,
+                                Tree = tree_name,
+                                lambda = ml$lambda,
+                                mu = ml$mu,
+                                loglik=ml$loglik,
+                                df=ml$df,
+                                conv=ml$conv)
+    saveRDS(df_bd_results, file = paste0("BD_EMP_MLE_", family_name, "_", tree_name, ".rds"))
   }
 }
-
-saveRDS(df_bd_results, "BD_EMP_MLE.rds")
 
 setwd("..")
 
@@ -97,7 +95,6 @@ if (!dir.exists("PBD")) {
 
 setwd("PBD")
 
-df_pbd_results <- data.frame()
 for (i in 1:length(family_list)) {
   family_name <- family_list[i]
   tree_list <- names(condamine_tree_list[[family_name]])
@@ -116,16 +113,17 @@ for (i in 1:length(family_list)) {
       soc = 2,
       verbose = FALSE
     )
-    df_pbd_results <- rbind(df_pbd_results, data.frame(Family = family_name,
-                                                     Tree = tree_name,
-                                                     b1 = ml$b,
-                                                     lambda1 = ml$lambda_1,
-                                                     b2 = ml$b,
-                                                     mu1 = ml$mu_1,
-                                                     mu2 = ml$mu_2,
-                                                     loglik=ml$loglik,
-                                                     df=ml$df,
-                                                     conv=ml$conv))
+    df_pbd_results <- data.frame(Family = family_name,
+                                 Tree = tree_name,
+                                 b1 = ml$b,
+                                 lambda1 = ml$lambda_1,
+                                 b2 = ml$b,
+                                 mu1 = ml$mu_1,
+                                 mu2 = ml$mu_2,
+                                 loglik=ml$loglik,
+                                 df=ml$df,
+                                 conv=ml$conv)
+    saveRDS(df_pbd_results, file = paste0("PBD_EMP_MLE_", family_name, "_", tree_name, ".rds"))
   }
 }
 
