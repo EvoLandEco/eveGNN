@@ -78,8 +78,8 @@ for (i in 1:length(family_list)) {
     )
     df_bd_results <- data.frame(Family = family_name,
                                 Tree = tree_name,
-                                lambda = ml$lambda,
-                                mu = ml$mu,
+                                lambda = ml$lambda0,
+                                mu = ml$mu0,
                                 loglik=ml$loglik,
                                 df=ml$df,
                                 conv=ml$conv)
