@@ -12,8 +12,8 @@ setwd(name)
 load("EMP_DATA/FamilyAmphibiaTrees.Rdata")
 load("EMP_DATA/FamilyBirdTrees.Rdata")
 load("EMP_DATA/FamilyCrocoTurtleTrees.Rdata")
-load("EMP_DATA/Condamine2019\\FamilyMammalTrees.Rdata")
-load("EMP_DATA/Condamine2019\\FamilySquamateTrees.Rdata")
+load("EMP_DATA/FamilyMammalTrees.Rdata")
+load("EMP_DATA/FamilySquamateTrees.Rdata")
 
 condamine_tree_list <- list(Amphibia = FamilyAmphibiaTrees,
                             Bird = FamilyBirdTrees,
