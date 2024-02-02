@@ -346,8 +346,8 @@ def main():
     filtered_testing_data = [data for data in filtered_testing_data if data.num_nodes <= max_nodes_limit]
 
     # Filtering out trees with less than 100 nodes
-    filtered_training_data = [data for data in filtered_training_data if data.num_nodes >= 100]
-    filtered_testing_data = [data for data in filtered_testing_data if data.num_nodes >= 100]
+    filtered_training_data = [data for data in filtered_training_data if data.num_nodes >= 40]
+    filtered_testing_data = [data for data in filtered_testing_data if data.num_nodes >= 40]
 
     print(f"Number of filtered training data: {len(filtered_training_data)}")
     print(f"Number of filtered testing data: {len(filtered_testing_data)}")
