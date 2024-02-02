@@ -332,6 +332,9 @@ def main():
     sum_training_data = functools.reduce(lambda x, y: x + y, training_dataset_list)
     sum_testing_data = functools.reduce(lambda x, y: x + y, testing_dataset_list)
 
+    print(f"Number of training data: {len(sum_training_data)}")
+    print(f"Number of testing data: {len(sum_testing_data)}")
+
     # Filtering out trees with only 3 nodes
     # They might cause problems with ToDense
     filtered_training_data = [data for data in sum_training_data if data.edge_index.shape != torch.Size([2, 2])]
@@ -344,6 +347,9 @@ def main():
     # For BD trees, there might be possibility that they only have one edge. Should filter them out.
     filtered_training_data = [data for data in filtered_training_data if data.edge_index.shape != torch.Size([2, 1])]
     filtered_testing_data = [data for data in filtered_testing_data if data.edge_index.shape != torch.Size([2, 1])]
+
+    print(f"Number of filtered training data: {len(filtered_training_data)}")
+    print(f"Number of filtered testing data: {len(filtered_testing_data)}")
 
     class TreeData(InMemoryDataset):
         def __init__(self, root, data_list, transform=None, pre_transform=None):
