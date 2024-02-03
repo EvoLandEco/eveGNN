@@ -279,7 +279,6 @@ def main():
     task_type = sys.argv[2]
     gnn_depth = int(sys.argv[3])
 
-    # Now you can use the variables name and set_i in your code
     print(f'Name: {name}, Task Type: {task_type}, GNN Depth: {gnn_depth}')
 
     training_dataset_list = []

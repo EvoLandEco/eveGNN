@@ -4,31 +4,27 @@ import pandas as pd
 import pyreadr
 import torch
 import glob
-import yaml
 import torch_geometric.transforms as T
 import torch.nn.functional as F
+import yaml
 from math import ceil
 from torch_geometric.data import InMemoryDataset, Data
 from torch_geometric.loader import DenseDataLoader
 from torch_geometric.nn import DenseGCNConv as GCNConv, dense_diff_pool
 
-
+# Load the global parameters from the config file
 global_params = None
-global_params_train = None
 
-with open("../Config/ddd_val_diffpool.yaml", "r") as ymlfile:
+with open("../Config/pbd_train_diffpool.yaml", "r") as ymlfile:
     global_params = yaml.safe_load(ymlfile)
 
-with open("../Config/ddd_train_diffpool.yaml", "r") as ymlfile:
-    global_params_train = yaml.safe_load(ymlfile)
-
 # Set global variables
-cap_norm_factor = global_params["cap_norm_factor"]
 epoch_number = global_params["epoch_number"]
 diffpool_ratio = global_params["diffpool_ratio"]
 dropout_ratio = global_params["dropout_ratio"]
 learning_rate = global_params["learning_rate"]
-val_batch_size = global_params["val_batch_size"]
+train_batch_size = global_params["train_batch_size"]
+test_batch_size = global_params["test_batch_size"]
 gcn_layer1_hidden_channels = global_params["gcn_layer1_hidden_channels"]
 gcn_layer2_hidden_channels = global_params["gcn_layer2_hidden_channels"]
 gcn_layer3_hidden_channels = global_params["gcn_layer3_hidden_channels"]
@@ -38,10 +34,8 @@ n_predicted_values = global_params["n_predicted_values"]
 batch_size_reduce_factor = global_params["batch_size_reduce_factor"]
 max_nodes_limit = global_params["max_nodes_limit"]
 
-# Set global variables from training configuration
-max_gnn_depth = int(global_params_train["max_gnn_depth"])
-# Set max node for DDD_TES
-model_max_node = 2109
+# Set max node for PBD_TES
+model_max_node = 2499
 
 
 def read_table(path):
@@ -222,7 +216,7 @@ def main():
     name = sys.argv[1]
     depth = int(sys.argv[2])
 
-    print("Applying pre-trained DDD DiffPool model to empirical trees...")
+    print("Applying pre-trained PBD DiffPool model to empirical trees...")
 
     full_dir = os.path.join(name, "EMP_DATA", "EXPORT")
 
@@ -356,10 +350,10 @@ def main():
         return outputs_all.cpu().detach().numpy(), family_all, tree_all, nodes_all.cpu().detach().numpy()
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    print(f"Evaluating using {device}")
+    print(f"Training using {device}")
 
     model = DiffPool(gnn_depth=depth)
-    path_to_saved_model = os.path.join(name, "DDD_FREE_TES", f"DDD_FREE_TES_model_diffpool_full_{depth}.pt")
+    path_to_saved_model = os.path.join(name, "PBD_FREE_TES", f"PBD_FREE_TES_model_diffpool_full_{depth}.pt")
     model.load_state_dict(torch.load(path_to_saved_model, map_location=device))
 
     model = model.to(device)
@@ -373,13 +367,13 @@ def main():
     emp_predictions, family_name, tree_name, nodes_all = eval_estimates(emp_loader)
 
     # Convert the dictionary to a pandas DataFrame
-    final_predictions = pd.DataFrame(emp_predictions, columns=["lambda_pred", "mu_pred", "cap_pred"])
+    final_predictions = pd.DataFrame(emp_predictions, columns=["b1_pred", "lambda1_pred", "b2_pred", "mu1_pred", "mu2_pred"])
     final_family = pd.DataFrame(family_name, columns=["family"])
     final_tree = pd.DataFrame(tree_name, columns=["tree"])
     final_predictions["nodes"] = nodes_all
     final_predictions = pd.concat([final_predictions, final_family, final_tree], axis=1)
     # Save the data to a file using pyreadr
-    pyreadr.write_rds(os.path.join(name, "EMP_RESULT", "DDD", "DDD_EMP_GNN_predictions.rds"), final_predictions)
+    pyreadr.write_rds(os.path.join(name, "EMP_RESULT", "PBD", "PBD_EMP_GNN_predictions.rds"), final_predictions)
 
 
 if __name__ == '__main__':

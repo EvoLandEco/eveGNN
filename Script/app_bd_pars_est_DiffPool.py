@@ -4,7 +4,6 @@ import pandas as pd
 import pyreadr
 import torch
 import glob
-import random
 import yaml
 import torch_geometric.transforms as T
 import torch.nn.functional as F
@@ -41,7 +40,7 @@ max_nodes_limit = global_params["max_nodes_limit"]
 # Set global variables from training configuration
 max_gnn_depth = int(global_params_train["max_gnn_depth"])
 # Set max node for BD_TES
-model_max_node = 2495
+model_max_node = 2497
 
 
 def read_table(path):
@@ -215,15 +214,16 @@ def export_to_rds(embeddings, epoch, name, task_type, which_set):
 
 
 def main():
-    if len(sys.argv) != 2:
-        print(f"Usage: {sys.argv[0]} <name>")
+    if len(sys.argv) != 3:
+        print(f"Usage: {sys.argv[0]} <name> <depth>")
         sys.exit(1)
 
     name = sys.argv[1]
+    depth = int(sys.argv[2])
 
     print("Applying pre-trained BD DiffPool model to empirical trees...")
 
-    full_dir = os.path.join(name, "EMP")
+    full_dir = os.path.join(name, "EMP_DATA", "EXPORT")
 
     # Concatenate the base directory path with the set_i folder name
     full_dir_tree = os.path.join(full_dir, 'GNN', 'tree')
@@ -357,8 +357,8 @@ def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Evaluating using {device}")
 
-    model = DiffPool(gnn_depth=1)
-    path_to_saved_model = os.path.join(name, "BD_FREE_TES", "BD_FREE_TES_model_diffpool_1.pt")
+    model = DiffPool(gnn_depth=depth)
+    path_to_saved_model = os.path.join(name, "BD_FREE_TES", f"BD_FREE_TES_model_diffpool_full_{depth}.pt")
     model.load_state_dict(torch.load(path_to_saved_model, map_location=device))
 
     model = model.to(device)
@@ -378,7 +378,7 @@ def main():
     final_predictions["nodes"] = nodes_all
     final_predictions = pd.concat([final_predictions, final_family, final_tree], axis=1)
     # Save the data to a file using pyreadr
-    pyreadr.write_rds(os.path.join(name, "BD_EMP_TES", "BD_EMP_TES_predictions.rds"), final_predictions)
+    pyreadr.write_rds(os.path.join(name, "EMP_RESULT", "BD", "BD_EMP_GNN_predictions.rds"), final_predictions)
 
 
 if __name__ == '__main__':

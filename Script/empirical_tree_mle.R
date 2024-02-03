@@ -2,10 +2,6 @@ args <- commandArgs(TRUE)
 
 name <- as.character(args[1])
 
-if (!dir.exists(name)) {
-  dir.create(name)
-}
-
 setwd(name)
 
 ### Condamine 2019 Ecology Letters Trees Loading
