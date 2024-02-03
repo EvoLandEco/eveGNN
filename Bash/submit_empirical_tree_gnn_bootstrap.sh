@@ -6,7 +6,7 @@
 #SBATCH --job-name=gnn_boot_start
 #SBATCH --output=logs/gnn_boot_start-%j.log
 #SBATCH --mem=4GB
-#SBATCH --partition=gpu
+#SBATCH --partition=regular
 
 ml R
 
