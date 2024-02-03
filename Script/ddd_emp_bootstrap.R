@@ -18,17 +18,14 @@ pars <- c(lambda, mu, cap)
 
 meta <- c("Family" = family_name, "Tree" = tree_name)
 
-boot_result <- eveGNN::tree_polymorphism_bootstrap(pars = pars,
-                                                   age = 10,
-                                                   ntip = ntip,
-                                                   model = "DDD",
-                                                   nrep = 100)
+boot_result <- replicate(1000, {
+  tree <- DDD::dd_sim(pars = pars, age = 10, ddmodel = 1)
+}, simplify = FALSE)
 
 setwd(path)
 
 for (i in 1:length(boot_result)) {
-  saveRDS(boot_result[[i]], file = paste0("BOOT_", family_name, "_", tree_name, "_", i, ".rds"))
-  eveGNN::export_to_gnn_bootstrap(data = boot_result[[i]],
+  eveGNN::export_to_gnn_bootstrap(data = boot_result[[i]]$tes,
                                   meta = meta,
                                   index = index,
                                   path = "EXPORT",
