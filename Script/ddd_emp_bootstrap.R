@@ -27,7 +27,7 @@ setwd(path)
 for (i in 1:length(boot_result)) {
   eveGNN::export_to_gnn_bootstrap(data = boot_result[[i]]$tes,
                                   meta = meta,
-                                  index = index,
+                                  index = i,
                                   path = "EXPORT",
                                   undirected = FALSE)
 }
