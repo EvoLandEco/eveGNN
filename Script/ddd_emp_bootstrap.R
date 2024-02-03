@@ -18,7 +18,7 @@ pars <- c(lambda, mu, cap)
 
 meta <- c("Family" = family_name, "Tree" = tree_name)
 
-boot_result <- replicate(1000, {
+boot_result <- replicate(100, {
   tree <- DDD::dd_sim(pars = pars, age = 10, ddmodel = 1)
 }, simplify = FALSE)
 

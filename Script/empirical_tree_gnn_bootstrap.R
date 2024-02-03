@@ -17,6 +17,8 @@ if (!dir.exists(ddd_path)) {
   dir.create(ddd_path, recursive = TRUE)
 }
 
+print(nrow(ddd_gnn_emp))
+
 for (i in 1:nrow(ddd_gnn_emp)) {
   lambda <- ddd_gnn_emp$lambda_pred[i]
   mu <- ddd_gnn_emp$mu_pred[i]
