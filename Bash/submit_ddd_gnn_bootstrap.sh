@@ -1,11 +1,11 @@
 #!/bin/bash
-#SBATCH --time=00:30:00
+#SBATCH --time=5:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
 #SBATCH --job-name=gnn_ddd_boot
 #SBATCH --output=logs/gnn_ddd_boot-%j.log
-#SBATCH --mem=3GB
+#SBATCH --mem=4GB
 #SBATCH --partition=regular
 
 lambda=${1}
