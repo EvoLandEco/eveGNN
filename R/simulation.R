@@ -131,6 +131,43 @@ dd_sim_fix_n <- function(n, pars, age, ddmodel = 1) {
 }
 
 
+#' @export bd_sim_fix_n
+bd_sim_fix_n <- function(n, pars, age) {
+  desired_data <- NULL
+  while(is.null(desired_data)) {
+    tryCatch({
+      sim_data <- ape::rlineage(birth = pars[1], death = pars[2], Tmax = age)
+      sim_data <- ape::drop.fossil(sim_data)
+      if(sim_data$Nnode == (n - 1)) {
+        desired_data <- sim_data
+      }
+    }, error = function(e) {
+      # Handle error
+      message("Error in bd_sim: ", e$message)
+    })
+  }
+  return(desired_data)
+}
+
+
+#' @export pbd_sim_fix_n
+pbd_sim_fix_n <- function(n, pars, age, soc) {
+  desired_data <- NULL
+  while(is.null(desired_data)) {
+    tryCatch({
+      sim_data <- pbd_sim(pars, age, soc = soc)
+      if(sim_data$tes$Nnode == (n - 1)) {
+        desired_data <- sim_data
+      }
+    }, error = function(e) {
+      # Handle error
+      message("Error in pbd_sim: ", e$message)
+    })
+  }
+  return(desired_data)
+}
+
+
 #' @export edd_sim_fix_n
 edd_sim_fix_n <- function(n, pars, age, model, metric, offset) {
   desired_data <- NULL
@@ -146,4 +183,29 @@ edd_sim_fix_n <- function(n, pars, age, model, metric, offset) {
     })
   }
   return(desired_data)
+}
+
+
+#' @export tree_polymorphism_bootstrap
+tree_polymorphism_bootstrap <- function(pars, age, ntip, model, nrep = 1000) {
+  result <- list()
+
+  while (length(result) < nrep) {
+    sim_data <- NULL
+    if (model == "BD") {
+      sim_data <- bd_sim_fix_n(n = ntip, pars = pars, age = age)
+    } else if (model == "DDD") {
+      sim_data <- dd_sim_fix_n(n = ntip, pars = pars, age = age, ddmodel = 1)
+      sim_data <- sim_data$tes
+    } else if (model == "PBD") {
+      sim_data <- pbd_sim_fix_n(n = ntip, pars = pars, age = age, soc = 2)
+      sim_data <- sim_data$tes
+    }
+
+    if (!is.null(sim_data)) {
+      result[[length(result) + 1]] <- sim_data
+    }
+  }
+
+  return(result)
 }

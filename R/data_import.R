@@ -452,11 +452,19 @@ load_final_difference_by_layer <- function(path, task_type, model_type, depth) {
 }
 
 
-load_full_mle_result <- function(path, task_type, model_type) {
+load_full_mle_result <- function(path, task_type, model_type, no_init = FALSE) {
+  mle_results <- NULL
   # construct filenames
-  file_name <- paste0("mle_diffs", "_", task_type, ".rds")
-  file_path <- file.path(path, task_type, file_name)
-  mle_results <- readRDS(file_path)
+  if (!no_init) {
+    file_name <- paste0("mle_diffs", "_", task_type, ".rds")
+    file_path <- file.path(path, task_type, file_name)
+    mle_results <- readRDS(file_path)
+  } else {
+    file_name <- paste0("mle_diffs", "_", task_type, "_NO_INIT", ".rds")
+    file_path <- file.path(path, task_type, "NO_INIT", file_name)
+    mle_results <- readRDS(file_path)
+  }
+
 
   out <- list()
   for (i in seq_len(length(mle_results))) {
@@ -480,10 +488,17 @@ load_full_mle_result <- function(path, task_type, model_type) {
 
 
 #' @export load_separated_mle_result
-load_separated_mle_result <- function(path, task_type, model_type) {
-    # construct filenames
-  mle_list <- list.files(file.path(path, paste0(task_type, "_MLE_TES")), pattern = "^differences_[0-9]+\\.rds$", full.names = TRUE)
+load_separated_mle_result <- function(path, task_type, model_type, no_init = FALSE) {
   mle_results <- list()
+  mle_list <- list()
+
+    # construct filenames
+  if (!no_init) {
+    mle_list <- list.files(file.path(path, paste0(task_type, "_MLE_TES")), pattern = "^differences_[0-9]+\\.rds$", full.names = TRUE)
+  } else {
+    mle_list <- list.files(file.path(path, paste0(task_type, "_MLE_TES"), "NO_INIT"), pattern = "^differences_[0-9]+\\.rds$", full.names = TRUE)
+  }
+
   out <- list()
   for (i in seq_len(length(mle_list))) {
     mle_results[[i]] <- readRDS(mle_list[i])
@@ -538,6 +553,44 @@ load_separated_mle_result <- function(path, task_type, model_type) {
   out$Model <- model_type
   out$Task <- paste0(task_type, "_MLE_TES")
   out <- as.data.frame(out)
+
+  return(out)
+}
+
+
+#' @export load_empirical_mle_result
+load_empirical_mle_result <- function(path) {
+  path_bd <- file.path(path, "EMP_RESULT","BD")
+  path_ddd <- file.path(path, "EMP_RESULT","DDD")
+  path_pbd <- file.path(path, "EMP_RESULT","PBD")
+
+  bd_file_list <- list.files(file.path(path_bd), pattern = "^BD_EMP_MLE_.*\\.rds$", full.names = TRUE)
+  ddd_file_list <- list.files(file.path(path_ddd), pattern = "^DDD_EMP_MLE_.*\\.rds$", full.names = TRUE)
+  pbd_file_list <- list.files(file.path(path_pbd), pattern = "^PBD_EMP_MLE_.*\\.rds$", full.names = TRUE)
+
+  bd_results <- list()
+  ddd_results <- list()
+  pbd_results <- list()
+
+  for (i in seq_len(length(bd_file_list))) {
+      bd_results[[i]] <- readRDS(bd_file_list[i])
+  }
+  for (i in seq_len(length(ddd_file_list))) {
+      ddd_results[[i]] <- readRDS(ddd_file_list[i])
+  }
+  for (i in seq_len(length(pbd_file_list))) {
+      pbd_results[[i]] <- readRDS(pbd_file_list[i])
+  }
+
+  bd_results <- dplyr::bind_rows(bd_results)
+  ddd_results <- dplyr::bind_rows(ddd_results)
+  pbd_results <- dplyr::bind_rows(pbd_results)
+
+  bd_results$Model <- "BD"
+  ddd_results$Model <- "DDD"
+  pbd_results$Model <- "PBD"
+
+  out <- list(BD = bd_results, DDD = ddd_results, PBD = pbd_results)
 
   return(out)
 }

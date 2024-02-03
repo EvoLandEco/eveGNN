@@ -505,29 +505,52 @@ plot_boxplot_difference <- function(path = NULL, model = "diffpool", depth = 2) 
     }
 
     plot_data_mle <- NULL
+    plot_data_mle_no_init <- NULL
 
     if (task != "EVE") {
       if (task == "DDD") {
-        plot_data_mle <- load_separated_mle_result(path = path, task_type = task, model_type = model)
+        plot_data_mle <- load_separated_mle_result(path = path, task_type = task, model_type = model, no_init = FALSE)
         plot_data_mle <- plot_data_mle %>%
-          dplyr::filter(lambda_r_diff < 2000, lambda_r_diff > -2000, mu_r_diff < 2000, mu_r_diff > -2000, cap_r_diff < 2000, cap_r_diff > -2000) %>%
+          dplyr::filter(lambda_r_diff < 5000, lambda_r_diff > -5000, mu_r_diff < 5000, mu_r_diff > -5000, cap_r_diff < 5000, cap_r_diff > -5000) %>%
           dplyr::select(lambda_r_diff, mu_r_diff, cap_r_diff, Task, Model) %>%
           dplyr::mutate(Depth = NA) %>%
           tidyr::gather("Parameter", "Value", -Task, -Model, -Depth) %>%
-          dplyr::mutate(Bias = dplyr::case_when(Parameter == "lambda_r_diff" ~ "MLE",
-                                                Parameter == "mu_r_diff" ~ "MLE",
-                                                Parameter == "cap_r_diff" ~ "MLE"))
+          dplyr::mutate(Bias = dplyr::case_when(Parameter == "lambda_r_diff" ~ "MLE_O",
+                                                Parameter == "mu_r_diff" ~ "MLE_O",
+                                                Parameter == "cap_r_diff" ~ "MLE_O"))
+        plot_data_mle_no_init <- load_separated_mle_result(path = path, task_type = task, model_type = model, no_init = TRUE)
+        plot_data_mle_no_init <- plot_data_mle_no_init %>%
+          dplyr::filter(lambda_r_diff < 5000, lambda_r_diff > -5000, mu_r_diff < 5000, mu_r_diff > -5000, cap_r_diff < 5000, cap_r_diff > -5000) %>%
+          dplyr::select(lambda_r_diff, mu_r_diff, cap_r_diff, Task, Model) %>%
+          dplyr::mutate(Depth = NA) %>%
+          dplyr::rename(lambda_r_diff_no_init = lambda_r_diff,
+                        mu_r_diff_no_init = mu_r_diff,
+                        cap_r_diff_no_init = cap_r_diff) %>%
+          tidyr::gather("Parameter", "Value", -Task, -Model, -Depth) %>%
+          dplyr::mutate(Bias = dplyr::case_when(Parameter == "lambda_r_diff_no_init" ~ "MLE_N",
+                                                Parameter == "mu_r_diff_no_init" ~ "MLE_N",
+                                                Parameter == "cap_r_diff_no_init" ~ "MLE_N"))
       } else if (task == "BD") {
-        plot_data_mle <- load_full_mle_result(path = path, task_type = paste0(task, "_MLE_TES"), model_type = model)
+        plot_data_mle <- load_full_mle_result(path = path, task_type = paste0(task, "_MLE_TES"), model_type = model, no_init = FALSE)
         plot_data_mle <- plot_data_mle %>%
-          dplyr::filter(lambda_r_diff < 1000, lambda_r_diff > -1000, mu_r_diff < 1500, mu_r_diff > -1500) %>%
+          dplyr::filter(lambda_r_diff < 2000, lambda_r_diff > -2000, mu_r_diff < 2000, mu_r_diff > -2000) %>%
           dplyr::select(lambda_r_diff, mu_r_diff, Task, Model) %>%
           dplyr::mutate(Depth = NA) %>%
           tidyr::gather("Parameter", "Value", -Task, -Model, -Depth) %>%
-          dplyr::mutate(Bias = dplyr::case_when(Parameter == "lambda_r_diff" ~ "MLE",
-                                           Parameter == "mu_r_diff" ~ "MLE"))
+          dplyr::mutate(Bias = dplyr::case_when(Parameter == "lambda_r_diff" ~ "MLE_O",
+                                           Parameter == "mu_r_diff" ~ "MLE_O"))
+        plot_data_mle_no_init <- load_full_mle_result(path = path, task_type = paste0(task, "_MLE_TES"), model_type = model, no_init = TRUE)
+        plot_data_mle_no_init <- plot_data_mle_no_init %>%
+          dplyr::filter(lambda_r_diff < 2000, lambda_r_diff > -2000, mu_r_diff < 2000, mu_r_diff > -2000) %>%
+          dplyr::select(lambda_r_diff, mu_r_diff, Task, Model) %>%
+          dplyr::mutate(Depth = NA) %>%
+          dplyr::rename(lambda_r_diff_no_init = lambda_r_diff,
+                        mu_r_diff_no_init = mu_r_diff) %>%
+          tidyr::gather("Parameter", "Value", -Task, -Model, -Depth) %>%
+          dplyr::mutate(Bias = dplyr::case_when(Parameter == "lambda_r_diff_no_init" ~ "MLE_N",
+                                                Parameter == "mu_r_diff_no_init" ~ "MLE_N"))
       } else if (task == "PBD") {
-        plot_data_mle <- load_separated_mle_result(path = path, task_type = task, model_type = model)
+        plot_data_mle <- load_separated_mle_result(path = path, task_type = task, model_type = model, no_init = FALSE)
         plot_data_mle <- plot_data_mle %>%
           dplyr::filter(lambda1_r_diff < 2000, lambda1_r_diff > -2000,
                         lambda2_r_diff < 2000, lambda2_r_diff > -2000,
@@ -537,11 +560,31 @@ plot_boxplot_difference <- function(path = NULL, model = "diffpool", depth = 2) 
           dplyr::select(lambda1_r_diff, lambda2_r_diff, lambda3_r_diff, mu1_r_diff, mu2_r_diff, Task, Model) %>%
           dplyr::mutate(Depth = NA) %>%
           tidyr::gather("Parameter", "Value", -Task, -Model, -Depth) %>%
-          dplyr::mutate(Bias = dplyr::case_when(Parameter == "lambda1_r_diff" ~ "MLE",
-                                                Parameter == "lambda2_r_diff" ~ "MLE",
-                                                Parameter == "lambda3_r_diff" ~ "MLE",
-                                                Parameter == "mu1_r_diff" ~ "MLE",
-                                                Parameter == "mu2_r_diff" ~ "MLE"))
+          dplyr::mutate(Bias = dplyr::case_when(Parameter == "lambda1_r_diff" ~ "MLE_O",
+                                                Parameter == "lambda2_r_diff" ~ "MLE_O",
+                                                Parameter == "lambda3_r_diff" ~ "MLE_O",
+                                                Parameter == "mu1_r_diff" ~ "MLE_O",
+                                                Parameter == "mu2_r_diff" ~ "MLE_O"))
+        plot_data_mle_no_init <- load_separated_mle_result(path = path, task_type = task, model_type = model, no_init = TRUE)
+        plot_data_mle_no_init <- plot_data_mle_no_init %>%
+          dplyr::filter(lambda1_r_diff < 2000, lambda1_r_diff > -2000,
+                        lambda2_r_diff < 2000, lambda2_r_diff > -2000,
+                        lambda3_r_diff < 2000, lambda3_r_diff > -2000,
+                        mu1_r_diff < 2000, mu1_r_diff > -2000,
+                        mu2_r_diff < 2000, mu2_r_diff > -2000) %>%
+          dplyr::select(lambda1_r_diff, lambda2_r_diff, lambda3_r_diff, mu1_r_diff, mu2_r_diff, Task, Model) %>%
+          dplyr::mutate(Depth = NA) %>%
+          dplyr::rename(lambda1_r_diff_no_init = lambda1_r_diff,
+                        lambda2_r_diff_no_init = lambda2_r_diff,
+                        lambda3_r_diff_no_init = lambda3_r_diff,
+                        mu1_r_diff_no_init = mu1_r_diff,
+                        mu2_r_diff_no_init = mu2_r_diff) %>%
+          tidyr::gather("Parameter", "Value", -Task, -Model, -Depth) %>%
+          dplyr::mutate(Bias = dplyr::case_when(Parameter == "lambda1_r_diff_no_init" ~ "MLE_N",
+                                                Parameter == "lambda2_r_diff_no_init" ~ "MLE_N",
+                                                Parameter == "lambda3_r_diff_no_init" ~ "MLE_N",
+                                                Parameter == "mu1_r_diff_no_init" ~ "MLE_N",
+                                                Parameter == "mu2_r_diff_no_init" ~ "MLE_N"))
       }
     }
 
@@ -559,30 +602,20 @@ plot_boxplot_difference <- function(path = NULL, model = "diffpool", depth = 2) 
 
     plot_data$Depth <- as.factor(plot_data$Depth)
     plot_data_mle$Depth <- as.factor(plot_data_mle$Depth)
+    plot_data_mle_no_init$Depth <- as.factor(plot_data_mle_no_init$Depth)
+
     if (task == "BD") {
       plot_data <- plot_data %>%
         dplyr::select(lambda_r_diff, mu_r_diff,
-                      lambda_r_diff_corrected, mu_r_diff_corrected,
                       Depth, Model, Task) %>%
         dplyr::filter(lambda_r_diff < 2500, mu_r_diff < 2500, lambda_r_diff > -2500, mu_r_diff > -2500) %>%
-        tidyr::gather("Parameter", "Value", -Task, -Model, -Depth) %>%
-        dplyr::mutate(Bias = dplyr::case_when(Parameter == "lambda_r_diff" ~ "Raw",
-                                       Parameter == "mu_r_diff" ~ "Raw",
-                                       Parameter == "lambda_r_diff_corrected" ~ "Corrected",
-                                       Parameter == "mu_r_diff_corrected" ~ "Corrected"))
+        tidyr::gather("Parameter", "Value", -Task, -Model, -Depth)
     } else if (task == "DDD") {
       plot_data <- plot_data %>%
         dplyr::select(lambda_r_diff, mu_r_diff, cap_r_diff,
-                      lambda_r_diff_corrected, mu_r_diff_corrected, cap_r_diff_corrected,
                       Depth, Model, Task) %>%
         dplyr::filter(lambda_r_diff < 2500, mu_r_diff < 2500, lambda_r_diff > -2500, mu_r_diff > -2500) %>%
-        tidyr::gather("Parameter", "Value", -Task, -Model, -Depth) %>%
-        dplyr::mutate(Bias = dplyr::case_when(Parameter == "lambda_r_diff" ~ "Raw",
-                                              Parameter == "mu_r_diff" ~ "Raw",
-                                              Parameter == "cap_r_diff" ~ "Raw",
-                                              Parameter == "lambda_r_diff_corrected" ~ "Corrected",
-                                              Parameter == "mu_r_diff_corrected" ~ "Corrected",
-                                              Parameter == "cap_r_diff_corrected" ~ "Corrected"))
+        tidyr::gather("Parameter", "Value", -Task, -Model, -Depth)
     } else if (task == "PBD") {
       plot_data <- plot_data %>%
         dplyr::filter(lambda1_r_diff < 2000, lambda1_r_diff > -2000,
@@ -591,27 +624,17 @@ plot_boxplot_difference <- function(path = NULL, model = "diffpool", depth = 2) 
                       mu1_r_diff < 2000, mu1_r_diff > -2000,
                       mu2_r_diff < 2000, mu2_r_diff > -2000) %>%
         dplyr::select(lambda1_r_diff, lambda2_r_diff, lambda3_r_diff, mu1_r_diff, mu2_r_diff,
-                      lambda1_r_diff_corrected, lambda2_r_diff_corrected, lambda3_r_diff_corrected, mu1_r_diff_corrected, mu2_r_diff_corrected,
                       Depth, Task, Model) %>%
-        tidyr::gather("Parameter", "Value", -Task, -Model, -Depth) %>%
-        dplyr::mutate(Bias = dplyr::case_when(Parameter == "lambda1_r_diff" ~ "Raw",
-                                              Parameter == "lambda2_r_diff" ~ "Raw",
-                                              Parameter == "lambda3_r_diff" ~ "Raw",
-                                              Parameter == "mu1_r_diff" ~ "Raw",
-                                              Parameter == "mu2_r_diff" ~ "Raw",
-                                              Parameter == "lambda1_r_diff_corrected" ~ "Corrected",
-                                              Parameter == "lambda2_r_diff_corrected" ~ "Corrected",
-                                              Parameter == "lambda3_r_diff_corrected" ~ "Corrected",
-                                              Parameter == "mu1_r_diff_corrected" ~ "Corrected",
-                                              Parameter == "mu2_r_diff_corrected" ~ "Corrected"))
+        tidyr::gather("Parameter", "Value", -Task, -Model, -Depth)
     }
 
-    plot_data_all <- dplyr::bind_rows(plot_data, plot_data_mle) %>%
+    plot_data_all <- dplyr::bind_rows(plot_data, plot_data_mle, plot_data_mle_no_init) %>%
       dplyr::select(-Depth) %>%
       dplyr::mutate(Flag = dplyr::case_when(
         grepl("FREE", Task) ~ "Free",
         grepl("VAL", Task) ~ "Val",
-        grepl("MLE", Task) ~ "MLE")) %>%
+        grepl("MLE_O", Bias) ~ "MLE_O",
+        grepl("MLE_N", Bias) ~ "MLE_N")) %>%
       dplyr::mutate(XVar = dplyr::case_when(
         grepl("lambda_", Parameter) ~ "lambda_r_diff",
         grepl("mu_", Parameter) ~ "mu_r_diff",
@@ -631,11 +654,11 @@ plot_boxplot_difference <- function(path = NULL, model = "diffpool", depth = 2) 
         dplyr::filter(XVar == i) %>%
         dplyr::mutate(Tag = difference_var_to_label(i))) +
         ggplot2::geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
-        ggplot2::geom_boxplot(ggplot2::aes(Task, Value, fill = Bias), outlier.shape = NA) +
+        ggplot2::geom_boxplot(ggplot2::aes(Task, Value, fill = Flag), outlier.shape = NA) +
         ggplot2::facet_wrap(~ Tag, labeller = ggplot2::label_parsed) +
         ggplot2::scale_y_continuous(labels = function(x) paste0(x, "%")) +
         ggplot2::labs(x = NULL, y = NULL, fill = "Type") +
-        nord::scale_fill_nord(palette = "aurora", discrete = T) +
+        nord::scale_fill_nord(palette = "aurora", discrete = T, labels = c("Test", "MLE non-optimal", "MLE optimal", "Validation")) +
         ggplot2::guides(fill = ggplot2::guide_legend(nrow = 1, byrow = TRUE)) +
         ggplot2::theme(plot.tag.position = "top",
                        panel.background = ggplot2::element_blank())
@@ -643,31 +666,31 @@ plot_boxplot_difference <- function(path = NULL, model = "diffpool", depth = 2) 
       if (task == "BD") {
         p <- p + ggplot2::scale_x_discrete(labels = c("T-TAS", "T-TES", "MLE-TES", "V-TAS", "V-TES"))
         if (i == "lambda_r_diff") {
-          p <- p + ggplot2::coord_cartesian(ylim = c(-250, 250))
+          p <- p + ggplot2::coord_cartesian(ylim = c(-200, 150))
         } else if (i == "mu_r_diff") {
-          p <- p + ggplot2::coord_cartesian(ylim = c(-500, 250))
+          p <- p + ggplot2::coord_cartesian(ylim = c(-600, 300))
         }
       } else if (task == "DDD") {
         p <- p + ggplot2::scale_x_discrete(labels = c("T-TAS", "T-TES", "MLE-TES", "V-TAS", "V-TES"))
         if (i == "lambda_r_diff") {
-          p <- p + ggplot2::coord_cartesian(ylim = c(-300, 250))
+          p <- p + ggplot2::coord_cartesian(ylim = c(-200, 200))
         } else if (i == "mu_r_diff") {
-          p <- p + ggplot2::coord_cartesian(ylim = c(-500, 250))
+          p <- p + ggplot2::coord_cartesian(ylim = c(-600, 300))
         } else if (i == "cap_r_diff") {
-          p <- p + ggplot2::coord_cartesian(ylim = c(-250, 250))
+          p <- p + ggplot2::coord_cartesian(ylim = c(-500, 150))
         }
       } else if (task == "PBD") {
         p <- p + ggplot2::scale_x_discrete(labels = c("T-TES", "MLE-TES", "V-TES"))
         if (i == "lambda1_r_diff") {
-          p <- p + ggplot2::coord_cartesian(ylim = c(-250, 250))
+          p <- p + ggplot2::coord_cartesian(ylim = c(-250, 100))
         } else if (i == "lambda2_r_diff") {
-          p <- p + ggplot2::coord_cartesian(ylim = c(-2000, 150))
+          p <- p + ggplot2::coord_cartesian(ylim = c(-2200, 200))
         } else if (i == "lambda3_r_diff") {
-          p <- p + ggplot2::coord_cartesian(ylim = c(-300, 250))
+          p <- p + ggplot2::coord_cartesian(ylim = c(-400, 200))
         } else if (i == "mu1_r_diff") {
-          p <- p + ggplot2::coord_cartesian(ylim = c(-1000, 250))
+          p <- p + ggplot2::coord_cartesian(ylim = c(-900, 150))
         } else if (i == "mu2_r_diff") {
-          p <- p + ggplot2::coord_cartesian(ylim = c(-1200, 250))
+          p <- p + ggplot2::coord_cartesian(ylim = c(-1200, 300))
         }
       }
 
