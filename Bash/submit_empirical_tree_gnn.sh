@@ -23,7 +23,7 @@ name=$1
 gnn_depth=$2
 
 # Firstly we export the empirical tree to GNN representation
-Rsript ../Script/empirical_tree_gnn_export.R
+Rscript ../Script/empirical_tree_gnn_export.R ${name}
 
 # Call the Python script with the arguments
 python ../Script/app_bd_pars_est_DiffPool.py "$name" "$gnn_depth"
