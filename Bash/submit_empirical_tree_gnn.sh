@@ -28,6 +28,6 @@ Rscript ../Script/empirical_tree_gnn_export.R ${name}
 # Call the Python script with the arguments
 python ../Script/app_bd_pars_est_DiffPool.py "$name" "$gnn_depth"
 python ../Script/app_ddd_pars_est_DiffPool.py "$name" "$gnn_depth"
-python ../Script/app_pbd_pars_est_DiffPool_full.py "$name" "$gnn_depth"
+python ../Script/app_pbd_pars_est_DiffPool.py "$name" "$gnn_depth"
 
 deactivate
