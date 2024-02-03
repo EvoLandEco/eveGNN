@@ -14,11 +14,11 @@ if (!dir.exists(export_path)) {
 }
 
 ### Condamine 2019 Ecology Letters Trees Loading
-load("EMP_DATA/FamilyAmphibiaTrees.Rdata")
-load("EMP_DATA/FamilyBirdTrees.Rdata")
-load("EMP_DATA/FamilyCrocoTurtleTrees.Rdata")
-load("EMP_DATA/FamilyMammalTrees.Rdata")
-load("EMP_DATA/FamilySquamateTrees.Rdata")
+load(file.path(data_path, "FamilyAmphibiaTrees.Rdata"))
+load(file.path(data_path, "FamilyBirdTrees.Rdata"))
+load(file.path(data_path, "FamilyCrocoTurtleTrees.Rdata"))
+load(file.path(data_path, "FamilyMammalTrees.Rdata"))
+load(file.path(data_path, "FamilySquamateTrees.Rdata"))
 
 condamine_tree_list <- list(Amphibia = FamilyAmphibiaTrees,
                             Bird = FamilyBirdTrees,
