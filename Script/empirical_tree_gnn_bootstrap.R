@@ -28,4 +28,5 @@ for (i in 1:nrow(ddd_gnn_emp)) {
 
   command <- paste0("sbatch submit_ddd_gnn_bootstrap.sh ",
                     paste0(lambda, " ", mu, " ", cap, " ", ntip, " ", family_name, " ", tree_name, " ", ddd_path))
+  system(command)
 }
