@@ -320,7 +320,7 @@ plot_scatter_difference_by_pars_rel_by_layer <- function(path = NULL, task = "BD
       plot_data_mle <- load_separated_mle_result(path = path, task_type = task, model_type = model)
       plot_data_mle <- plot_data_mle %>%
         dplyr::select(-lambda_a_diff, -mu_a_diff, -cap_a_diff) %>%
-        dplyr::filter(lambda_r_diff < 2000, lambda_r_diff > -2000, mu_r_diff < 2000, mu_r_diff > -2000, cap_r_diff < 2000, cap_r_diff > -2000) %>%
+        dplyr::filter(lambda_r_diff < 5000, lambda_r_diff > -5000, mu_r_diff < 5000, mu_r_diff > -5000, cap_r_diff < 2000, cap_r_diff > -2000) %>%
         tidyr::gather("Parameter", "Value", -Task, -Model, -num_nodes, -lambda, -mu, -cap)
     } else if (task == "BD") {
       plot_data_mle <- load_full_mle_result(path = path, task_type = paste0(task, "_MLE_TES"), model_type = model)
@@ -340,32 +340,28 @@ plot_scatter_difference_by_pars_rel_by_layer <- function(path = NULL, task = "BD
     }
   }
 
+  if (task != "BD") {
+    plot_data_mle$num_nodes <- 2 * plot_data_mle$num_nodes + 1
+  }
+
   plot_data$Depth <- as.factor(plot_data$Depth)
   if (task == "BD") {
     plot_data <- plot_data %>%
       dplyr::select(-lambda_diff, -mu_diff, -lambda_pred, -mu_pred,
-                    -lambda_a_diff, -mu_a_diff,
-                    -lambda_r_diff_corrected, -mu_r_diff_corrected,
-                    -lambda_pred_corrected, -mu_pred_corrected, -lambda_a_diff_corrected, -mu_a_diff_corrected) %>%
+                    -lambda_a_diff, -mu_a_diff) %>%
       dplyr::filter(lambda_r_diff < 350, mu_r_diff < 350, lambda_r_diff > -350, mu_r_diff > -350) %>%
       tidyr::gather("Parameter", "Value", -Task, -Model, -Depth, -lambda, -mu, -num_nodes)
   } else if (task == "DDD") {
     plot_data <- plot_data %>%
       dplyr::select(-lambda_diff, -mu_diff, -lambda_pred, -mu_pred, -cap_diff, -cap_pred,
-                    -lambda_a_diff, -mu_a_diff, -cap_a_diff,
-                    -lambda_r_diff_corrected, -mu_r_diff_corrected, -cap_r_diff_corrected,
-                    -lambda_pred_corrected, -mu_pred_corrected, -cap_pred_corrected,
-                    -lambda_a_diff_corrected, -mu_a_diff_corrected, -cap_a_diff_corrected) %>%
+                    -lambda_a_diff, -mu_a_diff, -cap_a_diff) %>%
       dplyr::filter(lambda_r_diff < 350, mu_r_diff < 350, lambda_r_diff > -350, mu_r_diff > -350) %>%
       tidyr::gather("Parameter", "Value", -Task, -Model, -Depth, -lambda, -mu, -num_nodes, -cap)
   } else if (task == "PBD") {
     plot_data <- plot_data %>%
       dplyr::select(-lambda1_diff, -lambda2_diff, -lambda3_diff, -mu1_diff, -mu2_diff,
                     -lambda1_pred, -lambda2_pred, -lambda3_pred, -mu1_pred, -mu2_pred,
-                    -lambda1_r_diff_corrected, -lambda2_r_diff_corrected, -lambda3_r_diff_corrected, -mu1_r_diff_corrected, -mu2_r_diff_corrected,
-                    -lambda1_pred_corrected, -lambda2_pred_corrected, -lambda3_pred_corrected, -mu1_pred_corrected, -mu2_pred_corrected,
-                    -lambda1_a_diff, -lambda2_a_diff, -lambda3_a_diff, -mu1_a_diff, -mu2_a_diff,
-                    -lambda1_a_diff_corrected, -lambda2_a_diff_corrected, -lambda3_a_diff_corrected, -mu1_a_diff_corrected, -mu2_a_diff_corrected) %>%
+                    -lambda1_a_diff, -lambda2_a_diff, -lambda3_a_diff, -mu1_a_diff, -mu2_a_diff) %>%
       dplyr::filter(lambda1_r_diff < 350, lambda2_r_diff < 350, lambda3_r_diff < 350, mu1_r_diff < 350, mu2_r_diff < 350,
                     lambda1_r_diff > -350, lambda2_r_diff > -350, lambda3_r_diff > -350, mu1_r_diff > -350, mu2_r_diff > -350) %>%
       tidyr::gather("Parameter", "Value", -Task, -Model, -Depth, -lambda1, -lambda2, -lambda3, -mu1, -mu2, -num_nodes)
@@ -403,7 +399,7 @@ plot_scatter_difference_by_pars_rel_by_layer <- function(path = NULL, task = "BD
                               ggplot2::labeller(Parameter = ggplot2::as_labeller(~difference_var_to_label(.x), ggplot2::label_parsed)),
                             nrow = 1) +
         ggpointdensity::geom_pointdensity(data = plot_data %>% dplyr::filter(Task == i),
-                                          ggplot2::aes_string(xvar_list[j], "Value"), method = "kde2d") +
+                                          ggplot2::aes_string(xvar_list[j], "(-1 * Value)"), method = "kde2d") +
         ggplot2::geom_hline(yintercept = abline_range[1], linetype = "dashed", color = abline_color) +
         ggplot2::geom_hline(yintercept = abline_range[2], linetype = "dashed", color = abline_color) +
         #viridis::scale_color_viridis(discrete = F) +
@@ -412,8 +408,17 @@ plot_scatter_difference_by_pars_rel_by_layer <- function(path = NULL, task = "BD
         ggplot2::labs(y = NULL, x = NULL) +
         ggplot2::theme(legend.position = "none",
                        plot.background = ggplot2::element_blank(),
-                       panel.background = ggplot2::element_blank()) +
-        ggplot2::coord_cartesian(ylim = c(-220, 220))
+                       panel.background = ggplot2::element_blank())
+
+      if (task == "BD") {
+        p <- p + ggplot2::coord_cartesian(ylim = c(-220, 220))
+      } else if (task == "DDD") {
+        p <- p + ggplot2::coord_cartesian(ylim = c(-220, 520))
+      } else if (task == "PBD") {
+        p <- p + ggplot2::coord_cartesian(ylim = c(-220, 520))
+      } else if (task == "EVE") {
+        p <- p + ggplot2::coord_cartesian(ylim = c(-220, 220))
+      }
 
       if (index == 1) {
         if (grepl("TES", i)) {
@@ -449,7 +454,7 @@ plot_scatter_difference_by_pars_rel_by_layer <- function(path = NULL, task = "BD
                             labeller = ggplot2::labeller(Parameter = ggplot2::as_labeller(~difference_var_to_label(.x), ggplot2::label_parsed)),
                             nrow = 1) +
         ggpointdensity::geom_pointdensity(data = plot_data_mle,
-                                          ggplot2::aes_string(xvar_list[j], "Value")) +
+                                          ggplot2::aes_string(xvar_list[j], "(-1 * Value)")) +
         ggplot2::geom_hline(yintercept = abline_range[1], linetype = "dashed", color = abline_color) +
         ggplot2::geom_hline(yintercept = abline_range[2], linetype = "dashed", color = abline_color) +
         #viridis::scale_color_viridis(discrete = F) +
@@ -654,7 +659,7 @@ plot_boxplot_difference <- function(path = NULL, model = "diffpool", depth = 2) 
         dplyr::filter(XVar == i) %>%
         dplyr::mutate(Tag = difference_var_to_label(i))) +
         ggplot2::geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
-        ggplot2::geom_boxplot(ggplot2::aes(Task, Value, fill = Flag), outlier.shape = NA) +
+        ggplot2::geom_boxplot(ggplot2::aes(Task, (-1 * Value), fill = Flag), outlier.shape = NA) +
         ggplot2::facet_wrap(~ Tag, labeller = ggplot2::label_parsed) +
         ggplot2::scale_y_continuous(labels = function(x) paste0(x, "%")) +
         ggplot2::labs(x = NULL, y = NULL, fill = "Type") +
@@ -666,31 +671,31 @@ plot_boxplot_difference <- function(path = NULL, model = "diffpool", depth = 2) 
       if (task == "BD") {
         p <- p + ggplot2::scale_x_discrete(labels = c("T-TAS", "T-TES", "MLE-TES", "V-TAS", "V-TES"))
         if (i == "lambda_r_diff") {
-          p <- p + ggplot2::coord_cartesian(ylim = c(-200, 150))
+          p <- p + ggplot2::coord_cartesian(ylim = c(-150, 200))
         } else if (i == "mu_r_diff") {
-          p <- p + ggplot2::coord_cartesian(ylim = c(-600, 300))
+          p <- p + ggplot2::coord_cartesian(ylim = c(-600, 600))
         }
       } else if (task == "DDD") {
         p <- p + ggplot2::scale_x_discrete(labels = c("T-TAS", "T-TES", "MLE-TES", "V-TAS", "V-TES"))
         if (i == "lambda_r_diff") {
           p <- p + ggplot2::coord_cartesian(ylim = c(-200, 200))
         } else if (i == "mu_r_diff") {
-          p <- p + ggplot2::coord_cartesian(ylim = c(-600, 300))
+          p <- p + ggplot2::coord_cartesian(ylim = c(-400, 600))
         } else if (i == "cap_r_diff") {
-          p <- p + ggplot2::coord_cartesian(ylim = c(-500, 150))
+          p <- p + ggplot2::coord_cartesian(ylim = c(-150, 500))
         }
       } else if (task == "PBD") {
         p <- p + ggplot2::scale_x_discrete(labels = c("T-TES", "MLE-TES", "V-TES"))
         if (i == "lambda1_r_diff") {
-          p <- p + ggplot2::coord_cartesian(ylim = c(-250, 100))
+          p <- p + ggplot2::coord_cartesian(ylim = c(-100, 250))
         } else if (i == "lambda2_r_diff") {
-          p <- p + ggplot2::coord_cartesian(ylim = c(-2200, 200))
+          p <- p + ggplot2::coord_cartesian(ylim = c(-2000, 2200))
         } else if (i == "lambda3_r_diff") {
-          p <- p + ggplot2::coord_cartesian(ylim = c(-400, 200))
+          p <- p + ggplot2::coord_cartesian(ylim = c(-200, 400))
         } else if (i == "mu1_r_diff") {
-          p <- p + ggplot2::coord_cartesian(ylim = c(-900, 150))
+          p <- p + ggplot2::coord_cartesian(ylim = c(-150, 900))
         } else if (i == "mu2_r_diff") {
-          p <- p + ggplot2::coord_cartesian(ylim = c(-1200, 300))
+          p <- p + ggplot2::coord_cartesian(ylim = c(-200, 1300))
         }
       }
 
