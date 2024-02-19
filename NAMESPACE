@@ -2,6 +2,7 @@
 
 export(all_differences)
 export(batch_sim_ddd)
+export(bd_fixed_age)
 export(bd_sim_fix_n)
 export(compute_accuracy_bd_ml_free)
 export(compute_accuracy_bd_ml_free_no_init)

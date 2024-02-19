@@ -54,6 +54,23 @@ randomized_bd_fixed_age <- function(dists, age) {
 }
 
 
+#' @export bd_fixed_age
+bd_fixed_age <- function(lambda, mu, age) {
+  tas <- ape::rlineage(birth = lambda, death = mu, Tmax = age)
+  tes <- ape::drop.fossil(tas)
+  result <- list()
+  result$tas <- tas
+  result$tes <- tes
+  result$brts <- treestats::branching_times(tes)
+  result$age <- age
+  result$model <- "BD"
+  params <- c(lambda, mu)
+  result$pars <- params
+
+  return(result)
+}
+
+
 #' @export randomized_pbd_fixed_age
 randomized_pbd_fixed_age <- function(dists, age) {
   params <- generate_params(dists)
@@ -66,6 +83,7 @@ randomized_pbd_fixed_age <- function(dists, age) {
 
   return(result)
 }
+
 
 #' @export randomized_eve_fixed_age
 randomized_eve_fixed_age <- function(dists, age, model, metric, offset) {

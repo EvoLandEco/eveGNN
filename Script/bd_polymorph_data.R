@@ -4,115 +4,72 @@ name <- as.character(args[1])
 
 setwd(name)
 
-### Condamine 2019 Ecology Letters Trees Loading
-load("EMP_DATA/FamilyAmphibiaTrees.Rdata")
-load("EMP_DATA/FamilyBirdTrees.Rdata")
-load("EMP_DATA/FamilyCrocoTurtleTrees.Rdata")
-load("EMP_DATA/FamilyMammalTrees.Rdata")
-load("EMP_DATA/FamilySquamateTrees.Rdata")
+future::plan("multicore", workers = 4)
 
-if (!dir.exists("POLY_RESULT")) {
-  dir.create("POLY_RESULT")
+bd_poly_list_1 <- future.apply::future_replicate(1000,
+                                               eveGNN::bd_fixed_age(0.6, 0.1, age = 10),
+                                               simplify = FALSE)
+
+bd_poly_list_2 <- future.apply::future_replicate(1000,
+                                               eveGNN::bd_fixed_age(0.6, 0.2, age = 10),
+                                               simplify = FALSE)
+
+bd_poly_list_3 <- future.apply::future_replicate(1000,
+                                                eveGNN::bd_fixed_age(0.6, 0.3, age = 10),
+                                                simplify = FALSE)
+
+bd_poly_list_4 <- future.apply::future_replicate(1000,
+                                                eveGNN::bd_fixed_age(0.6, 0.4, age = 10),
+                                                simplify = FALSE)
+
+bd_poly_list_5 <- future.apply::future_replicate(1000,
+                                                eveGNN::bd_fixed_age(0.6, 0.5, age = 10),
+                                                simplify = FALSE)
+
+bd_poly_list_6 <- future.apply::future_replicate(1000,
+                                                eveGNN::bd_fixed_age(0.5, 0.1, age = 10),
+                                                simplify = FALSE)
+
+bd_poly_list_7 <- future.apply::future_replicate(1000,
+                                                eveGNN::bd_fixed_age(0.4, 0.1, age = 10),
+                                                simplify = FALSE)
+
+bd_poly_list_8 <- future.apply::future_replicate(1000,
+                                                eveGNN::bd_fixed_age(0.3, 0.1, age = 10),
+                                                simplify = FALSE)
+
+bd_poly_list_9 <- future.apply::future_replicate(1000,
+                                                eveGNN::bd_fixed_age(0.2, 0.1, age = 10),
+                                                simplify = FALSE)
+
+bd_poly_list <- c(bd_poly_list_1, bd_poly_list_2,
+                  bd_poly_list_3, bd_poly_list_4,
+                  bd_poly_list_5, bd_poly_list_6,
+                  bd_poly_list_7, bd_poly_list_8,
+                  bd_poly_list_9)
+
+if (!dir.exists("BD_POLY_TES")) {
+  dir.create("BD_POLY_TES")
 }
 
-setwd("POLY_RESULT")
+setwd("BD_POLY_TES")
 
-if (!dir.exists("DDD")) {
-  dir.create("DDD")
-}
+print("Exporting BD Poly TES Data to GNN")
 
-setwd("DDD")
+bd_poly_list <- purrr::transpose(bd_poly_list)
 
-family_list <- names(condamine_tree_list)
-
-for (i in 1:length(family_list)) {
-  family_name <- family_list[i]
-  tree_list <- names(condamine_tree_list[[family_name]])
-  for (j in 1:length(tree_list)) {
-    tree_name <- tree_list[j]
-    meta <- c("Family" = family_name, "Tree" = tree_name)
-    tree <- condamine_tree_list[[family_name]][[tree_name]]$tree
-    tree <- eveGNN::rescale_crown_age(tree, 10)
-    tree_brts <- treestats::branching_times(tree)
-    file_name <- paste0("tree_brts_", family_name, "_", tree_name, ".rds")
-    saveRDS(tree_brts, file_name)
-    system(paste0("sbatch ../../../../Bash/submit_ddd_emp_mle.sh ", paste0(file_name, " ", family_name, " ", tree_name)))
-  }
-}
+eveGNN::export_to_gnn_with_params_bd(bd_poly_list, "tes", undirected = FALSE)
 
 setwd("..")
 
-if (!dir.exists("BD")) {
-  dir.create("BD")
+if (!dir.exists("BD_POLY_MLE")) {
+  dir.create("BD_POLY_MLE")
 }
 
-setwd("BD")
+setwd("BD_POLY_MLE")
 
-for (i in 1:length(family_list)) {
-  family_name <- family_list[i]
-  tree_list <- names(condamine_tree_list[[family_name]])
-  for (j in 1:length(tree_list)) {
-    tree_name <- tree_list[j]
-    meta <- c("Family" = family_name, "Tree" = tree_name)
-    tree <- condamine_tree_list[[family_name]][[tree_name]]$tree
-    tree <- eveGNN::rescale_crown_age(tree, 10)
-    tree_brts <- treestats::branching_times(tree)
-    ml <- DDD::bd_ML(
-      brts = tree_brts,
-      idparsopt = c(1, 2),
-      tdmodel = 0,
-      btorph = 0,
-      soc = 2,
-      cond = 1,
-      num_cycles = Inf
-    )
-    df_bd_results <- data.frame(Family = family_name,
-                                Tree = tree_name,
-                                lambda = ml$lambda0,
-                                mu = ml$mu0,
-                                loglik=ml$loglik,
-                                df=ml$df,
-                                conv=ml$conv)
-    saveRDS(df_bd_results, file = paste0("BD_EMP_MLE_", family_name, "_", tree_name, ".rds"))
-  }
-}
+print("Computing MLE for BD Poly Data without initial parameters")
 
-setwd("..")
+bd_mle_diffs_tes_no_init <- eveGNN::compute_accuracy_bd_ml_free_no_init(bd_poly_list, strategy = "multicore", workers = 8)
 
-if (!dir.exists("PBD")) {
-  dir.create("PBD")
-}
-
-setwd("PBD")
-
-for (i in 1:length(family_list)) {
-  family_name <- family_list[i]
-  tree_list <- names(condamine_tree_list[[family_name]])
-  for (j in 1:length(tree_list)) {
-    tree_name <- tree_list[j]
-    meta <- c("Family" = family_name, "Tree" = tree_name)
-    tree <- condamine_tree_list[[family_name]][[tree_name]]$tree
-    tree <- eveGNN::rescale_crown_age(tree, 10)
-    tree_brts <- treestats::branching_times(tree)
-    ml <- PBD::pbd_ML(
-      brts = tree_brts,
-      initparsopt = c(0.2, 0.1, 1, 0.1),
-      idparsopt = 1:4,
-      exteq = 0,
-      btorph = 0,
-      soc = 2,
-      verbose = FALSE
-    )
-    df_pbd_results <- data.frame(Family = family_name,
-                                 Tree = tree_name,
-                                 b1 = ml$b,
-                                 lambda1 = ml$lambda_1,
-                                 b2 = ml$b,
-                                 mu1 = ml$mu_1,
-                                 mu2 = ml$mu_2,
-                                 loglik=ml$loglik,
-                                 df=ml$df,
-                                 conv=ml$conv)
-    saveRDS(df_pbd_results, file = paste0("PBD_EMP_MLE_", family_name, "_", tree_name, ".rds"))
-  }
-}
+saveRDS(bd_mle_diffs_tes_no_init, "mle_diffs_BD_POLY_TES.rds")
