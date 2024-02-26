@@ -40,7 +40,7 @@ setwd("DDD_FREE_TES")
 
 print("Exporting Training/Testing TES Data to GNN")
 
-eveGNN::export_to_gnn_with_params(ddd_list_all$within_range, "tes", undirected = FALSE, master = TRUE)
+eveGNN::export_to_gnn_with_params(ddd_list_all$within_range, "tes", undirected = TRUE, master = TRUE)
 
 setwd("..")
 
@@ -52,7 +52,7 @@ setwd("DDD_FREE_TAS")
 
 print("Exporting Training/Testing TAS Data to GNN")
 
-eveGNN::export_to_gnn_with_params(ddd_list_all$within_range, "tas", undirected = FALSE, master = TRUE)
+eveGNN::export_to_gnn_with_params(ddd_list_all$within_range, "tas", undirected = TRUE, master = TRUE)
 
 setwd("..")
 
@@ -64,7 +64,7 @@ setwd("DDD_VAL_TES")
 
 print("Exporting Validation TES Data to GNN")
 
-eveGNN::export_to_gnn_with_params(ddd_list_all$outside_range, "tes", undirected = FALSE, master = TRUE)
+eveGNN::export_to_gnn_with_params(ddd_list_all$outside_range, "tes", undirected = TRUE, master = TRUE)
 
 setwd("..")
 
@@ -76,7 +76,7 @@ setwd("DDD_VAL_TAS")
 
 print("Exporting Validation TAS Data to GNN")
 
-eveGNN::export_to_gnn_with_params(ddd_list_all$outside_range, "tas", undirected = FALSE, master = TRUE)
+eveGNN::export_to_gnn_with_params(ddd_list_all$outside_range, "tas", undirected = TRUE, master = TRUE)
 
 setwd("..")
 
