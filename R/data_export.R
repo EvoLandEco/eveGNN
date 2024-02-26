@@ -345,7 +345,7 @@ get_all_neighbors_distances <- function(tree) {
 
 
 #' @export tree_to_adj_mat
-tree_to_adj_mat <- function(tree) {
+tree_to_adj_mat <- function(tree, master = FALSE) {
   # Check if the tree is of class 'phylo'
   if(!inherits(tree, "phylo")) {
     stop("The provided tree is not a valid phylo object.")
@@ -366,25 +366,57 @@ tree_to_adj_mat <- function(tree) {
   neighbor_matrix <- do.call(rbind, padded_dists)
   colnames(neighbor_matrix) <- NULL
 
+  if (master) {
+    neighbor_matrix <- rbind(neighbor_matrix, rep(0, ncol(neighbor_matrix)))
+  }
+
   return(neighbor_matrix)
 }
 
 
 #' @export tree_to_connectivity
-tree_to_connectivity <- function(tree, undirected = FALSE) {
+tree_to_connectivity <- function(tree, undirected = FALSE, master = FALSE) {
   # Check if the tree is of class 'phylo'
   if(!inherits(tree, "phylo")) {
     stop("The provided tree is not a valid phylo object.")
   }
 
+  out <- NULL
+
   if (undirected) {
     part_a <- tree$edge - 1
     part_b <- cbind(part_a[, 2], part_a[, 1])
     part_ab <- rbind(part_a, part_b)
-    return(part_ab)
+    out <- part_ab
   } else {
-    return(tree$edge - 1)
+    out <- tree$edge - 1
   }
+
+  if (master && undirected) {
+    # Nnode + 1 is the number of tips, Nnode + 2 is the index of the root node
+    # Nnode + 3 is the starting index of the internal node
+    # We need Nnode + 3 - 1 because of 0-based indexing in Python, thus Nnode + 2
+    start_id <- tree$Nnode + 2
+
+    # Similarly, Nnode * 2 + 1 - 1 is the ending index of the internal node
+    end_id <- tree$Nnode * 2
+
+    # Index for the new master node
+    master_id <- tree$Nnode * 2 + 1
+
+    # Add the master node to the connectivity matrix
+    new_part_a <- cbind(start_id:end_id, rep(master_id, times = end_id - start_id + 1))
+    new_part_b <- cbind(new_part_a[, 2], new_part_a[, 1])
+    new_part_ab <- rbind(new_part_a, new_part_b)
+
+    out <- rbind(out, new_part_ab)
+  }
+
+  if (master && !undirected) {
+    stop("Master node is currently only supported for undirected trees.")
+  }
+
+  return(out)
 }
 
 
