@@ -4,7 +4,6 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
 #SBATCH --job-name=gnn_ddd_pars_free_mle
-#SBATCH --output=logs/gnn_ddd_pars_free_mle-%j.log
 #SBATCH --mem=3GB
 #SBATCH --partition=regular
 
