@@ -1,6 +1,6 @@
 batch_size_reduce_factor: 0.25
 cap_norm_factor: 1000
-diffpool_ratio: 0.25
+diffpool_ratio: 0.5
 dropout_ratio: 0.5
 epoch_number: 11
 gcn_layer1_hidden_channels: 256
