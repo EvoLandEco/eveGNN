@@ -1,11 +1,11 @@
 #!/bin/bash
-#SBATCH --time=3:59:00
+#SBATCH --time=23:59:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --gpus-per-node=1
 #SBATCH --job-name=gnn_ddd_pars_est_diffpool
 #SBATCH --output=logs/gnn_ddd_pars_est_diffpool-%j.log
-#SBATCH --mem=24GB
+#SBATCH --mem=64GB
 #SBATCH --partition=gpu
 
 ml Python/3.8.16-GCCcore-11.2.0
