@@ -32,13 +32,13 @@ grouping_var_to_label <- function(grouping_var) {
 difference_var_to_label <- function(difference_var) {
   difference_var <-  as.character(difference_var)
   for (i in 1:length(difference_var)) {
-    if (difference_var[i] == "lambda_r_diff" || difference_var[i] == "lambda_a_diff" ||
+    if (difference_var[i] == "lambda_pred" || difference_var[i] == "lambda_r_diff" || difference_var[i] == "lambda_a_diff" ||
       difference_var[i] == "lambda_r_diff_corrected" || difference_var[i] == "lambda_a_diff_corrected") {
       difference_var[i] <- "lambda[0]"
-    } else if (difference_var[i] == "mu_r_diff" || difference_var[i] == "mu_a_diff" ||
+    } else if (difference_var[i] == "mu_pred" || difference_var[i] == "mu_r_diff" || difference_var[i] == "mu_a_diff" ||
       difference_var[i] == "mu_r_diff_corrected" || difference_var[i] == "mu_a_diff_corrected") {
       difference_var[i] <- "mu[0]"
-    } else if (difference_var[i] == "cap_r_diff" || difference_var[i] == "cap_a_diff" ||
+    } else if (difference_var[i] == "cap_pred" || difference_var[i] == "cap_r_diff" || difference_var[i] == "cap_a_diff" ||
       difference_var[i] == "cap_r_diff_corrected" || difference_var[i] == "cap_a_diff_corrected") {
       difference_var[i] <- "K"
     } else if (difference_var[i] == "beta_n_r_diff" || difference_var[i] == "beta_n_a_diff" ||
