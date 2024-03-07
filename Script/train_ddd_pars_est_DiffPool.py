@@ -13,8 +13,6 @@ from math import ceil
 from torch_geometric.data import InMemoryDataset, Data
 from torch_geometric.loader import DenseDataLoader
 from torch_geometric.nn import DenseGCNConv as GCNConv, dense_diff_pool
-from torch.nn import GELU
-from torch_geometric.nn import GCN2Conv, BatchNorm, global_mean_pool
 
 # Load the global parameters from the config file
 global_params = None
@@ -447,42 +445,6 @@ def main():
 
             return x, l1 + l2, e1 + e2
 
-    class GraphLevelGNN(torch.nn.Module):
-        def __init__(self, in_channels, hidden_channels, out_channels, num_layers, alpha=0.2, theta=0.5, dropout=0.5):
-            super(GraphLevelGNN, self).__init__()
-            self.convs = torch.nn.ModuleList()
-            self.bns = torch.nn.ModuleList()
-            self.dropout = dropout
-
-            # First GCN2Conv layer
-            self.convs.append(GCN2Conv(in_channels, hidden_channels, alpha=alpha, theta=theta, layer=1, shared_weights=True, normalize=True))
-
-            # Intermediate GCN2Conv layers
-            for _ in range(1, num_layers - 1):
-                self.convs.append(GCN2Conv(hidden_channels, hidden_channels, alpha=alpha, theta=theta, layer=2, shared_weights=True, normalize=True))
-                self.bns.append(BatchNorm(hidden_channels))
-
-            # No need for additional conv layers in this simple example
-
-            # Final layer for graph-level prediction
-            self.lin = torch.nn.Linear(hidden_channels, out_channels)
-
-        def forward(self, x, edge_index, batch):
-            for i, conv in enumerate(self.convs):
-                x = conv(x, edge_index)
-                if i < len(self.bns):
-                    x = self.bns[i](x)
-                x = F.relu(x)
-                x = F.dropout(x, p=self.dropout, training=self.training)
-
-            # Global pooling
-            x = global_mean_pool(x, batch)  # Aggregate features to graph level
-
-            # Final regression layer
-            x = self.lin(x)
-
-            return x
-
     class EarlyStopper:
         def __init__(self, patience=3, min_delta=0.1):
             self.patience = patience
@@ -552,8 +514,7 @@ def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Training using {device}")
 
-    #  model = DiffPool()
-    model = GraphLevelGNN(128, 128, 3, gnn_depth)
+    model = DiffPool()
     model = model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     criterion = torch.nn.MSELoss().to(device)
