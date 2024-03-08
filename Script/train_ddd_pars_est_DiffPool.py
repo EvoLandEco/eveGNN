@@ -454,7 +454,7 @@ def main():
             x = x.half()
 
             x = self.gnn3_embed(x, adj).half()
-            x = x.flatten()
+            x = x.flatten(start_dim=1)
             x = self.linear_layers(x)
 
             return x, l1 + l2, e1 + e2
