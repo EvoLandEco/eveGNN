@@ -438,7 +438,7 @@ def main():
 
             x = F.dropout(x, p=dropout_ratio, training=self.training)
             x = self.lin1(x)
-            x = F.relu(x)
+            x = F.gelu(x)
             x = F.dropout(x, p=dropout_ratio, training=self.training)
             x = self.lin2(x)
             # x = F.relu(x)
