@@ -9,7 +9,6 @@ import random
 import torch_geometric.transforms as T
 import torch.nn.functional as F
 import yaml
-import numpy as np
 from math import ceil
 from torch_geometric.data import InMemoryDataset, Data
 from torch_geometric.loader import DenseDataLoader
@@ -370,14 +369,6 @@ def main():
     training_dataset = TreeData(root=None, data_list=filtered_training_data, transform=T.ToDense(max_nodes))
     testing_dataset = TreeData(root=None, data_list=filtered_testing_data, transform=T.ToDense(max_nodes))
 
-    def conv2d_output_size(input_size, padding, kernel_size, stride, dilation=None):
-        output_size = np.floor((input_size + 2 * padding - dilation * (kernel_size - 1) - 1) / stride + 1).astype(int)
-        return output_size
-
-    def maxpool2d_output_size(input_size, kernel_size, stride):
-        output_size = np.floor((input_size - kernel_size) / stride + 1).astype(int)
-        return output_size
-
     class GNN(torch.nn.Module):
         def __init__(self, in_channels, hidden_channels, out_channels,
                      normalize=False, lin=True):
@@ -413,46 +404,22 @@ def main():
 
             return x
 
-    num_nodes_pool1 = ceil(diffpool_ratio * max_nodes)
-    num_nodes_pool2 = ceil(diffpool_ratio * num_nodes_pool1)
-
     class DiffPool(torch.nn.Module):
         def __init__(self):
             super(DiffPool, self).__init__()
 
-            self.gnn1_pool = GNN(training_dataset.num_node_features, gcn_layer1_hidden_channels, num_nodes_pool1)
+            num_nodes = ceil(diffpool_ratio * max_nodes)
+            self.gnn1_pool = GNN(training_dataset.num_node_features, gcn_layer1_hidden_channels, num_nodes)
             self.gnn1_embed = GNN(training_dataset.num_node_features, gcn_layer1_hidden_channels, gcn_layer2_hidden_channels)
 
-            self.gnn2_pool = GNN(gcn_layer2_hidden_channels, gcn_layer2_hidden_channels, num_nodes_pool2)
+            num_nodes = ceil(diffpool_ratio * num_nodes)
+            self.gnn2_pool = GNN(gcn_layer2_hidden_channels, gcn_layer2_hidden_channels, num_nodes)
             self.gnn2_embed = GNN(gcn_layer2_hidden_channels, gcn_layer2_hidden_channels, gcn_layer3_hidden_channels, lin=False)
 
-            self.gnn3_embed = GNN(gcn_layer3_hidden_channels, gcn_layer3_hidden_channels, num_nodes_pool2, lin=False)
+            self.gnn3_embed = GNN(gcn_layer3_hidden_channels, gcn_layer3_hidden_channels, lin_layer1_hidden_channels, lin=False)
 
-            self.cnn_layers = torch.nn.Sequential(
-                torch.nn.Conv2d(in_channels=1, out_channels=16, kernel_size=4, padding=0),
-                torch.nn.ReLU(),
-                torch.nn.MaxPool2d(kernel_size=4),
-                torch.nn.Conv2d(in_channels=16, out_channels=32, kernel_size=4, padding=0),
-                torch.nn.ReLU(),
-                torch.nn.MaxPool2d(kernel_size=4)
-            )
-
-            temp_size = conv2d_output_size(num_nodes_pool2, 0, 4, stride=1, dilation=1)
-            temp_size = maxpool2d_output_size(temp_size, 4, 4)
-            temp_size = conv2d_output_size(temp_size, 0, 4, stride=1, dilation=1)
-            temp_size = maxpool2d_output_size(temp_size, 4, 4)
-
-            lin_layer1_input_channels = 32 * temp_size * temp_size
-
-            self.linear_layers = torch.nn.Sequential(
-                torch.nn.Linear(lin_layer1_input_channels, 128),
-                torch.nn.ReLU(),
-                torch.nn.Dropout(p=dropout_ratio),
-                torch.nn.Linear(128, 16),
-                torch.nn.ReLU(),
-                torch.nn.Dropout(p=dropout_ratio),
-                torch.nn.Linear(16, n_predicted_values)
-            )
+            self.lin1 = torch.nn.Linear(lin_layer1_hidden_channels, lin_layer2_hidden_channels)
+            self.lin2 = torch.nn.Linear(lin_layer2_hidden_channels, n_predicted_values)
 
         def forward(self, x, adj, mask=None):
             s = self.gnn1_pool(x, adj, mask)
@@ -466,14 +433,15 @@ def main():
             x, adj, l2, e2 = dense_diff_pool(x, adj, s)
 
             x = self.gnn3_embed(x, adj)
-            print(x.shape)
-            x = x.reshape(x.shape[0], 1, num_nodes_pool2, num_nodes_pool2)
-            x = self.cnn_layers(x)
-            print(x.shape)
-            x = x.view(x.size(0), -1)
-            print(x.shape)
-            x = self.linear_layers(x)
-            print(x.shape)
+
+            x = x.mean(dim=1)
+
+            x = F.dropout(x, p=dropout_ratio, training=self.training)
+            x = self.lin1(x)
+            x = F.relu(x)
+            x = F.dropout(x, p=dropout_ratio, training=self.training)
+            x = self.lin2(x)
+            # x = F.relu(x)
 
             return x, l1 + l2, e1 + e2
 
