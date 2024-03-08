@@ -452,7 +452,7 @@ def main():
             x, adj, l2, e2 = dense_diff_pool(x, adj, s)
 
             x = self.gnn3_embed(x, adj)
-            x = x.view(x.size(0), -1)
+            x = x.flatten()
             x = self.linear_layers(x)
 
             return x, l1 + l2, e1 + e2
