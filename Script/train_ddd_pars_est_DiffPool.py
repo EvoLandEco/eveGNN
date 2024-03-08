@@ -441,17 +441,19 @@ def main():
             )
 
         def forward(self, x, adj, mask=None):
-            s = self.gnn1_pool(x, adj, mask)
-            x = self.gnn1_embed(x, adj, mask)
+            s = self.gnn1_pool(x, adj, mask).half()
+            x = self.gnn1_embed(x, adj, mask).half()
 
             x, adj, l1, e1 = dense_diff_pool(x, adj, s, mask)
+            x = x.half()
 
-            s = self.gnn2_pool(x, adj)
-            x = self.gnn2_embed(x, adj)
+            s = self.gnn2_pool(x, adj).half()
+            x = self.gnn2_embed(x, adj).half()
 
             x, adj, l2, e2 = dense_diff_pool(x, adj, s)
+            x = x.half()
 
-            x = self.gnn3_embed(x, adj)
+            x = self.gnn3_embed(x, adj).half()
             x = x.flatten()
             x = self.linear_layers(x)
 
