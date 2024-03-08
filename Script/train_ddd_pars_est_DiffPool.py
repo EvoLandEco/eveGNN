@@ -14,6 +14,7 @@ from math import ceil
 from torch_geometric.data import InMemoryDataset, Data
 from torch_geometric.loader import DenseDataLoader
 from torch_geometric.nn import DenseGCNConv as GCNConv, dense_diff_pool
+from torch.cuda.amp import autocast, GradScaler
 
 # Load the global parameters from the config file
 global_params = None
@@ -370,13 +371,7 @@ def main():
     training_dataset = TreeData(root=None, data_list=filtered_training_data, transform=T.ToDense(max_nodes))
     testing_dataset = TreeData(root=None, data_list=filtered_testing_data, transform=T.ToDense(max_nodes))
 
-    def conv2d_output_size(input_size, padding, kernel_size, stride, dilation=None):
-        output_size = np.floor((input_size + 2 * padding - dilation * (kernel_size - 1) - 1) / stride + 1).astype(int)
-        return output_size
-
-    def maxpool2d_output_size(input_size, kernel_size, stride):
-        output_size = np.floor((input_size - kernel_size) / stride + 1).astype(int)
-        return output_size
+    scaler = GradScaler()
 
     class GNN(torch.nn.Module):
         def __init__(self, in_channels, hidden_channels, out_channels,
@@ -441,21 +436,20 @@ def main():
             )
 
         def forward(self, x, adj, mask=None):
-            s = self.gnn1_pool(x, adj, mask).half()
-            x = self.gnn1_embed(x, adj, mask).half()
+            with autocast():
+                s = self.gnn1_pool(x, adj, mask)
+                x = self.gnn1_embed(x, adj, mask)
 
-            x, adj, l1, e1 = dense_diff_pool(x, adj, s, mask)
-            x = x.half()
+                x, adj, l1, e1 = dense_diff_pool(x, adj, s, mask)
 
-            s = self.gnn2_pool(x, adj).half()
-            x = self.gnn2_embed(x, adj).half()
+                s = self.gnn2_pool(x, adj)
+                x = self.gnn2_embed(x, adj)
 
-            x, adj, l2, e2 = dense_diff_pool(x, adj, s)
-            x = x.half()
+                x, adj, l2, e2 = dense_diff_pool(x, adj, s)
 
-            x = self.gnn3_embed(x, adj).half()
-            x = x.flatten(start_dim=1)
-            x = self.linear_layers(x)
+                x = self.gnn3_embed(x, adj)
+                x = x.flatten(start_dim=1)
+                x = self.linear_layers(x)
 
             return x, l1 + l2, e1 + e2
 
@@ -485,9 +479,10 @@ def main():
             optimizer.zero_grad()
             out, _, _ = model(data.x, data.adj, data.mask)
             loss = criterion(out, data.y.view(data.num_nodes.__len__(), n_predicted_values))
-            loss.backward()
+            scaler.scale(loss).backward()
             loss_all += loss.item() * data.num_nodes.__len__()
-            optimizer.step()
+            scaler.step(optimizer)
+            scaler.update()
 
         return loss_all / len(train_loader.dataset)
 
