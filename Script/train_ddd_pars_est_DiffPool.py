@@ -477,9 +477,8 @@ def main():
         for data in train_loader:
             data.to(device)
             optimizer.zero_grad()
-            with autocast():
-                out, _, _ = model(data.x, data.adj, data.mask)
-                loss = criterion(out, data.y.view(data.num_nodes.__len__(), n_predicted_values))
+            out, _, _ = model(data.x, data.adj, data.mask)
+            loss = criterion(out, data.y.view(data.num_nodes.__len__(), n_predicted_values))
             scaler.scale(loss).backward()
             loss_all += loss.item() * data.num_nodes.__len__()
             scaler.step(optimizer)
