@@ -397,7 +397,7 @@ def main():
 
         def forward(self, x, adj, mask=None):
             for step in range(len(self.convs)):
-                x = F.relu(self.convs[step](x, adj, mask))
+                x = F.gelu(self.convs[step](x, adj, mask))
                 x = torch.permute(x, (0, 2, 1))
                 x = self.bns[step](x)
                 x = torch.permute(x, (0, 2, 1))
