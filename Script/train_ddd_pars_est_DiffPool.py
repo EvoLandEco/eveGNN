@@ -517,7 +517,7 @@ def main():
     model = DiffPool()
     model = model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-    criterion = torch.nn.MSELoss().to(device)
+    criterion = torch.nn.HuberLoss().to(device)
 
     def shape_check(dataset, max_nodes):
         incorrect_shapes = []  # List to store indices of data elements with incorrect shapes
