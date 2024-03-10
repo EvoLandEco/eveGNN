@@ -469,8 +469,9 @@ def main():
         for data in train_loader:
             data.to(device)
             optimizer.zero_grad()
-            out, _, _ = model(data.x, data.adj, data.mask)
+            out, l, e = model(data.x, data.adj, data.mask)
             loss = criterion(out, data.y.view(data.num_nodes.__len__(), n_predicted_values))
+            loss = loss + l * 100000 + e * 0.1
             loss.backward()
             loss_all += loss.item() * data.num_nodes.__len__()
             optimizer.step()
@@ -505,8 +506,9 @@ def main():
         loss_all = 0  # Keep track of the loss
         for data in test_loader:
             data.to(device)
-            out, _, _ = model(data.x, data.adj, data.mask)
+            out, l, e = model(data.x, data.adj, data.mask)
             loss = criterion(out, data.y.view(data.num_nodes.__len__(), n_predicted_values))
+            loss = loss + l * 100000 + e * 0.1
             loss_all += loss.item() * data.num_nodes.__len__()
 
         return loss_all / len(train_loader.dataset)
@@ -516,7 +518,7 @@ def main():
 
     model = DiffPool()
     model = model.to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
     criterion = torch.nn.HuberLoss().to(device)
 
     def shape_check(dataset, max_nodes):
