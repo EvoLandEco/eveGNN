@@ -13,6 +13,7 @@ from math import ceil
 from torch_geometric.data import InMemoryDataset, Data
 from torch_geometric.loader import DenseDataLoader
 from torch_geometric.nn import DenseGCNConv as GCNConv, dense_diff_pool
+from torch_geometric.nn import DenseSAGEConv as SAGEConv
 
 # Load the global parameters from the config file
 global_params = None
@@ -382,17 +383,17 @@ def main():
                 last_index = gnn_depth - 1
 
                 if gnn_depth == 1:
-                    self.convs.append(GCNConv(in_channels, out_channels, normalize))
+                    self.convs.append(SAGEConv(in_channels, out_channels, normalize))
                     self.bns.append(torch.nn.BatchNorm1d(out_channels))
                 else:
                     if i == first_index:
-                        self.convs.append(GCNConv(in_channels, hidden_channels, normalize))
+                        self.convs.append(SAGEConv(in_channels, hidden_channels, normalize))
                         self.bns.append(torch.nn.BatchNorm1d(hidden_channels))
                     elif i == last_index:
-                        self.convs.append(GCNConv(hidden_channels, out_channels, normalize))
+                        self.convs.append(SAGEConv(hidden_channels, out_channels, normalize))
                         self.bns.append(torch.nn.BatchNorm1d(out_channels))
                     else:
-                        self.convs.append(GCNConv(hidden_channels, hidden_channels, normalize))
+                        self.convs.append(SAGEConv(hidden_channels, hidden_channels, normalize))
                         self.bns.append(torch.nn.BatchNorm1d(hidden_channels))
 
         def forward(self, x, adj, mask=None):
