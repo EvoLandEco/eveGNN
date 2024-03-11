@@ -12,5 +12,6 @@ lin_layer2_hidden_channels: 32
 max_gnn_depth: 6
 max_nodes_limit: 2500
 n_predicted_values: 3
+normalize_edge_length: True
 test_batch_size: 64
 train_batch_size: 64

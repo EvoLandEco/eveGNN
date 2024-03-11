@@ -37,6 +37,7 @@ lin_layer2_hidden_channels = global_params["lin_layer2_hidden_channels"]
 n_predicted_values = global_params["n_predicted_values"]
 batch_size_reduce_factor = global_params["batch_size_reduce_factor"]
 max_nodes_limit = global_params["max_nodes_limit"]
+normalize_edge_length = global_params["normalize_edge_length"]
 
 
 def read_table(path):
@@ -158,7 +159,7 @@ def check_list_count(count, data_list, length_list, params_list):
     print("Count check passed")
 
 
-def read_rds_to_pytorch(path, count):
+def read_rds_to_pytorch(path, count, normalize=False):
     # List all files in the directory
     files_tree = [f for f in os.listdir(os.path.join(path, 'GNN', 'tree'))
                   if f.startswith('tree_') and f.endswith('.rds')]
@@ -222,7 +223,12 @@ def read_rds_to_pytorch(path, count):
         # Determine the number of nodes
         num_nodes = edge_index_tensor.max().item() + 1
 
-        edge_length_tensor = torch.tensor(length_list[i].values, dtype=torch.float)
+        if normalize:
+            # Normalize node features by dividing edge lengths by log transformed number of nodes
+            norm_length_list = length_list[i] / torch.log(num_nodes)
+            edge_length_tensor = torch.tensor(norm_length_list.values, dtype=torch.float)
+        else:
+            edge_length_tensor = torch.tensor(length_list[i].values, dtype=torch.float)
 
         params_current = params_list[i]
 
@@ -302,7 +308,7 @@ def main():
     print(f'There are: {rds_count} trees in the {task_type} folder.')
     print(f"Now reading {task_type}...")
     # Read the .rds files into a list of PyTorch Geometric Data objects
-    current_dataset = read_rds_to_pytorch(full_dir, rds_count)
+    current_dataset = read_rds_to_pytorch(full_dir, rds_count, normalize_edge_length)
     # Shuffle the data
     current_dataset = shuffle_data(current_dataset)
     current_training_data = get_training_data(current_dataset)
@@ -332,7 +338,7 @@ def main():
     val_rds_count = check_rds_files_count(full_val_dir_tree, full_val_dir_el)
     print(f'There are: {val_rds_count} trees in the validation folder.')
     print(f"Now reading validation data...")
-    current_val_dataset = read_rds_to_pytorch(val_dir, val_rds_count)
+    current_val_dataset = read_rds_to_pytorch(val_dir, val_rds_count, normalize_edge_length)
     validation_dataset_list.append(current_val_dataset)
 
     sum_training_data = functools.reduce(lambda x, y: x + y, training_dataset_list)
