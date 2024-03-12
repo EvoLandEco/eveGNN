@@ -1,6 +1,7 @@
 import sys
 import os
 import pandas as pd
+import numpy as np
 import pyreadr
 import torch
 import glob
@@ -225,7 +226,7 @@ def read_rds_to_pytorch(path, count, normalize=False):
 
         if normalize:
             # Normalize node features by dividing edge lengths by log transformed number of nodes
-            norm_length_list = length_list[i] / torch.log(num_nodes)
+            norm_length_list = length_list[i] / np.log10(len(length_list[i]))
             edge_length_tensor = torch.tensor(norm_length_list.values, dtype=torch.float)
         else:
             edge_length_tensor = torch.tensor(length_list[i].values, dtype=torch.float)
