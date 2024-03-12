@@ -39,6 +39,7 @@ n_predicted_values = global_params["n_predicted_values"]
 batch_size_reduce_factor = global_params["batch_size_reduce_factor"]
 max_nodes_limit = global_params["max_nodes_limit"]
 normalize_edge_length = global_params["normalize_edge_length"]
+huber_delta = global_params["huber_delta"]
 
 
 def read_table(path):
@@ -527,7 +528,7 @@ def main():
     model = DiffPool()
     model = model.to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
-    criterion = torch.nn.HuberLoss().to(device)
+    criterion = torch.nn.HuberLoss(delta=huber_delta).to(device)
 
     def shape_check(dataset, max_nodes):
         incorrect_shapes = []  # List to store indices of data elements with incorrect shapes
