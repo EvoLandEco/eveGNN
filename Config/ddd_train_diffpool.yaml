@@ -6,7 +6,7 @@ epoch_number: 31
 gcn_layer1_hidden_channels: 256
 gcn_layer2_hidden_channels: 128
 gcn_layer3_hidden_channels: 64
-huber_delta: 0.5
+huber_delta: 3
 learning_rate: 0.001
 lin_layer1_hidden_channels: 64
 lin_layer2_hidden_channels: 32
