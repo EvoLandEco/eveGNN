@@ -39,6 +39,7 @@ n_predicted_values = global_params["n_predicted_values"]
 batch_size_reduce_factor = global_params["batch_size_reduce_factor"]
 max_nodes_limit = global_params["max_nodes_limit"]
 normalize_edge_length = global_params["normalize_edge_length"]
+normalize_graph_representation = global_params["normalize_graph_representation"]
 huber_delta = global_params["huber_delta"]
 
 
@@ -417,6 +418,8 @@ def main():
         def __init__(self):
             super(DiffPool, self).__init__()
 
+            self.graph_sizes = torch.tensor([], dtype=torch.long)
+
             num_nodes = ceil(diffpool_ratio * max_nodes)
             self.gnn1_pool = GNN(training_dataset.num_node_features, gcn_layer1_hidden_channels, num_nodes)
             self.gnn1_embed = GNN(training_dataset.num_node_features, gcn_layer1_hidden_channels, gcn_layer2_hidden_channels)
@@ -430,7 +433,7 @@ def main():
             self.lin1 = torch.nn.Linear(lin_layer1_hidden_channels, lin_layer2_hidden_channels)
             self.lin2 = torch.nn.Linear(lin_layer2_hidden_channels, n_predicted_values)
 
-        def forward(self, x, adj, mask=None):
+        def forward(self, x, adj, mask=None, graph_sizes=None):
             s = self.gnn1_pool(x, adj, mask)
             x = self.gnn1_embed(x, adj, mask)
 
@@ -444,6 +447,10 @@ def main():
             x = self.gnn3_embed(x, adj)
 
             x = x.mean(dim=1)
+
+            if normalize_graph_representation:
+                self.graph_sizes = graph_sizes.view(-1, 1)
+                x = x / self.graph_sizes
 
             x = F.dropout(x, p=dropout_ratio, training=self.training)
             x = self.lin1(x)
@@ -476,9 +483,10 @@ def main():
 
         loss_all = 0  # Keep track of the loss
         for data in train_loader:
+            graph_sizes = data.num_nodes
             data.to(device)
             optimizer.zero_grad()
-            out, l, e = model(data.x, data.adj, data.mask)
+            out, l, e = model(data.x, data.adj, data.mask, graph_sizes)
             loss = criterion(out, data.y.view(data.num_nodes.__len__(), n_predicted_values))
             loss = loss + l * 100000 + e * 0.1
             loss.backward()
