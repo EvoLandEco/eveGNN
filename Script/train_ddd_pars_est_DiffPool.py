@@ -449,7 +449,7 @@ def main():
             x = x.mean(dim=1)
 
             if normalize_graph_representation:
-                self.graph_sizes = graph_sizes.view(-1, 1)
+                self.graph_sizes = graph_sizes.view(-1, 1).to(device)
                 x = x / self.graph_sizes
 
             x = F.dropout(x, p=dropout_ratio, training=self.training)
