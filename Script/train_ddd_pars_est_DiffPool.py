@@ -41,6 +41,7 @@ max_nodes_limit = global_params["max_nodes_limit"]
 normalize_edge_length = global_params["normalize_edge_length"]
 normalize_graph_representation = global_params["normalize_graph_representation"]
 huber_delta = global_params["huber_delta"]
+global_pooling_method = global_params["global_pooling_method"]
 
 
 def read_table(path):
@@ -446,7 +447,14 @@ def main():
 
             x = self.gnn3_embed(x, adj)
 
-            x = x.mean(dim=1)
+            if global_pooling_method == "mean":
+                x = x.mean(dim=1)
+            elif global_pooling_method == "max":
+                x = x.max(dim=1).values
+            elif global_pooling_method == "sum":
+                x = x.sum(dim=1)
+            else:
+                raise ValueError("Invalid global pooling method.")
 
             if normalize_graph_representation:
                 self.graph_sizes = graph_sizes.view(-1, 1).to(device)
