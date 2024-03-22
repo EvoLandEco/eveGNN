@@ -61,8 +61,10 @@ export_to_gnn_bootstrap <- function(data, meta, index, path, undirected = FALSE)
 export_to_gnn_with_params <- function(data, which = "tas", undirected = FALSE, master = FALSE) {
   path <- file.path("GNN/tree/")
   path_EL <- file.path("GNN/tree/EL/")
+  path_ST <- file.path("GNN/tree/ST/")
   eve:::check_path(path)
   eve:::check_path(path_EL)
+  eve:::check_path(path_ST)
 
   if (which == "tas") {
     for (i in seq_along(data$tas)) {
@@ -97,6 +99,14 @@ export_to_gnn_with_params <- function(data, which = "tas", undirected = FALSE, m
       age <- data$age[[i]]
       file_name <- paste0(path_EL, "/EL_", la, "_", mu, "_", cap, "_", age, "_", i, ".rds")
       saveRDS(tree_to_adj_mat(data$tes[[i]], master = master), file = file_name)
+    }
+    for (i in seq_along(data$tes)) {
+      la <- data$pars[[i]][1]
+      mu <- data$pars[[i]][2]
+      cap <- data$pars[[i]][3]
+      age <- data$age[[i]]
+      file_name <- paste0(path_ST, "/ST_", la, "_", mu, "_", cap, "_", age, "_", i, ".rds")
+      saveRDS(tree_to_stats(data$tes[[i]]), file = file_name)
     }
   }
 }
@@ -469,6 +479,21 @@ tree_to_edge_feature <- function(tree, undirected = FALSE) {
   } else {
     return(tree$edge.length)
   }
+}
+
+
+#' @export tree_to_stats
+tree_to_stats <- function(tree) {
+  # Check if the tree is of class 'phylo'
+  if(!inherits(tree, "phylo")) {
+    stop("The provided tree is not a valid phylo object.")
+  }
+
+  stats <- treestats::calc_all_stats(tree)
+  stats$num_nodes <- 2 * stats$number_of_lineages + 1
+  stats$number_of_lineages <- NULL
+
+  return(stats)
 }
 
 
