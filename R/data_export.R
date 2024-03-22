@@ -493,7 +493,7 @@ tree_to_stats <- function(tree) {
   stats$num_nodes <- 2 * stats$number_of_lineages + 1
   stats$number_of_lineages <- NULL
 
-  return(stats)
+  return(unlist(stats))
 }
 
 
