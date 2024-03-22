@@ -491,14 +491,9 @@ def main():
                 self.graph_sizes = graph_sizes.view(-1, 1).to(device)
                 x = x / self.graph_sizes
 
-            print(x)
-            print(x.shape)
             self.stats = stats
-            print(self.stats.shape)
             self.stats = torch.squeeze(self.stats, -1).to(device)
-            print(self.stats.shape)
             x = torch.cat((x, self.stats), dim=1)
-            print(x)
 
             x = F.dropout(x, p=dropout_ratio, training=self.training)
             x = self.lin1(x)
