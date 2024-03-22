@@ -58,17 +58,17 @@ def count_rds_files(path):
     return len(rds_files)
 
 
-def check_rds_files_count(tree_path, el_path):
-    # Count the number of .rds files in both paths
+def check_rds_files_count(tree_path, el_path, st_path):
+    # Count the number of .rds files in all three paths
     tree_count = count_rds_files(tree_path)
     el_count = count_rds_files(el_path)
+    st_count = count_rds_files(st_path)
 
     # Check if the counts are equal
-    if tree_count == el_count:
-        return tree_count
+    if tree_count == el_count == st_count:
+        return tree_count  # Assuming all counts are equal, return one of them
     else:
-        raise ValueError("The number of .rds files in the two paths are not equal")
-
+        raise ValueError("The number of .rds files in the three paths are not equal")
 
 def list_subdirectories(path):
     try:
@@ -114,40 +114,46 @@ def sort_files(files):
     return sorted(files, key=get_sort_key)
 
 
-def check_file_consistency(files_tree, files_el):
-    # Check if the two lists have the same length
-    if len(files_tree) != len(files_el):
-        raise ValueError("Mismatched lengths")
+def check_file_consistency(files_tree, files_el, files_st):
+    # Check if the three lists have the same length
+    if not (len(files_tree) == len(files_el) == len(files_st)):
+        raise ValueError("Mismatched lengths among file lists.")
 
     # Define a function to extract parameters from filename
     def get_params_tuple(filename):
         return tuple(map(float, filename.split('_')[1:-1]))
 
-    # Check each pair of files for matching parameters
-    for tree_file, el_file in zip(files_tree, files_el):
+    # Check each trio of files for matching parameters
+    for tree_file, el_file, st_file in zip(files_tree, files_el, files_st):
         tree_params = get_params_tuple(tree_file)
         el_params = get_params_tuple(el_file)
-        if tree_params != el_params:
-            raise ValueError(f"Mismatched parameters: {tree_file} vs {el_file}")
+        st_params = get_params_tuple(st_file)
+
+        if not (tree_params == el_params == st_params):
+            raise ValueError(f"Mismatched parameters among files: {tree_file}, {el_file}, and {st_file}")
 
     # If we get here, all checks passed
-    print("File lists consistency check passed")
+    print("File lists consistency check passed across tree, EL, and ST datasets.")
 
 
-def check_params_consistency(params_tree_list, params_el_list):
-    is_consistent = all(a == b for a, b in zip(params_tree_list, params_el_list))
+def check_params_consistency(params_tree_list, params_el_list, params_st_list):
+    # Check if all corresponding elements in the three lists are equal
+    is_consistent = all(a == b == c for a, b, c in zip(params_tree_list, params_el_list, params_st_list))
+
     if is_consistent:
-        print("Parameters are consistent across the tree and EL datasets.")
+        print("Parameters are consistent across the tree, EL, and ST datasets.")
     else:
-        raise ValueError("Mismatch in parameters between the tree and EL datasets.")
+        raise ValueError("Mismatch in parameters between the tree, EL, and ST datasets.")
+
     return is_consistent
 
 
-def check_list_count(count, data_list, length_list, params_list):
+def check_list_count(count, data_list, length_list, params_list, stats_list):
     # Get the number of elements in each list
     data_count = len(data_list)
     length_count = len(length_list)
     params_count = len(params_list)
+    stats_count = len(stats_list)  # Get the count for the new stats_list
 
     # Check if the count matches the number of elements in each list
     if count != data_count:
@@ -159,6 +165,9 @@ def check_list_count(count, data_list, length_list, params_list):
     if count != params_count:
         raise ValueError(f"Count mismatch: input argument count is {count}, params_list has {params_count} elements.")
 
+    if count != stats_count:  # New check for stats_list
+        raise ValueError(f"Count mismatch: input argument count is {count}, stats_list has {stats_count} elements.")
+
     # If all checks pass, print a success message
     print("Count check passed")
 
@@ -169,13 +178,16 @@ def read_rds_to_pytorch(path, count, normalize=False):
                   if f.startswith('tree_') and f.endswith('.rds')]
     files_el = [f for f in os.listdir(os.path.join(path, 'GNN', 'tree', 'EL'))
                 if f.startswith('EL_') and f.endswith('.rds')]
+    files_st = [f for f in os.listdir(os.path.join(path, 'GNN', 'tree', 'ST'))
+                if f.startswith('ST_') and f.endswith('.rds')]
 
     # Sort the files based on the parameters
     files_tree = sort_files(files_tree)
     files_el = sort_files(files_el)
+    files_st = sort_files(files_st)
 
     # Check if the files are consistent
-    check_file_consistency(files_tree, files_el)
+    check_file_consistency(files_tree, files_el, files_st)
 
     # List to hold the data from each .rds file
     data_list = []
@@ -200,7 +212,18 @@ def read_rds_to_pytorch(path, count, normalize=False):
         length_list.append(length_data)
         params_el_list.append(get_params_string(filename))
 
-    check_params_consistency(params_tree_list, params_el_list)
+    stats_list = []
+    params_st_list = []
+
+    # Loop through the files with the prefix 'ST_'
+    for filename in files_st:
+        stats_file_path = os.path.join(path, 'GNN', 'tree', 'ST', filename)
+        stats_result = pyreadr.read_r(stats_file_path)
+        stats_data = stats_result[None]
+        stats_list.append(stats_data)
+        params_st_list.append(get_params_string(filename))
+
+    check_params_consistency(params_tree_list, params_el_list, params_st_list)
 
     params_list = []
 
@@ -212,7 +235,7 @@ def read_rds_to_pytorch(path, count, normalize=False):
     for vector in params_list:
         vector[2] = vector[2] / cap_norm_factor
 
-    check_list_count(count, data_list, length_list, params_list)
+    check_list_count(count, data_list, length_list, params_list, stats_list)
 
     # List to hold the Data objects
     pytorch_geometric_data_list = []
@@ -238,11 +261,14 @@ def read_rds_to_pytorch(path, count, normalize=False):
 
         params_current_tensor = torch.tensor(params_current[0:n_predicted_values], dtype=torch.float)
 
+        stats_tensor = torch.tensor(stats_list[i].values, dtype=torch.float)
+
         # Create a Data object with the edge index, number of nodes, and category value
         data = Data(x=edge_length_tensor,
                     edge_index=edge_index_tensor,
                     num_nodes=num_nodes,
-                    y=params_current_tensor)
+                    y=params_current_tensor,
+                    stats=stats_tensor)
 
         # Append the Data object to the list
         pytorch_geometric_data_list.append(data)
@@ -305,10 +331,11 @@ def main():
     full_dir = os.path.join(name, task_type)
     full_dir_tree = os.path.join(full_dir, 'GNN', 'tree')
     full_dir_el = os.path.join(full_dir, 'GNN', 'tree', 'EL')
+    full_dir_st = os.path.join(full_dir, 'GNN', 'tree', 'ST')
     # Call read_rds_to_pytorch with the full directory path
     print(full_dir)
     # Check if the number of .rds files in the tree and el paths are equal
-    rds_count = check_rds_files_count(full_dir_tree, full_dir_el)
+    rds_count = check_rds_files_count(full_dir_tree, full_dir_el, full_dir_st)
     print(f'There are: {rds_count} trees in the {task_type} folder.')
     print(f"Now reading {task_type}...")
     # Read the .rds files into a list of PyTorch Geometric Data objects
@@ -339,7 +366,8 @@ def main():
 
     full_val_dir_tree = os.path.join(val_dir, 'GNN', 'tree')
     full_val_dir_el = os.path.join(val_dir, 'GNN', 'tree', 'EL')
-    val_rds_count = check_rds_files_count(full_val_dir_tree, full_val_dir_el)
+    full_val_dir_st = os.path.join(val_dir, 'GNN', 'tree', 'ST')
+    val_rds_count = check_rds_files_count(full_val_dir_tree, full_val_dir_el, full_val_dir_st)
     print(f'There are: {val_rds_count} trees in the validation folder.')
     print(f"Now reading validation data...")
     current_val_dataset = read_rds_to_pytorch(val_dir, val_rds_count, normalize_edge_length)
@@ -379,6 +407,8 @@ def main():
 
     training_dataset = TreeData(root=None, data_list=filtered_training_data, transform=T.ToDense(max_nodes))
     testing_dataset = TreeData(root=None, data_list=filtered_testing_data, transform=T.ToDense(max_nodes))
+
+    num_stats = training_dataset[0].stats.shape[0]
 
     class GNN(torch.nn.Module):
         def __init__(self, in_channels, hidden_channels, out_channels,
@@ -420,6 +450,7 @@ def main():
             super(DiffPool, self).__init__()
 
             self.graph_sizes = torch.tensor([], dtype=torch.long)
+            self.stats = torch.tensor([], dtype=torch.float)
 
             num_nodes = ceil(diffpool_ratio * max_nodes)
             self.gnn1_pool = GNN(training_dataset.num_node_features, gcn_layer1_hidden_channels, num_nodes)
@@ -431,10 +462,10 @@ def main():
 
             self.gnn3_embed = GNN(gcn_layer3_hidden_channels, gcn_layer3_hidden_channels, lin_layer1_hidden_channels, lin=False)
 
-            self.lin1 = torch.nn.Linear(lin_layer1_hidden_channels, lin_layer2_hidden_channels)
+            self.lin1 = torch.nn.Linear(lin_layer1_hidden_channels + num_stats, lin_layer2_hidden_channels)
             self.lin2 = torch.nn.Linear(lin_layer2_hidden_channels, n_predicted_values)
 
-        def forward(self, x, adj, mask=None, graph_sizes=None):
+        def forward(self, x, adj, mask=None, graph_sizes=None, stats=None):
             s = self.gnn1_pool(x, adj, mask)
             x = self.gnn1_embed(x, adj, mask)
 
@@ -459,6 +490,15 @@ def main():
             if normalize_graph_representation:
                 self.graph_sizes = graph_sizes.view(-1, 1).to(device)
                 x = x / self.graph_sizes
+
+            print(x)
+            print(x.shape)
+            self.stats = stats
+            print(self.stats.shape)
+            self.stats = torch.squeeze(self.stats, -1).to(device)
+            print(self.stats.shape)
+            x = torch.cat((x, self.stats), dim=1)
+            print(x)
 
             x = F.dropout(x, p=dropout_ratio, training=self.training)
             x = self.lin1(x)
@@ -494,7 +534,7 @@ def main():
             data.to(device)
             graph_sizes = data.num_nodes
             optimizer.zero_grad()
-            out, l, e = model(data.x, data.adj, data.mask, graph_sizes)
+            out, l, e = model(data.x, data.adj, data.mask, graph_sizes, data.stats)
             loss = criterion(out, data.y.view(data.num_nodes.__len__(), n_predicted_values))
             loss = loss + l * 100000 + e * 0.1
             loss.backward()
