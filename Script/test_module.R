@@ -1,0 +1,1 @@
+params <- yaml::read_yaml("../Config/ddd_sim.yaml")
