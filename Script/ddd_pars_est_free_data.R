@@ -2,7 +2,7 @@ args <- commandArgs(TRUE)
 
 name <- as.character(args[1])
 
-params <- yaml::read_yaml("../Config/ddd_sim.yaml")
+#params <- yaml::read_yaml("../Config/ddd_sim.yaml")
 
 if (!dir.exists(name)) {
   dir.create(name)
@@ -10,16 +10,28 @@ if (!dir.exists(name)) {
 
 setwd(name)
 
-dists <- params$dists
-cap_range <- params$cap_range
-max_mu <- params$max_mu
-within_ranges <- params$within_ranges
-nrep <- params$nrep
-age <- params$age
-ddmodel <- params$ddmodel
-proportion <- params$proportion
-nworkers_sim <- params$nworkers_sim
-nworkers_mle <- params$nworkers_mle
+#dists <- params$dists
+#cap_range <- params$cap_range
+#max_mu <- params$max_mu
+#within_ranges <- params$within_ranges
+#nrep <- params$nrep
+#age <- params$age
+#ddmodel <- params$ddmodel
+#proportion <- params$proportion
+#nworkers_sim <- params$nworkers_sim
+#nworkers_mle <- params$nworkers_mle
+
+dists <- list(list(distribution = "uniform", n = 1L, min = 0.1, max = 3))
+cap_range <- c(10, 1000)
+max_mu <- 0.9
+within_ranges <- list(c(0.3, 2.7), c(0.1, 0.8), c(100, 900))
+nrep <- 100000
+age <- 10
+ddmodel <- 1
+proportion <- 0.02
+nworkers_sim <- 6
+nworkers_mle <- 32
+
 
 future::plan("multicore", workers = nworkers_sim)
 
