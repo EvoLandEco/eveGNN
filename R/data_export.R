@@ -489,6 +489,11 @@ tree_to_stats <- function(tree) {
     stop("The provided tree is not a valid phylo object.")
   }
 
+  # Check if the tree is ultrametric, if not return 0
+  if (!ape::is.ultrametric(tree)) {
+    return(0.00)
+  }
+
   gamma <- treestats::gamma_statistic(tree)
   colless <- treestats::colless(tree) / 1000
   beta <- treestats::beta_statistic(tree)
