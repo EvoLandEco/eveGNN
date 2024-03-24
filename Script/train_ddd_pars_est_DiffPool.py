@@ -70,6 +70,7 @@ def check_rds_files_count(tree_path, el_path, st_path):
     else:
         raise ValueError("The number of .rds files in the three paths are not equal")
 
+
 def list_subdirectories(path):
     try:
         # Ensure the given path exists and it's a directory
@@ -220,6 +221,8 @@ def read_rds_to_pytorch(path, count, normalize=False):
         stats_file_path = os.path.join(path, 'GNN', 'tree', 'ST', filename)
         stats_result = pyreadr.read_r(stats_file_path)
         stats_data = stats_result[None]
+        print(f"Now reading stats in {filename}...")
+        print(stats_data)
         stats_list.append(stats_data)
         params_st_list.append(get_params_string(filename))
 
@@ -492,8 +495,12 @@ def main():
                 x = x / self.graph_sizes
 
             self.stats = stats
-            self.stats = torch.squeeze(self.stats, -1).to(device)
-            x = torch.cat((x, self.stats), dim=1)
+            if self.stats is not None:
+                self.stats = torch.squeeze(self.stats, -1).to(device)
+                x = torch.cat((x, self.stats), dim=1)
+            else:
+                print(f"Error Stats shape: {self.stats.shape}")
+                raise ValueError("Stats is of type None.")
 
             x = F.dropout(x, p=dropout_ratio, training=self.training)
             x = self.lin1(x)
@@ -529,6 +536,7 @@ def main():
             data.to(device)
             graph_sizes = data.num_nodes
             optimizer.zero_grad()
+            print(f"Stats tensor before calling forward: {data.stats}")
             out, l, e = model(data.x, data.adj, data.mask, graph_sizes, data.stats)
             loss = criterion(out, data.y.view(data.num_nodes.__len__(), n_predicted_values))
             loss = loss + l * 100000 + e * 0.1
