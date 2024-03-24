@@ -83,6 +83,14 @@ export_to_gnn_with_params <- function(data, which = "tas", undirected = FALSE, m
       file_name <- paste0(path_EL, "/EL_", la, "_", mu, "_", cap, "_", age, "_", i, ".rds")
       saveRDS(tree_to_adj_mat(data$tas[[i]], master = master), file = file_name)
     }
+    for (i in seq_along(data$tas)) {
+      la <- data$pars[[i]][1]
+      mu <- data$pars[[i]][2]
+      cap <- data$pars[[i]][3]
+      age <- data$age[[i]]
+      file_name <- paste0(path_ST, "/ST_", la, "_", mu, "_", cap, "_", age, "_", i, ".rds")
+      saveRDS(tree_to_stats(data$tas[[i]]), file = file_name)
+    }
   } else if (which == "tes") {
     for (i in seq_along(data$tes)) {
       la <- data$pars[[i]][1]
