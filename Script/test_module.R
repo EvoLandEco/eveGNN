@@ -1,4 +1,4 @@
-install.packages("yaml", repos = "https://cloud.r-project.org")
+install.packages(c("yaml","ape","furrr","future.apply","purrr"), repos = "https://cloud.r-project.org")
 remotes::install_github("YuLab-SMU/ggtree", force = TRUE)
 remotes::install_github("thijsjanzen/treestats", force = TRUE)
 remotes::install_github("EvoLandEco/eve", force = TRUE)
