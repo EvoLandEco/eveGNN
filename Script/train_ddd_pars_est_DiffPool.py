@@ -438,7 +438,7 @@ def main():
 
         def forward(self, x, adj, mask=None):
             for step in range(len(self.convs)):
-                x = F.gelu(self.convs[step](x, adj, mask))
+                x = torch.sigmoid(self.convs[step](x, adj, mask))
                 x = torch.permute(x, (0, 2, 1))
                 x = self.bns[step](x)
                 x = torch.permute(x, (0, 2, 1))
@@ -497,7 +497,7 @@ def main():
 
             x = F.dropout(x, p=dropout_ratio, training=self.training)
             x = self.lin1(x)
-            x = F.gelu(x)
+            x = torch.sigmoid(x)
             x = F.dropout(x, p=dropout_ratio, training=self.training)
             x = self.lin2(x)
             # x = F.relu(x)
