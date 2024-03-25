@@ -550,7 +550,7 @@ def main():
         for data in loader:
             data.to(device)
             graph_sizes = data.num_nodes
-            out, _, _ = model(data.x, data.adj, data.mask, graph_sizes)
+            out, _, _ = model(data.x, data.adj, data.mask, graph_sizes, data.stats)
             diffs = torch.abs(out - data.y.view(data.num_nodes.__len__(), n_predicted_values))
             diffs_all = torch.cat((diffs_all, diffs), dim=0)
             outputs_all = torch.cat((outputs_all, out), dim=0)
@@ -568,9 +568,10 @@ def main():
         for data in test_loader:
             data.to(device)
             graph_sizes = data.num_nodes
-            out, l, e = model(data.x, data.adj, data.mask, graph_sizes)
+            out, l, e = model(data.x, data.adj, data.mask, graph_sizes, data.stats)
             loss = criterion(out, data.y.view(data.num_nodes.__len__(), n_predicted_values))
             loss = loss + l * 100000 + e * 0.1
+            print(f"l value: {l}; e value: {e}")
             loss_all += loss.item() * data.num_nodes.__len__()
 
         return loss_all / len(train_loader.dataset)
