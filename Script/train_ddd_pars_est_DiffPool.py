@@ -571,7 +571,6 @@ def main():
             out, l, e = model(data.x, data.adj, data.mask, graph_sizes, data.stats)
             loss = criterion(out, data.y.view(data.num_nodes.__len__(), n_predicted_values))
             loss = loss + l * 100000 + e * 0.1
-            print(f"l value: {l}; e value: {e}")
             loss_all += loss.item() * data.num_nodes.__len__()
 
         return loss_all / len(train_loader.dataset)
