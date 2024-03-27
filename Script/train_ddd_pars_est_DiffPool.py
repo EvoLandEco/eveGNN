@@ -437,13 +437,16 @@ def main():
                         self.bns.append(torch.nn.BatchNorm1d(hidden_channels))
 
         def forward(self, x, adj, mask=None):
+            outputs = []  # Initialize a list to store outputs at each step
             for step in range(len(self.convs)):
-                x = torch.tanh(self.convs[step](x, adj, mask))
+                x = F.gelu(self.convs[step](x, adj, mask))
                 x = torch.permute(x, (0, 2, 1))
                 x = self.bns[step](x)
                 x = torch.permute(x, (0, 2, 1))
+                outputs.append(x)  # Store the current x
 
-            return x
+            x_concatenated = torch.cat(outputs, dim=-1)
+            return x_concatenated
 
     class DiffPool(torch.nn.Module):
         def __init__(self):
@@ -452,17 +455,20 @@ def main():
             self.graph_sizes = torch.tensor([], dtype=torch.long)
             self.stats = torch.tensor([], dtype=torch.float)
 
-            num_nodes = ceil(diffpool_ratio * max_nodes)
-            self.gnn1_pool = GNN(training_dataset.num_node_features, gcn_layer1_hidden_channels, num_nodes)
+            num_nodes1 = ceil(diffpool_ratio * max_nodes)
+            self.gnn1_pool = GNN(training_dataset.num_node_features, gcn_layer1_hidden_channels, num_nodes1)
             self.gnn1_embed = GNN(training_dataset.num_node_features, gcn_layer1_hidden_channels, gcn_layer2_hidden_channels)
 
-            num_nodes = ceil(diffpool_ratio * num_nodes)
-            self.gnn2_pool = GNN(gcn_layer2_hidden_channels, gcn_layer2_hidden_channels, num_nodes)
-            self.gnn2_embed = GNN(gcn_layer2_hidden_channels, gcn_layer2_hidden_channels, gcn_layer3_hidden_channels, lin=False)
+            num_nodes2 = ceil(diffpool_ratio * num_nodes1)
+            gnn1_out_channels = gcn_layer1_hidden_channels * (gnn_depth - 1) + gcn_layer2_hidden_channels
+            self.gnn2_pool = GNN(gnn1_out_channels, gcn_layer2_hidden_channels, num_nodes2)
+            self.gnn2_embed = GNN(gnn1_out_channels, gcn_layer2_hidden_channels, gcn_layer3_hidden_channels, lin=False)
 
-            self.gnn3_embed = GNN(gcn_layer3_hidden_channels, gcn_layer3_hidden_channels, lin_layer1_hidden_channels, lin=False)
+            gnn2_out_channels = gcn_layer2_hidden_channels * (gnn_depth - 1) + gcn_layer3_hidden_channels
+            self.gnn3_embed = GNN(gnn2_out_channels, gcn_layer3_hidden_channels, lin_layer1_hidden_channels, lin=False)
 
-            self.lin1 = torch.nn.Linear(lin_layer1_hidden_channels + num_stats, lin_layer2_hidden_channels)
+            gnn3_out_channels = gcn_layer3_hidden_channels * (gnn_depth - 1) + lin_layer1_hidden_channels
+            self.lin1 = torch.nn.Linear(gnn3_out_channels + num_stats, lin_layer2_hidden_channels)
             self.lin2 = torch.nn.Linear(lin_layer2_hidden_channels, n_predicted_values)
 
         def forward(self, x, adj, mask=None, graph_sizes=None, stats=None):
@@ -497,7 +503,7 @@ def main():
 
             x = F.dropout(x, p=dropout_ratio, training=self.training)
             x = self.lin1(x)
-            x = torch.tanh(x)
+            x = F.gelu(x)
             x = F.dropout(x, p=dropout_ratio, training=self.training)
             x = self.lin2(x)
             # x = F.relu(x)
