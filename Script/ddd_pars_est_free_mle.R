@@ -11,7 +11,6 @@ setwd("DDD_MLE_TES")
 # Maximize the ML, let the MLE run in the best way possible
 tryCatch(
   R.utils::withTimeout({
-    misspec <- data$tas[[i]]$Nnode - data$tes[[i]]$Nnode
     ml <- DDD::dd_ML(
       brts = data$brts[[i]],
       initparsopt = data$pars[[i]],
@@ -20,7 +19,6 @@ tryCatch(
       soc = 2,
       cond = 1,
       ddmodel = 1,
-      missnumspec = misspec,
       num_cycles = Inf
     )
     # If an error occurred, ml will be NA and we return NA right away.
