@@ -397,7 +397,7 @@ def main():
 
     # Filtering out trees with less than 200 nodes for the training set
     # TODO: Add switch to decide which sets to filter
-    filtered_training_data = [data for data in filtered_training_data if data.num_nodes >= minimum_nodes_limit]
+    # filtered_training_data = [data for data in filtered_training_data if data.num_nodes >= minimum_nodes_limit]
     # filtered_testing_data = [data for data in filtered_testing_data if data.num_nodes >= max_nodes_limit]
     # filtered_validation_data = [data for data in filtered_validation_data if data.num_nodes >= max_nodes_limit]
 
