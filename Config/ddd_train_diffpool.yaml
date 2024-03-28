@@ -9,8 +9,11 @@ gcn_layer3_hidden_channels: 64
 global_pooling_method: "mean"
 huber_delta: 1.0
 learning_rate: 0.001
-lin_layer1_hidden_channels: 64
-lin_layer2_hidden_channels: 32
+lin_layer1_hidden_channels: 128
+lin_layer2_hidden_channels: 128
+lin_layer3_hidden_channels: 64
+lin_layer4_hidden_channels: 64
+lin_layer5_hidden_channels: 16
 max_gnn_depth: 6
 max_nodes_limit: 2500
 n_predicted_values: 3
