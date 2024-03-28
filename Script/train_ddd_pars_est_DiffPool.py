@@ -15,6 +15,9 @@ from torch_geometric.data import InMemoryDataset, Data
 from torch_geometric.loader import DenseDataLoader
 from torch_geometric.nn import DenseGCNConv as GCNConv, dense_diff_pool
 from torch_geometric.nn import DenseSAGEConv as SAGEConv
+from torch_geometric.loader import DataLoader
+from torch_geometric.nn import GCN2Conv
+from torch_geometric.nn import global_add_pool, global_mean_pool, global_max_pool
 
 # Load the global parameters from the config file
 global_params = None
@@ -396,7 +399,7 @@ def main():
     # Filtering out trees with less than 200 nodes for the training set
     # TODO: Add switch to decide which sets to filter
     # TODO: Find out more robust criteria for filtering out less recognizable trees
-    filtered_training_data = [data for data in filtered_training_data if data.num_nodes >= minimum_nodes_limit]
+    # filtered_training_data = [data for data in filtered_training_data if data.num_nodes >= minimum_nodes_limit]
     # filtered_testing_data = [data for data in filtered_testing_data if data.num_nodes >= max_nodes_limit]
     # filtered_validation_data = [data for data in filtered_validation_data if data.num_nodes >= max_nodes_limit]
 
@@ -417,8 +420,10 @@ def main():
     max_nodes = max(max_nodes_train, max_nodes_test, max_nodes_val)
     print(f"Max nodes: {max_nodes} for {task_type}")
 
-    training_dataset = TreeData(root=None, data_list=filtered_training_data, transform=T.ToDense(max_nodes))
-    testing_dataset = TreeData(root=None, data_list=filtered_testing_data, transform=T.ToDense(max_nodes))
+    transform = T.Compose([T.NormalizeFeatures(), T.GCNNorm(), T.ToSparseTensor()])
+
+    training_dataset = TreeData(root=None, data_list=filtered_training_data, transform=transform)
+    testing_dataset = TreeData(root=None, data_list=filtered_testing_data, transform=transform)
 
     num_stats = training_dataset[0].stats.shape[0]
 
@@ -536,6 +541,42 @@ def main():
 
             return x, l1 + l2, e1 + e2
 
+    class Net(torch.nn.Module):
+        def __init__(self, hidden_channels, num_layers, alpha, theta,
+                     shared_weights=True, dropout=0.0):
+            super().__init__()
+
+            self.lins = torch.nn.ModuleList()
+            self.lins.append(torch.nn.Linear(training_dataset.num_features, hidden_channels))
+            self.lins.append(torch.nn.Linear(3 * hidden_channels, n_predicted_values))
+
+            self.convs = torch.nn.ModuleList()
+            for layer in range(2 * num_layers):
+                self.convs.append(
+                    GCN2Conv(hidden_channels, alpha, theta, layer + 1,
+                             shared_weights, normalize=False))
+
+            self.dropout = dropout
+
+        def forward(self, x, adj_t, batch_size):
+            x = F.dropout(x, self.dropout, training=self.training)
+            x = x_0 = self.lins[0](x).relu()
+
+            for conv in self.convs:
+                h = F.dropout(x, self.dropout, training=self.training)
+                h = conv(h, x_0, adj_t)
+                x = h + x
+                x = x.relu()
+
+            x = torch.cat([global_add_pool(x, batch_size), global_mean_pool(x, batch_size), global_max_pool(x, batch_size)], dim=1)
+
+            x = F.dropout(x, self.dropout, training=self.training)
+            x = self.lins[1](x)
+            print(x.shape)
+
+            return x
+
+
     # FIXME: The EarlyStopper class does not work as expected
     class EarlyStopper:
         def __init__(self, patience=3, min_delta=0.1):
@@ -560,13 +601,13 @@ def main():
         loss_all = 0  # Keep track of the loss
         for data in train_loader:
             data.to(device)
-            graph_sizes = data.num_nodes
             optimizer.zero_grad()
-            out, l, e = model(data.x, data.adj, data.mask, graph_sizes, data.stats)
-            loss = criterion(out, data.y.view(data.num_nodes.__len__(), n_predicted_values))
-            loss = loss + l * 100000 + e * 0.1
+            out = model(data.x, data.adj_t, data.batch)
+            print(out.shape)
+            print(out)
+            loss = criterion(out, data.y.view(data.num_graphs, n_predicted_values))
             loss.backward()
-            loss_all += loss.item() * data.num_nodes.__len__()
+            loss_all += loss.item() * data.num_graphs
             optimizer.step()
 
         return loss_all / len(train_loader.dataset)
@@ -582,13 +623,14 @@ def main():
 
         for data in loader:
             data.to(device)
-            graph_sizes = data.num_nodes
-            out, _, _ = model(data.x, data.adj, data.mask, graph_sizes, data.stats)
-            diffs = torch.abs(out - data.y.view(data.num_nodes.__len__(), n_predicted_values))
+            out = model(data.x, data.adj_t, data.batch)
+            diffs = torch.abs(out - data.y.view(data.num_graphs, n_predicted_values))
             diffs_all = torch.cat((diffs_all, diffs), dim=0)
             outputs_all = torch.cat((outputs_all, out), dim=0)
-            y_all = torch.cat((y_all, data.y.view(data.num_nodes.__len__(), n_predicted_values)), dim=0)
-            nodes_all = torch.cat((nodes_all, data.num_nodes), dim=0)
+            y_all = torch.cat((y_all, data.y.view(data.num_graphs, n_predicted_values)), dim=0)
+            for i in range(data.num_graphs):
+                current_num_nodes = torch.tensor([data._num_nodes[i]], dtype=torch.long, device=device)
+                nodes_all = torch.cat((nodes_all, current_num_nodes), dim=0)
 
         print(f"diffs_all length: {len(diffs_all)}; test_loader.dataset length: {len(test_loader.dataset)}; Equal: {len(diffs_all) == len(test_loader.dataset)}")
         mean_diffs = torch.sum(diffs_all, dim=0) / len(test_loader.dataset)
@@ -600,51 +642,25 @@ def main():
         loss_all = 0  # Keep track of the loss
         for data in test_loader:
             data.to(device)
-            graph_sizes = data.num_nodes
-            out, l, e = model(data.x, data.adj, data.mask, graph_sizes, data.stats)
-            loss = criterion(out, data.y.view(data.num_nodes.__len__(), n_predicted_values))
-            loss = loss + l * 100000 + e * 0.1
-            loss_all += loss.item() * data.num_nodes.__len__()
+            out = model(data.x, data.adj_t, data.batch)
+            loss = criterion(out, data.y.view(data.num_graphs, n_predicted_values))
+            loss_all += loss.item() * data.num_graphs
 
         return loss_all / len(train_loader.dataset)
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Training using {device}")
 
-    model = DiffPool()
+    #model = DiffPool()
+    model = Net(hidden_channels=256, num_layers=gnn_depth, alpha=0.5, theta=1.0, shared_weights=False, dropout=0.2)
     model = model.to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
     criterion = torch.nn.HuberLoss(delta=huber_delta).to(device)
 
-    def shape_check(dataset, max_nodes):
-        incorrect_shapes = []  # List to store indices of data elements with incorrect shapes
-        for i in range(len(dataset)):
-            data = dataset[i]
-            # Check the shapes of data.x, data.adj, and data.mask
-            if data.x.shape != torch.Size([max_nodes, 3]) or \
-                    data.y.shape != torch.Size([n_predicted_values]) or \
-                    data.adj.shape != torch.Size([max_nodes, max_nodes]) or \
-                    data.mask.shape != torch.Size([max_nodes]):
-                incorrect_shapes.append(i)  # Add index to the list if any shape is incorrect
-
-        # Print the indices of incorrect data elements or a message if all shapes are correct
-        if incorrect_shapes:
-            print(f"Incorrect shapes found at indices: {incorrect_shapes}")
-        else:
-            print("No incorrect shapes found.")
-
-    # Check the shapes of the training and testing datasets
-    # Be aware that ToDense will pad the data with zeros according to max_nodes
-    # ToDense may create malformed data.y when the number of nodes is 3 (2 tips)
-    shape_check(training_dataset, max_nodes)
-    shape_check(testing_dataset, max_nodes)
-
-    train_loader = DenseDataLoader(training_dataset, batch_size=train_batch_size_adjusted, shuffle=False)
-    test_loader = DenseDataLoader(testing_dataset, batch_size=test_batch_size_adjusted, shuffle=False)
+    train_loader = DataLoader(training_dataset, batch_size=train_batch_size_adjusted, shuffle=False)
+    test_loader = DataLoader(testing_dataset, batch_size=test_batch_size_adjusted, shuffle=False)
     print(f"Training dataset length: {len(train_loader.dataset)}")
     print(f"Testing dataset length: {len(test_loader.dataset)}")
-    print(train_loader.dataset.transform)
-    print(test_loader.dataset.transform)
 
     print(model)
 
@@ -656,15 +672,6 @@ def main():
     final_test_y = []
     final_test_nodes = []
 
-    train_dir = os.path.join(name, task_type, "training")
-    test_dir = os.path.join(name, task_type, "testing")
-
-    # TODO: Remove the following block, it's not needed anymore
-    # Check and create directories if not exist
-    if not os.path.exists(train_dir):
-        os.makedirs(train_dir)
-    if not os.path.exists(test_dir):
-        os.makedirs(test_dir)
 
     # TODO: Remove early stopping, or save the model so long as loss is smaller than the previous
     # Set up the early stopper
@@ -674,7 +681,6 @@ def main():
     train_test_ratio = len(train_loader.dataset) / len(test_loader.dataset)
 
     for epoch in range(1, epoch_number):
-
         actual_epoch = epoch
         train_loss_all = train()
         test_loss_all = compute_test_loss()
