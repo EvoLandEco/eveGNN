@@ -45,6 +45,7 @@ normalize_edge_length = global_params["normalize_edge_length"]
 normalize_graph_representation = global_params["normalize_graph_representation"]
 huber_delta = global_params["huber_delta"]
 global_pooling_method = global_params["global_pooling_method"]
+minimum_nodes_limit = global_params["minimum_nodes_limit"]
 
 
 def read_table(path):
@@ -392,10 +393,10 @@ def main():
     filtered_validation_data = [data for data in filtered_validation_data if data.num_nodes <= max_nodes_limit]
 
     # Filtering out trees with less than 200 nodes for the training set
-    # TODO: Replace 200 with a global parameter
-    filtered_training_data = [data for data in filtered_training_data if data.num_nodes <= 200]
-    # filtered_testing_data = [data for data in filtered_testing_data if data.num_nodes <= max_nodes_limit]
-    # filtered_validation_data = [data for data in filtered_validation_data if data.num_nodes <= max_nodes_limit]
+    # TODO: Add switch to decide which sets to filter
+    filtered_training_data = [data for data in filtered_training_data if data.num_nodes >= minimum_nodes_limit]
+    # filtered_testing_data = [data for data in filtered_testing_data if data.num_nodes >= max_nodes_limit]
+    # filtered_validation_data = [data for data in filtered_validation_data if data.num_nodes >= max_nodes_limit]
 
     class TreeData(InMemoryDataset):
         def __init__(self, root, data_list, transform=None, pre_transform=None):
