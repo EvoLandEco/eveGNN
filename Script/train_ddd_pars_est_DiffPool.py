@@ -74,6 +74,7 @@ def check_rds_files_count(tree_path, el_path, st_path):
     else:
         raise ValueError("The number of .rds files in the three paths are not equal")
 
+
 def list_subdirectories(path):
     try:
         # Ensure the given path exists and it's a directory
@@ -394,6 +395,7 @@ def main():
 
     # Filtering out trees with less than 200 nodes for the training set
     # TODO: Add switch to decide which sets to filter
+    # TODO: Find out more robust criteria for filtering out less recognizable trees
     filtered_training_data = [data for data in filtered_training_data if data.num_nodes >= minimum_nodes_limit]
     # filtered_testing_data = [data for data in filtered_testing_data if data.num_nodes >= max_nodes_limit]
     # filtered_validation_data = [data for data in filtered_validation_data if data.num_nodes >= max_nodes_limit]
@@ -421,6 +423,7 @@ def main():
     num_stats = training_dataset[0].stats.shape[0]
 
     class GNN(torch.nn.Module):
+        # TODO: parameter lin is not used, remove it or implement it (LNN after GNN)
         def __init__(self, in_channels, hidden_channels, out_channels,
                      normalize=False, lin=True):
             super(GNN, self).__init__()
@@ -510,6 +513,7 @@ def main():
                 self.graph_sizes = graph_sizes.view(-1, 1).to(device)
                 x = x / self.graph_sizes
 
+            # TODO: Add switch to decide whether to use stats or not
             self.stats = stats
             self.stats = torch.squeeze(self.stats, -1).to(device)
             x = torch.cat((x, self.stats), dim=1)
@@ -532,6 +536,7 @@ def main():
 
             return x, l1 + l2, e1 + e2
 
+    # FIXME: The EarlyStopper class does not work as expected
     class EarlyStopper:
         def __init__(self, patience=3, min_delta=0.1):
             self.patience = patience
@@ -629,8 +634,8 @@ def main():
             print("No incorrect shapes found.")
 
     # Check the shapes of the training and testing datasets
-    # Be aware that ToDense will pad the data with zeros to the max_nodes value
-    # However, ToDense may create malformed data.y when the number of nodes is 3 (2 tips)
+    # Be aware that ToDense will pad the data with zeros according to max_nodes
+    # ToDense may create malformed data.y when the number of nodes is 3 (2 tips)
     shape_check(training_dataset, max_nodes)
     shape_check(testing_dataset, max_nodes)
 
@@ -654,12 +659,14 @@ def main():
     train_dir = os.path.join(name, task_type, "training")
     test_dir = os.path.join(name, task_type, "testing")
 
+    # TODO: Remove the following block, it's not needed anymore
     # Check and create directories if not exist
     if not os.path.exists(train_dir):
         os.makedirs(train_dir)
     if not os.path.exists(test_dir):
         os.makedirs(test_dir)
 
+    # TODO: Remove early stopping, or save the model so long as loss is smaller than the previous
     # Set up the early stopper
     # early_stopper = EarlyStopper(patience=3, min_delta=0.05)
     actual_epoch = 0
