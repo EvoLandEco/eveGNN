@@ -502,28 +502,8 @@ tree_to_stats <- function(tree) {
     return(0.00)
   }
 
-  gamma <- treestats::gamma_statistic(tree)
-  colless <- treestats::colless(tree) / 1000
-  beta <- treestats::beta_statistic(tree)
-  pigot_rho <- treestats::pigot_rho(tree)
-  nltt_base <- treestats::nLTT_base(tree)
-  phylogenetic_diversity <- treestats::phylogenetic_diversity(tree) / 1000
-  avg_ladder <- treestats::avg_ladder(tree) / 10
-  cherries <- treestats::cherries(tree) / 100
-  stairs <- treestats::stairs(tree)
-  j_one <- treestats::j_one(tree)
-  area_per_pair <- treestats::area_per_pair(tree) / 100
-  average_leaf_depth <- treestats::average_leaf_depth(tree) /10
-  rogers <- treestats::rogers(tree) / 100
-  mpd <- treestats::mean_pair_dist(tree) / 100
-  mntd <- treestats::mntd(tree) / 10
-  mbl <- treestats::mean_branch_length(tree) / 10
-  num_nodes <- (2 * tree$Nnode + 1) / 1000
-
-  stats <- c(gamma, colless, beta, pigot_rho, nltt_base,
-             phylogenetic_diversity, avg_ladder, cherries,
-             stairs, j_one, area_per_pair, average_leaf_depth,
-             rogers, mpd, mntd, mbl, num_nodes)
+  # TODO: Maintain a named list of the stats used, ensure they are consistent
+  stats <- treestats::calc_all_stats(tree)
 
   return(unlist(stats))
 }
