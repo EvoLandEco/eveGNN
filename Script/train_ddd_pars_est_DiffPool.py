@@ -388,6 +388,12 @@ def main():
     filtered_testing_data = [data for data in filtered_testing_data if data.num_nodes <= max_nodes_limit]
     filtered_validation_data = [data for data in filtered_validation_data if data.num_nodes <= max_nodes_limit]
 
+    # Filtering out trees with less than 200 nodes for the training set
+    # TODO: Replace 200 with a global parameter
+    filtered_training_data = [data for data in filtered_training_data if data.num_nodes <= 200]
+    # filtered_testing_data = [data for data in filtered_testing_data if data.num_nodes <= max_nodes_limit]
+    # filtered_validation_data = [data for data in filtered_validation_data if data.num_nodes <= max_nodes_limit]
+
     class TreeData(InMemoryDataset):
         def __init__(self, root, data_list, transform=None, pre_transform=None):
             super(TreeData, self).__init__(root, transform, pre_transform)
