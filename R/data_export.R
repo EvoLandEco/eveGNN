@@ -67,7 +67,7 @@ export_to_gnn_with_params <- function(data, which = "tas", undirected = FALSE, m
   eve:::check_path(path)
   eve:::check_path(path_EL)
   eve:::check_path(path_ST)
-    eve:::check_path(path_BT)
+  eve:::check_path(path_BT)
 
   if (which == "tas") {
     for (i in seq_along(data$tas)) {
@@ -134,6 +134,7 @@ export_to_gnn_with_params <- function(data, which = "tas", undirected = FALSE, m
       age <- data$age[[i]]
       file_name <- paste0(path_BT, "/BT_", la, "_", mu, "_", cap, "_", age, "_", i, ".rds")
       saveRDS(tree_to_brts(data$tes[[i]]), file = file_name)
+    }
   }
 }
 
