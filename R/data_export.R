@@ -315,6 +315,7 @@ export_to_gnn_batch <- function(data, name, batch, batch_size, which = "tas", un
 }
 
 
+# TODO: Check unused parameter data, safely remove it if possible
 #' @export write_pars_to_gnn
 write_pars_to_gnn <- function(data, name) {
   index <- as.numeric(as.character(name))
