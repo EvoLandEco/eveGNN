@@ -16,7 +16,7 @@ lin_layer4_hidden_channels: 64
 lin_layer5_hidden_channels: 16
 max_gnn_depth: 6
 max_nodes_limit: 2500
-minimum_nodes_limit: 200
+minimum_nodes_limit: 10
 n_predicted_values: 3
 normalize_edge_length: False
 normalize_graph_representation: False
