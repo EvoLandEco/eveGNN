@@ -483,6 +483,8 @@ def main():
             self.gnn3_embed = GNN(gnn2_out_channels, gcn_layer3_hidden_channels, lin_layer1_hidden_channels, lin=False)
 
             gnn3_out_channels = gcn_layer3_hidden_channels * (gnn_depth - 1) + lin_layer1_hidden_channels
+            if global_pooling_method == "all":
+                gnn3_out_channels = gnn3_out_channels * 3
             self.lin1 = torch.nn.Linear(gnn3_out_channels + num_stats, lin_layer2_hidden_channels)
             self.lin2 = torch.nn.Linear(lin_layer2_hidden_channels, lin_layer3_hidden_channels)
             self.lin3 = torch.nn.Linear(lin_layer3_hidden_channels, lin_layer4_hidden_channels)
@@ -508,6 +510,8 @@ def main():
                 x = x.max(dim=1).values
             elif global_pooling_method == "sum":
                 x = x.sum(dim=1)
+            elif global_pooling_method == "all":
+                x = torch.cat((x.mean(dim=1), x.max(dim=1).values, x.sum(dim=1)), dim=1)
             else:
                 raise ValueError("Invalid global pooling method.")
 
