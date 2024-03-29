@@ -7,6 +7,7 @@ import torch
 import glob
 import functools
 import random
+import torch_geometric
 import torch_geometric.transforms as T
 import torch.nn.functional as F
 import yaml
@@ -15,6 +16,10 @@ from torch_geometric.data import InMemoryDataset, Data
 from torch_geometric.loader import DenseDataLoader
 from torch_geometric.nn import DenseGCNConv as GCNConv, dense_diff_pool
 from torch_geometric.nn import DenseSAGEConv as SAGEConv
+
+# Check if Torch 2.1+ is installed
+if not torch_geometric.typing.WITH_PT21:
+    quit("Torch 2.1+ is required for this script.")
 
 # Load the global parameters from the config file
 global_params = None
@@ -618,8 +623,10 @@ def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Training using {device}")
 
-    model = DiffPool()
-    model = model.to(device)
+    model = DiffPool().to(device)
+    # Detect type of os, don't compile model on Windows
+    if os.name != 'nt':
+        model = torch.compile(model)
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
     criterion = torch.nn.HuberLoss(delta=huber_delta).to(device)
 
