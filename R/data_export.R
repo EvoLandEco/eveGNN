@@ -57,6 +57,7 @@ export_to_gnn_bootstrap <- function(data, meta, index, path, undirected = FALSE)
 }
 
 # This function is for DDD
+# TODO: Combine several functions into one loop
 #' @export export_to_gnn_with_params
 export_to_gnn_with_params <- function(data, which = "tas", undirected = FALSE, master = FALSE) {
   path <- file.path("GNN/tree/")
@@ -526,6 +527,7 @@ tree_to_stats <- function(tree) {
 }
 
 
+# TODO: Also export LTT along with branching times (I doubt this will improve the performance)
 #' @export tree_to_brts
 tree_to_brts <- function(tree) {
   # Check if the tree is of class 'phylo'
