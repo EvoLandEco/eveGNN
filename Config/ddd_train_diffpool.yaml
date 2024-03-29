@@ -6,7 +6,7 @@ epoch_number: 61
 gcn_layer1_hidden_channels: 256
 gcn_layer2_hidden_channels: 128
 gcn_layer3_hidden_channels: 64
-global_pooling_method: "mean"
+global_pooling_method: "all"
 huber_delta: 1.0
 learning_rate: 0.001
 lin_layer1_hidden_channels: 128
