@@ -422,8 +422,11 @@ def main():
     max_nodes = max(max_nodes_train, max_nodes_test, max_nodes_val)
     print(f"Max nodes: {max_nodes} for {task_type}")
 
-    training_dataset = TreeData(root=None, data_list=filtered_training_data, transform=T.ToDense(max_nodes))
-    testing_dataset = TreeData(root=None, data_list=filtered_testing_data, transform=T.ToDense(max_nodes))
+    # TODO: Add switch to decide whether to use NormalizeFeatures or not
+    pre_trans = T.Compose([T.NormalizeFeatures(), T.ToDense(max_nodes)])
+
+    training_dataset = TreeData(root=None, data_list=filtered_training_data, transform=pre_trans)
+    testing_dataset = TreeData(root=None, data_list=filtered_testing_data, transform=pre_trans)
 
     num_stats = training_dataset[0].stats.shape[0]
 
