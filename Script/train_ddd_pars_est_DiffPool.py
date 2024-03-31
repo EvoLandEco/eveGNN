@@ -7,7 +7,6 @@ import torch
 import glob
 import functools
 import random
-import torch_geometric
 import torch_geometric.transforms as T
 import torch.nn.functional as F
 import yaml
@@ -16,10 +15,6 @@ from torch_geometric.data import InMemoryDataset, Data
 from torch_geometric.loader import DenseDataLoader
 from torch_geometric.nn import DenseGCNConv as GCNConv, dense_diff_pool
 from torch_geometric.nn import DenseSAGEConv as SAGEConv
-
-# Check if Torch 2.1+ is installed
-if not torch_geometric.typing.WITH_PT21:
-    quit("Torch 2.1+ is required for this script.")
 
 # Load the global parameters from the config file
 global_params = None
@@ -40,9 +35,6 @@ gcn_layer2_hidden_channels = global_params["gcn_layer2_hidden_channels"]
 gcn_layer3_hidden_channels = global_params["gcn_layer3_hidden_channels"]
 lin_layer1_hidden_channels = global_params["lin_layer1_hidden_channels"]
 lin_layer2_hidden_channels = global_params["lin_layer2_hidden_channels"]
-lin_layer3_hidden_channels = global_params["lin_layer3_hidden_channels"]
-lin_layer4_hidden_channels = global_params["lin_layer4_hidden_channels"]
-lin_layer5_hidden_channels = global_params["lin_layer5_hidden_channels"]
 n_predicted_values = global_params["n_predicted_values"]
 batch_size_reduce_factor = global_params["batch_size_reduce_factor"]
 max_nodes_limit = global_params["max_nodes_limit"]
@@ -50,7 +42,6 @@ normalize_edge_length = global_params["normalize_edge_length"]
 normalize_graph_representation = global_params["normalize_graph_representation"]
 huber_delta = global_params["huber_delta"]
 global_pooling_method = global_params["global_pooling_method"]
-minimum_nodes_limit = global_params["minimum_nodes_limit"]
 
 
 def read_table(path):
@@ -78,7 +69,6 @@ def check_rds_files_count(tree_path, el_path, st_path):
         return tree_count  # Assuming all counts are equal, return one of them
     else:
         raise ValueError("The number of .rds files in the three paths are not equal")
-
 
 def list_subdirectories(path):
     try:
@@ -398,13 +388,6 @@ def main():
     filtered_testing_data = [data for data in filtered_testing_data if data.num_nodes <= max_nodes_limit]
     filtered_validation_data = [data for data in filtered_validation_data if data.num_nodes <= max_nodes_limit]
 
-    # Filtering out trees with less than 200 nodes for the training set
-    # TODO: Add switch to decide which sets to filter
-    # TODO: Find out more robust criteria for filtering out less recognizable trees
-    filtered_training_data = [data for data in filtered_training_data if data.num_nodes >= minimum_nodes_limit]
-    # filtered_testing_data = [data for data in filtered_testing_data if data.num_nodes >= max_nodes_limit]
-    # filtered_validation_data = [data for data in filtered_validation_data if data.num_nodes >= max_nodes_limit]
-
     class TreeData(InMemoryDataset):
         def __init__(self, root, data_list, transform=None, pre_transform=None):
             super(TreeData, self).__init__(root, transform, pre_transform)
@@ -422,16 +405,12 @@ def main():
     max_nodes = max(max_nodes_train, max_nodes_test, max_nodes_val)
     print(f"Max nodes: {max_nodes} for {task_type}")
 
-    # TODO: Add switch to decide whether to use NormalizeFeatures or not
-    pre_trans = T.Compose([T.NormalizeFeatures(), T.ToDense(max_nodes)])
-
     training_dataset = TreeData(root=None, data_list=filtered_training_data, transform=T.ToDense(max_nodes))
     testing_dataset = TreeData(root=None, data_list=filtered_testing_data, transform=T.ToDense(max_nodes))
 
     num_stats = training_dataset[0].stats.shape[0]
 
     class GNN(torch.nn.Module):
-        # TODO: parameter lin is not used, remove it or implement it (LNN after GNN)
         def __init__(self, in_channels, hidden_channels, out_channels,
                      normalize=False, lin=True):
             super(GNN, self).__init__()
@@ -489,13 +468,8 @@ def main():
             self.gnn3_embed = GNN(gnn2_out_channels, gcn_layer3_hidden_channels, lin_layer1_hidden_channels, lin=False)
 
             gnn3_out_channels = gcn_layer3_hidden_channels * (gnn_depth - 1) + lin_layer1_hidden_channels
-            if global_pooling_method == "all":
-                gnn3_out_channels = gnn3_out_channels * 3
             self.lin1 = torch.nn.Linear(gnn3_out_channels + num_stats, lin_layer2_hidden_channels)
-            self.lin2 = torch.nn.Linear(lin_layer2_hidden_channels, lin_layer3_hidden_channels)
-            self.lin3 = torch.nn.Linear(lin_layer3_hidden_channels, lin_layer4_hidden_channels)
-            self.lin4 = torch.nn.Linear(lin_layer4_hidden_channels, lin_layer5_hidden_channels)
-            self.lin5 = torch.nn.Linear(lin_layer5_hidden_channels, n_predicted_values)
+            self.lin2 = torch.nn.Linear(lin_layer2_hidden_channels, n_predicted_values)
 
         def forward(self, x, adj, mask=None, graph_sizes=None, stats=None):
             s = self.gnn1_pool(x, adj, mask)
@@ -516,8 +490,6 @@ def main():
                 x = x.max(dim=1).values
             elif global_pooling_method == "sum":
                 x = x.sum(dim=1)
-            elif global_pooling_method == "all":
-                x = torch.cat((x.mean(dim=1), x.max(dim=1).values, x.sum(dim=1)), dim=1)
             else:
                 raise ValueError("Invalid global pooling method.")
 
@@ -525,7 +497,6 @@ def main():
                 self.graph_sizes = graph_sizes.view(-1, 1).to(device)
                 x = x / self.graph_sizes
 
-            # TODO: Add switch to decide whether to use stats or not
             self.stats = stats
             self.stats = torch.squeeze(self.stats, -1).to(device)
             x = torch.cat((x, self.stats), dim=1)
@@ -535,20 +506,10 @@ def main():
             x = F.gelu(x)
             x = F.dropout(x, p=dropout_ratio, training=self.training)
             x = self.lin2(x)
-            x = F.gelu(x)
-            x = F.dropout(x, p=dropout_ratio, training=self.training)
-            x = self.lin3(x)
-            x = F.gelu(x)
-            x = F.dropout(x, p=dropout_ratio, training=self.training)
-            x = self.lin4(x)
-            x = F.gelu(x)
-            x = F.dropout(x, p=dropout_ratio, training=self.training)
-            x = self.lin5(x)
             # x = F.relu(x)
 
             return x, l1 + l2, e1 + e2
 
-    # FIXME: The EarlyStopper class does not work as expected
     class EarlyStopper:
         def __init__(self, patience=3, min_delta=0.1):
             self.patience = patience
@@ -623,10 +584,8 @@ def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Training using {device}")
 
-    model = DiffPool().to(device)
-    # Detect type of os, don't compile model on Windows
-    if os.name != 'nt':
-        model = torch.compile(model)
+    model = DiffPool()
+    model = model.to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
     criterion = torch.nn.HuberLoss(delta=huber_delta).to(device)
 
@@ -648,8 +607,8 @@ def main():
             print("No incorrect shapes found.")
 
     # Check the shapes of the training and testing datasets
-    # Be aware that ToDense will pad the data with zeros according to max_nodes
-    # ToDense may create malformed data.y when the number of nodes is 3 (2 tips)
+    # Be aware that ToDense will pad the data with zeros to the max_nodes value
+    # However, ToDense may create malformed data.y when the number of nodes is 3 (2 tips)
     shape_check(training_dataset, max_nodes)
     shape_check(testing_dataset, max_nodes)
 
@@ -673,14 +632,12 @@ def main():
     train_dir = os.path.join(name, task_type, "training")
     test_dir = os.path.join(name, task_type, "testing")
 
-    # TODO: Remove the following block, it's not needed anymore
     # Check and create directories if not exist
     if not os.path.exists(train_dir):
         os.makedirs(train_dir)
     if not os.path.exists(test_dir):
         os.makedirs(test_dir)
 
-    # TODO: Remove early stopping, or save the model so long as loss is smaller than the previous
     # Set up the early stopper
     # early_stopper = EarlyStopper(patience=3, min_delta=0.05)
     actual_epoch = 0
