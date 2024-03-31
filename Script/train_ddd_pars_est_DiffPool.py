@@ -15,6 +15,7 @@ from torch_geometric.data import InMemoryDataset, Data
 from torch_geometric.loader import DenseDataLoader
 from torch_geometric.nn import DenseGCNConv as GCNConv, dense_diff_pool
 from torch_geometric.nn import DenseSAGEConv as SAGEConv
+from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence, pad_sequence, pack_sequence
 
 # Load the global parameters from the config file
 global_params = None
@@ -33,6 +34,12 @@ test_batch_size = global_params["test_batch_size"]
 gcn_layer1_hidden_channels = global_params["gcn_layer1_hidden_channels"]
 gcn_layer2_hidden_channels = global_params["gcn_layer2_hidden_channels"]
 gcn_layer3_hidden_channels = global_params["gcn_layer3_hidden_channels"]
+dnn_hidden_channels = global_params["dnn_hidden_channels"]
+dnn_output_channels = global_params["dnn_output_channels"]
+dnn_depth = global_params["dnn_depth"]
+lstm_hidden_channels = global_params["lstm_hidden_channels"]
+lstm_output_channels = global_params["lstm_output_channels"]
+lstm_depth = global_params["lstm_depth"]
 lin_layer1_hidden_channels = global_params["lin_layer1_hidden_channels"]
 lin_layer2_hidden_channels = global_params["lin_layer2_hidden_channels"]
 n_predicted_values = global_params["n_predicted_values"]
@@ -58,17 +65,19 @@ def count_rds_files(path):
     return len(rds_files)
 
 
-def check_rds_files_count(tree_path, el_path, st_path):
-    # Count the number of .rds files in all three paths
+def check_rds_files_count(tree_path, el_path, st_path, bt_path):
+    # Count the number of .rds files in all four paths
     tree_count = count_rds_files(tree_path)
     el_count = count_rds_files(el_path)
     st_count = count_rds_files(st_path)
+    bt_count = count_rds_files(bt_path)  # Count for the new bt_path
 
     # Check if the counts are equal
-    if tree_count == el_count == st_count:
+    if tree_count == el_count == st_count == bt_count:
         return tree_count  # Assuming all counts are equal, return one of them
     else:
-        raise ValueError("The number of .rds files in the three paths are not equal")
+        raise ValueError("The number of .rds files in the four paths are not equal")
+
 
 def list_subdirectories(path):
     try:
@@ -114,46 +123,48 @@ def sort_files(files):
     return sorted(files, key=get_sort_key)
 
 
-def check_file_consistency(files_tree, files_el, files_st):
-    # Check if the three lists have the same length
-    if not (len(files_tree) == len(files_el) == len(files_st)):
+def check_file_consistency(files_tree, files_el, files_st, files_bt):
+    # Check if the four lists have the same length
+    if not (len(files_tree) == len(files_el) == len(files_st) == len(files_bt)):
         raise ValueError("Mismatched lengths among file lists.")
 
     # Define a function to extract parameters from filename
     def get_params_tuple(filename):
         return tuple(map(float, filename.split('_')[1:-1]))
 
-    # Check each trio of files for matching parameters
-    for tree_file, el_file, st_file in zip(files_tree, files_el, files_st):
+    # Check each quartet of files for matching parameters
+    for tree_file, el_file, st_file, bt_file in zip(files_tree, files_el, files_st, files_bt):
         tree_params = get_params_tuple(tree_file)
         el_params = get_params_tuple(el_file)
         st_params = get_params_tuple(st_file)
+        bt_params = get_params_tuple(bt_file)
 
-        if not (tree_params == el_params == st_params):
-            raise ValueError(f"Mismatched parameters among files: {tree_file}, {el_file}, and {st_file}")
+        if not (tree_params == el_params == st_params == bt_params):
+            raise ValueError(f"Mismatched parameters among files: {tree_file}, {el_file}, {st_file}, {bt_file}")
 
     # If we get here, all checks passed
-    print("File lists consistency check passed across tree, EL, and ST datasets.")
+    print("File lists consistency check passed across tree, EL, ST, and BT datasets.")
 
 
-def check_params_consistency(params_tree_list, params_el_list, params_st_list):
-    # Check if all corresponding elements in the three lists are equal
-    is_consistent = all(a == b == c for a, b, c in zip(params_tree_list, params_el_list, params_st_list))
+def check_params_consistency(params_tree_list, params_el_list, params_st_list, params_bt_list):
+    # Check if all corresponding elements in the four lists are equal
+    is_consistent = all(a == b == c == d for a, b, c, d in zip(params_tree_list, params_el_list, params_st_list, params_bt_list))
 
     if is_consistent:
-        print("Parameters are consistent across the tree, EL, and ST datasets.")
+        print("Parameters are consistent across the tree, EL, ST, and BT datasets.")
     else:
-        raise ValueError("Mismatch in parameters between the tree, EL, and ST datasets.")
+        raise ValueError("Mismatch in parameters between the tree, EL, ST, and BT datasets.")
 
     return is_consistent
 
 
-def check_list_count(count, data_list, length_list, params_list, stats_list):
+def check_list_count(count, data_list, length_list, params_list, stats_list, brts_list):
     # Get the number of elements in each list
     data_count = len(data_list)
     length_count = len(length_list)
     params_count = len(params_list)
-    stats_count = len(stats_list)  # Get the count for the new stats_list
+    stats_count = len(stats_list)
+    brts_count = len(brts_list)  # Calculate the count for the new brts_list
 
     # Check if the count matches the number of elements in each list
     if count != data_count:
@@ -165,8 +176,11 @@ def check_list_count(count, data_list, length_list, params_list, stats_list):
     if count != params_count:
         raise ValueError(f"Count mismatch: input argument count is {count}, params_list has {params_count} elements.")
 
-    if count != stats_count:  # New check for stats_list
+    if count != stats_count:
         raise ValueError(f"Count mismatch: input argument count is {count}, stats_list has {stats_count} elements.")
+
+    if count != brts_count:  # Check for brts_list
+        raise ValueError(f"Count mismatch: input argument count is {count}, brts_list has {brts_count} elements.")
 
     # If all checks pass, print a success message
     print("Count check passed")
@@ -180,14 +194,17 @@ def read_rds_to_pytorch(path, count, normalize=False):
                 if f.startswith('EL_') and f.endswith('.rds')]
     files_st = [f for f in os.listdir(os.path.join(path, 'GNN', 'tree', 'ST'))
                 if f.startswith('ST_') and f.endswith('.rds')]
+    files_bt = [f for f in os.listdir(os.path.join(path, 'GNN', 'tree', 'BT'))
+                if f.startswith('BT_') and f.endswith('.rds')]  # Get the list of files in the new BT directory
 
     # Sort the files based on the parameters
     files_tree = sort_files(files_tree)
     files_el = sort_files(files_el)
     files_st = sort_files(files_st)
+    files_bt = sort_files(files_bt)  # Sort the files in the new BT directory
 
     # Check if the files are consistent
-    check_file_consistency(files_tree, files_el, files_st)
+    check_file_consistency(files_tree, files_el, files_st, files_bt)
 
     # List to hold the data from each .rds file
     data_list = []
@@ -223,7 +240,18 @@ def read_rds_to_pytorch(path, count, normalize=False):
         stats_list.append(stats_data)
         params_st_list.append(get_params_string(filename))
 
-    check_params_consistency(params_tree_list, params_el_list, params_st_list)
+    brts_list = []
+    params_bt_list = []
+
+    # Loop through the files with the prefix 'BT_'
+    for filename in files_bt:
+        brts_file_path = os.path.join(path, 'GNN', 'tree', 'BT', filename)
+        brts_result = pyreadr.read_r(brts_file_path)
+        brts_data = brts_result[None]
+        brts_list.append(brts_data)
+        params_bt_list.append(get_params_string(filename))
+
+    check_params_consistency(params_tree_list, params_el_list, params_st_list, params_bt_list)
 
     params_list = []
 
@@ -235,7 +263,7 @@ def read_rds_to_pytorch(path, count, normalize=False):
     for vector in params_list:
         vector[2] = vector[2] / cap_norm_factor
 
-    check_list_count(count, data_list, length_list, params_list, stats_list)
+    check_list_count(count, data_list, length_list, params_list, stats_list, brts_list)
 
     # List to hold the Data objects
     pytorch_geometric_data_list = []
@@ -263,12 +291,22 @@ def read_rds_to_pytorch(path, count, normalize=False):
 
         stats_tensor = torch.tensor(stats_list[i].values, dtype=torch.float)
 
+        stats_tensor = stats_tensor.squeeze(1)  # Remove the extra dimension
+
+        brts_tensor = torch.tensor(brts_list[i].values, dtype=torch.float)
+
+        brts_tensor = brts_tensor.squeeze(1)  # Remove the extra dimension
+
+        brts_length = torch.tensor([len(brts_list[i].values)], dtype=torch.long)
+
         # Create a Data object with the edge index, number of nodes, and category value
         data = Data(x=edge_length_tensor,
                     edge_index=edge_index_tensor,
                     num_nodes=num_nodes,
                     y=params_current_tensor,
-                    stats=stats_tensor)
+                    stats=stats_tensor,
+                    brts=brts_tensor,
+                    brts_len=brts_length)
 
         # Append the Data object to the list
         pytorch_geometric_data_list.append(data)
@@ -332,10 +370,11 @@ def main():
     full_dir_tree = os.path.join(full_dir, 'GNN', 'tree')
     full_dir_el = os.path.join(full_dir, 'GNN', 'tree', 'EL')
     full_dir_st = os.path.join(full_dir, 'GNN', 'tree', 'ST')
+    full_dir_bt = os.path.join(full_dir, 'GNN', 'tree', 'BT')  # Add the full path for the new BT directory
     # Call read_rds_to_pytorch with the full directory path
     print(full_dir)
     # Check if the number of .rds files in the tree and el paths are equal
-    rds_count = check_rds_files_count(full_dir_tree, full_dir_el, full_dir_st)
+    rds_count = check_rds_files_count(full_dir_tree, full_dir_el, full_dir_st, full_dir_bt)
     print(f'There are: {rds_count} trees in the {task_type} folder.')
     print(f"Now reading {task_type}...")
     # Read the .rds files into a list of PyTorch Geometric Data objects
@@ -367,7 +406,8 @@ def main():
     full_val_dir_tree = os.path.join(val_dir, 'GNN', 'tree')
     full_val_dir_el = os.path.join(val_dir, 'GNN', 'tree', 'EL')
     full_val_dir_st = os.path.join(val_dir, 'GNN', 'tree', 'ST')
-    val_rds_count = check_rds_files_count(full_val_dir_tree, full_val_dir_el, full_val_dir_st)
+    full_val_dir_bt = os.path.join(val_dir, 'GNN', 'tree', 'BT')  # Add the full path for the new BT directory
+    val_rds_count = check_rds_files_count(full_val_dir_tree, full_val_dir_el, full_val_dir_st, full_val_dir_bt)
     print(f'There are: {val_rds_count} trees in the validation folder.')
     print(f"Now reading validation data...")
     current_val_dataset = read_rds_to_pytorch(val_dir, val_rds_count, normalize_edge_length)
@@ -388,8 +428,30 @@ def main():
     filtered_testing_data = [data for data in filtered_testing_data if data.num_nodes <= max_nodes_limit]
     filtered_validation_data = [data for data in filtered_validation_data if data.num_nodes <= max_nodes_limit]
 
+    # Get the maximum number of nodes, for padding the matrices of the graphs
+    max_nodes_train = max([data.num_nodes for data in filtered_training_data])
+    max_nodes_test = max([data.num_nodes for data in filtered_testing_data])
+    max_nodes_val = max([data.num_nodes for data in filtered_validation_data])
+    max_nodes = max(max_nodes_train, max_nodes_test, max_nodes_val)
+    print(f"Max nodes: {max_nodes} for {task_type}")
+
+    # Similarly, get the maximum lengths of brts sequences, for padding
+    max_brts_len_train = max([len(data.brts) for data in filtered_training_data])
+    max_brts_len_test = max([len(data.brts) for data in filtered_testing_data])
+    max_brts_len_val = max([len(data.brts) for data in filtered_validation_data])
+    max_brts_len = max(max_brts_len_train, max_brts_len_test, max_brts_len_val)
+    print(f"Max brts length: {max_brts_len} for {task_type}")
+
     class TreeData(InMemoryDataset):
         def __init__(self, root, data_list, transform=None, pre_transform=None):
+            # Calculate the maximum length of brts across all graphs
+            max_length = max_brts_len
+
+            # Pad the brts attribute for each graph
+            for data in data_list:
+                pad_size = max_length - len(data.brts)
+                data.brts = torch.cat([data.brts, data.brts.new_full((pad_size,), fill_value=0)], dim=0)
+
             super(TreeData, self).__init__(root, transform, pre_transform)
             self.data, self.slices = self.collate(data_list)
 
@@ -399,20 +461,15 @@ def main():
         def _process(self):
             pass  # No processing required
 
-    max_nodes_train = max([data.num_nodes for data in filtered_training_data])
-    max_nodes_test = max([data.num_nodes for data in filtered_testing_data])
-    max_nodes_val = max([data.num_nodes for data in filtered_validation_data])
-    max_nodes = max(max_nodes_train, max_nodes_test, max_nodes_val)
-    print(f"Max nodes: {max_nodes} for {task_type}")
-
     training_dataset = TreeData(root=None, data_list=filtered_training_data, transform=T.ToDense(max_nodes))
     testing_dataset = TreeData(root=None, data_list=filtered_testing_data, transform=T.ToDense(max_nodes))
 
     num_stats = training_dataset[0].stats.shape[0]
 
+    # The graph neural network model class with variable number of SAGEConv layers
     class GNN(torch.nn.Module):
         def __init__(self, in_channels, hidden_channels, out_channels,
-                     normalize=False, lin=True):
+                     normalize=False):
             super(GNN, self).__init__()
 
             self.convs = torch.nn.ModuleList()
@@ -448,42 +505,137 @@ def main():
             x_concatenated = torch.cat(outputs, dim=-1)
             return x_concatenated
 
+    # The dense neural network model class with variable number of linear layers
+    class DNN(torch.nn.Module):
+        def __init__(self, in_channels, hidden_channels, out_channels, dropout_rate=0.5):
+            super(DNN, self).__init__()
+
+            self.lins = torch.nn.ModuleList()
+            self.bns = torch.nn.ModuleList()
+            self.dropouts = torch.nn.ModuleList()  # Add a list for dropout modules
+
+            for i in range(dnn_depth):
+                first_index = 0
+                last_index = dnn_depth - 1
+
+                if dnn_depth == 1:
+                    self.lins.append(torch.nn.Linear(in_channels, out_channels))
+                    self.bns.append(torch.nn.BatchNorm1d(out_channels))
+                else:
+                    if i == first_index:
+                        self.lins.append(torch.nn.Linear(in_channels, hidden_channels))
+                        self.bns.append(torch.nn.BatchNorm1d(hidden_channels))
+                    elif i == last_index:
+                        self.lins.append(torch.nn.Linear(hidden_channels, out_channels))
+                        self.bns.append(torch.nn.BatchNorm1d(out_channels))
+                    else:
+                        self.lins.append(torch.nn.Linear(hidden_channels, hidden_channels))
+                        self.bns.append(torch.nn.BatchNorm1d(hidden_channels))
+
+                # Initialize dropout modules
+                self.dropouts.append(torch.nn.Dropout(dropout_rate))
+
+        def forward(self, x):
+            outputs = []  # Initialize a list to store outputs at each step
+            for step in range(len(self.lins)):
+                x = F.gelu(self.lins[step](x))
+                x = self.dropouts[step](x)  # Apply dropout after activation
+                x = self.bns[step](x)
+                outputs.append(x)
+
+            x_concatenated = torch.cat(outputs, dim=-1)
+            return x_concatenated
+
+    # The LSTM model class with variable number of layers to process variable-length branch time sequences
+    class LSTM(torch.nn.Module):
+        def __init__(self, in_channels, hidden_channels, out_channels, lstm_depth=1, dropout_rate=0.5):
+            super(LSTM, self).__init__()
+
+            self.lstm = torch.nn.LSTM(input_size = in_channels, hidden_size = hidden_channels, num_layers=lstm_depth, batch_first=True, dropout=dropout_ratio if lstm_depth > 1 else 0)
+            self.dropout = torch.nn.Dropout(dropout_rate)  # Dropout layer after LSTM
+            self.lin = torch.nn.Linear(hidden_channels, out_channels)
+
+        def forward(self, x):
+            x, _ = self.lstm(x)
+
+            # Unpack the sequences
+            x, _ = pad_packed_sequence(x, batch_first=True)
+
+            # Get the final hidden state
+            x = x[:, -1, :]
+
+            x = F.gelu(x)
+
+            x = self.dropout(x)  # Apply dropout after LSTM and activation
+            x = self.lin(x)
+            return x
+
+    # Differential pooling model class
+    # Multimodal architecture with GNNs, LSTMs, and DNNs
     class DiffPool(torch.nn.Module):
-        def __init__(self):
+        def __init__(self, verbose=False):
             super(DiffPool, self).__init__()
+            self.verbose = verbose
+            if self.verbose:
+                print("Initializing DiffPool model...")
 
+            # Read in augmented data
             self.graph_sizes = torch.tensor([], dtype=torch.long)
-            self.stats = torch.tensor([], dtype=torch.float)
 
+            if self.verbose:
+                print("Graph sizes loaded...")
+
+            # DiffPool Layer 1
             num_nodes1 = ceil(diffpool_ratio * max_nodes)
             self.gnn1_pool = GNN(training_dataset.num_node_features, gcn_layer1_hidden_channels, num_nodes1)
             self.gnn1_embed = GNN(training_dataset.num_node_features, gcn_layer1_hidden_channels, gcn_layer2_hidden_channels)
 
+            # DiffPool Layer 2
             num_nodes2 = ceil(diffpool_ratio * num_nodes1)
             gnn1_out_channels = gcn_layer1_hidden_channels * (gnn_depth - 1) + gcn_layer2_hidden_channels
             self.gnn2_pool = GNN(gnn1_out_channels, gcn_layer2_hidden_channels, num_nodes2)
-            self.gnn2_embed = GNN(gnn1_out_channels, gcn_layer2_hidden_channels, gcn_layer3_hidden_channels, lin=False)
+            self.gnn2_embed = GNN(gnn1_out_channels, gcn_layer2_hidden_channels, gcn_layer3_hidden_channels)
 
+            # DiffPool Layer 3
             gnn2_out_channels = gcn_layer2_hidden_channels * (gnn_depth - 1) + gcn_layer3_hidden_channels
-            self.gnn3_embed = GNN(gnn2_out_channels, gcn_layer3_hidden_channels, lin_layer1_hidden_channels, lin=False)
-
+            self.gnn3_embed = GNN(gnn2_out_channels, gcn_layer3_hidden_channels, lin_layer1_hidden_channels)
             gnn3_out_channels = gcn_layer3_hidden_channels * (gnn_depth - 1) + lin_layer1_hidden_channels
-            self.lin1 = torch.nn.Linear(gnn3_out_channels + num_stats, lin_layer2_hidden_channels)
+
+            # DNN Layers for statistics
+            self.dnn = DNN(num_stats, dnn_hidden_channels, dnn_output_channels)
+            dnn_final_channels = dnn_hidden_channels * (dnn_depth - 1) + dnn_output_channels
+
+            # LSTM Layers for branch time sequences
+            self.lstm = LSTM(in_channels=1, hidden_channels=lstm_hidden_channels, out_channels=lstm_output_channels)
+
+            # Final Readout Layers
+            self.lin1 = torch.nn.Linear(gnn3_out_channels + dnn_final_channels + lstm_output_channels, lin_layer2_hidden_channels)
             self.lin2 = torch.nn.Linear(lin_layer2_hidden_channels, n_predicted_values)
 
-        def forward(self, x, adj, mask=None, graph_sizes=None, stats=None):
+        def forward(self, x, adj, mask=None, graph_sizes=None, stats=None, brts=None):
+            # Forward pass through the DiffPool layer 1
             s = self.gnn1_pool(x, adj, mask)
             x = self.gnn1_embed(x, adj, mask)
-
             x, adj, l1, e1 = dense_diff_pool(x, adj, s, mask)
 
+            if self.verbose:
+                print("DiffPool Layer 1 Completed...")
+
+            # Forward pass through the DiffPool layer 2
             s = self.gnn2_pool(x, adj)
             x = self.gnn2_embed(x, adj)
-
             x, adj, l2, e2 = dense_diff_pool(x, adj, s)
 
+            if self.verbose:
+                print("DiffPool Layer 2 Completed...")
+
+            # Forward pass through the DiffPool layer 3
             x = self.gnn3_embed(x, adj)
 
+            if self.verbose:
+                print("DiffPool Layer 3 Completed...")
+
+            # Global pooling after the final GNN layer
             if global_pooling_method == "mean":
                 x = x.mean(dim=1)
             elif global_pooling_method == "max":
@@ -493,21 +645,47 @@ def main():
             else:
                 raise ValueError("Invalid global pooling method.")
 
+            if self.verbose:
+                print("Global Pooling Completed...")
+
+            # Whether to normalize the graph representation by dividing by the graph sizes
             if normalize_graph_representation:
                 self.graph_sizes = graph_sizes.view(-1, 1).to(device)
                 x = x / self.graph_sizes
 
-            self.stats = stats
-            self.stats = torch.squeeze(self.stats, -1).to(device)
-            x = torch.cat((x, self.stats), dim=1)
+            if self.verbose and normalize_graph_representation:
+                print("Graph Representation Normalized...")
 
+            # Here process the statistics and branch time sequences
+            processed_stats = self.dnn(stats)
+            if self.verbose:
+                print("Statistics Processed by DNN...")
+            lengths_brts = torch.sum(brts != 0, dim=1).cpu().tolist()
+            brts_cpu = brts.cpu()
+            brts_cpu = brts_cpu.unsqueeze(-1)
+            packed_brts = pack_padded_sequence(brts_cpu, lengths_brts, batch_first=True, enforce_sorted=False).to(device)
+            processed_brts = self.lstm(packed_brts)
+            if self.verbose:
+                print("Branching Time Sequences Processed by LSTM...")
+
+            # Concatenate the processed statistics and branch time sequences with the graph representation
+            x = torch.cat((x, processed_stats, processed_brts), dim=1).to(device)
+            if self.verbose:
+                print("Feature Concatenation Completed...")
+
+            # Forward pass through the readout layers
             x = F.dropout(x, p=dropout_ratio, training=self.training)
             x = self.lin1(x)
             x = F.gelu(x)
             x = F.dropout(x, p=dropout_ratio, training=self.training)
             x = self.lin2(x)
             # x = F.relu(x)
+            if self.verbose:
+                print("Readout Layers Completed...")
+                print("Forward Pass Completed...")
+                print("Epoch Completed...")
 
+            # Return the final output along with the DiffPool layer losses
             return x, l1 + l2, e1 + e2
 
     class EarlyStopper:
@@ -535,7 +713,7 @@ def main():
             data.to(device)
             graph_sizes = data.num_nodes
             optimizer.zero_grad()
-            out, l, e = model(data.x, data.adj, data.mask, graph_sizes, data.stats)
+            out, l, e = model(data.x, data.adj, data.mask, graph_sizes, data.stats, data.brts)
             loss = criterion(out, data.y.view(data.num_nodes.__len__(), n_predicted_values))
             loss = loss + l * 100000 + e * 0.1
             loss.backward()
@@ -556,7 +734,7 @@ def main():
         for data in loader:
             data.to(device)
             graph_sizes = data.num_nodes
-            out, _, _ = model(data.x, data.adj, data.mask, graph_sizes, data.stats)
+            out, _, _ = model(data.x, data.adj, data.mask, graph_sizes, data.stats, data.brts)
             diffs = torch.abs(out - data.y.view(data.num_nodes.__len__(), n_predicted_values))
             diffs_all = torch.cat((diffs_all, diffs), dim=0)
             outputs_all = torch.cat((outputs_all, out), dim=0)
@@ -574,7 +752,7 @@ def main():
         for data in test_loader:
             data.to(device)
             graph_sizes = data.num_nodes
-            out, l, e = model(data.x, data.adj, data.mask, graph_sizes, data.stats)
+            out, l, e = model(data.x, data.adj, data.mask, graph_sizes, data.stats, data.brts)
             loss = criterion(out, data.y.view(data.num_nodes.__len__(), n_predicted_values))
             loss = loss + l * 100000 + e * 0.1
             loss_all += loss.item() * data.num_nodes.__len__()
