@@ -425,8 +425,8 @@ def main():
     # TODO: Add switch to decide whether to use NormalizeFeatures or not
     pre_trans = T.Compose([T.NormalizeFeatures(), T.ToDense(max_nodes)])
 
-    training_dataset = TreeData(root=None, data_list=filtered_training_data, transform=pre_trans)
-    testing_dataset = TreeData(root=None, data_list=filtered_testing_data, transform=pre_trans)
+    training_dataset = TreeData(root=None, data_list=filtered_training_data, transform=T.ToDense(max_nodes))
+    testing_dataset = TreeData(root=None, data_list=filtered_testing_data, transform=T.ToDense(max_nodes))
 
     num_stats = training_dataset[0].stats.shape[0]
 
