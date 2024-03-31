@@ -361,6 +361,7 @@ def main():
 
     # Now you can use the variables name and set_i in your code
     print(f'Name: {name}, Task Type: {task_type}', f'GNN Depth: {gnn_depth}')
+    print("Now on branch Multimodal-DiffPool")
 
     training_dataset_list = []
     testing_dataset_list = []
