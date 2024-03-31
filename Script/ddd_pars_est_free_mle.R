@@ -55,7 +55,7 @@ tryCatch(
   R.utils::withTimeout({
     ml <- DDD::dd_ML(
       brts = data$brts[[i]],
-      initparsopt = c(runif(1, 0, 3), runif(1, 0, 0.9), runif(1, 10, 1000)),
+      initparsopt = c(runif(1, 0.1, 4), runif(1, 0, 1.5), runif(1, 10, 1000)),
       idparsopt = c(1, 2, 3),
       btorph = 0,
       soc = 2,
