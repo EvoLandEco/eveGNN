@@ -557,15 +557,15 @@ def main():
             self.lin = torch.nn.Linear(hidden_channels, out_channels)
 
         def forward(self, x):
-            x, _ = self.lstm(x)
+            out, (h_n, c_n) = self.lstm(x)
 
             # Unpack the sequences
-            x, _ = pad_packed_sequence(x, batch_first=True)
+            # x, _ = pad_packed_sequence(x, batch_first=True)
 
             # Get the final hidden state
-            x = x[:, -1, :]
+            final_hidden_state = h_n[-1, :, :]
 
-            x = F.gelu(x)
+            x = F.gelu(final_hidden_state)
 
             x = self.dropout(x)  # Apply dropout after LSTM and activation
             x = self.lin(x)
