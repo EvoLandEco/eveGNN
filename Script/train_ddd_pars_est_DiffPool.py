@@ -432,14 +432,28 @@ def main():
     # Get the maximum number of nodes, for padding the matrices of the graphs
     max_nodes_train = max([data.num_nodes for data in filtered_training_data])
     max_nodes_test = max([data.num_nodes for data in filtered_testing_data])
-    max_nodes_val = max([data.num_nodes for data in filtered_validation_data])
+
+    # Get the maximum number of nodes in the validation set
+    # Check if the validation set is empty
+    max_nodes_val = 0
+    if len(filtered_validation_data) == 0:
+        max_nodes_val = 0
+    else:
+        max_nodes_val = max([data.num_nodes for data in filtered_validation_data])
     max_nodes = max(max_nodes_train, max_nodes_test, max_nodes_val)
     print(f"Max nodes: {max_nodes} for {task_type}")
 
     # Similarly, get the maximum lengths of brts sequences, for padding
     max_brts_len_train = max([len(data.brts) for data in filtered_training_data])
     max_brts_len_test = max([len(data.brts) for data in filtered_testing_data])
-    max_brts_len_val = max([len(data.brts) for data in filtered_validation_data])
+
+    # Get the maximum length of brts sequences in the validation set
+    # Check if the validation set is empty
+    max_brts_len_val = 0
+    if len(filtered_validation_data) == 0:
+        max_brts_len_val = 0
+    else:
+        max_brts_len_val = max([len(data.brts) for data in filtered_validation_data])
     max_brts_len = max(max_brts_len_train, max_brts_len_test, max_brts_len_val)
     print(f"Max brts length: {max_brts_len} for {task_type}")
 
