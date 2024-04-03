@@ -1072,6 +1072,5 @@ def main():
     pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_predictions_diffpool_{gnn_depth}_max.rds"), final_predictions_max)
 
 
-
 if __name__ == '__main__':
     main()
