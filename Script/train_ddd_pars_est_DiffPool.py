@@ -550,6 +550,9 @@ def main():
                 # Initialize dropout modules
                 self.dropouts.append(torch.nn.Dropout(dropout_rate))
 
+            # Initialize readout layers
+            self.readout = torch.nn.Linear(out_channels, n_predicted_values)
+
         def forward(self, x):
             outputs = []  # Initialize a list to store outputs at each step
             for step in range(len(self.lins)):
@@ -559,7 +562,8 @@ def main():
                 outputs.append(x)
 
             x_concatenated = torch.cat(outputs, dim=-1)
-            return x_concatenated
+            x_readout = self.readout(x_concatenated)
+            return x_readout
 
     # The LSTM model class with variable number of layers to process variable-length branch time sequences
     class LSTM(torch.nn.Module):
@@ -569,6 +573,7 @@ def main():
             self.lstm = torch.nn.LSTM(input_size = in_channels, hidden_size = hidden_channels, num_layers=lstm_depth, batch_first=True, dropout=dropout_ratio if lstm_depth > 1 else 0)
             self.dropout = torch.nn.Dropout(dropout_rate)  # Dropout layer after LSTM
             self.lin = torch.nn.Linear(hidden_channels, out_channels)
+            self.readout = torch.nn.Linear(out_channels, n_predicted_values)
 
         def forward(self, x):
             out, (h_n, c_n) = self.lstm(x)
@@ -583,74 +588,49 @@ def main():
 
             x = self.dropout(x)  # Apply dropout after LSTM and activation
             x = self.lin(x)
+            x = F.gelu(x)
+            x = self.dropout(x)
+            x = self.readout(x)
             return x
 
     # Differential pooling model class
     # Multimodal architecture with GNNs, LSTMs, and DNNs
     class DiffPool(torch.nn.Module):
-        def __init__(self, verbose=False):
+        def __init__(self):
             super(DiffPool, self).__init__()
-            self.verbose = verbose
-            if self.verbose:
-                print("Initializing DiffPool model...")
 
-            # Read in augmented data
             self.graph_sizes = torch.tensor([], dtype=torch.long)
+            self.stats = torch.tensor([], dtype=torch.float)
 
-            if self.verbose:
-                print("Graph sizes loaded...")
-
-            # DiffPool Layer 1
             num_nodes1 = ceil(diffpool_ratio * max_nodes)
             self.gnn1_pool = GNN(training_dataset.num_node_features, gcn_layer1_hidden_channels, num_nodes1)
             self.gnn1_embed = GNN(training_dataset.num_node_features, gcn_layer1_hidden_channels, gcn_layer2_hidden_channels)
 
-            # DiffPool Layer 2
             num_nodes2 = ceil(diffpool_ratio * num_nodes1)
             gnn1_out_channels = gcn_layer1_hidden_channels * (gnn_depth - 1) + gcn_layer2_hidden_channels
             self.gnn2_pool = GNN(gnn1_out_channels, gcn_layer2_hidden_channels, num_nodes2)
-            self.gnn2_embed = GNN(gnn1_out_channels, gcn_layer2_hidden_channels, gcn_layer3_hidden_channels)
+            self.gnn2_embed = GNN(gnn1_out_channels, gcn_layer2_hidden_channels, gcn_layer3_hidden_channels, lin=False)
 
-            # DiffPool Layer 3
             gnn2_out_channels = gcn_layer2_hidden_channels * (gnn_depth - 1) + gcn_layer3_hidden_channels
-            self.gnn3_embed = GNN(gnn2_out_channels, gcn_layer3_hidden_channels, lin_layer1_hidden_channels)
+            self.gnn3_embed = GNN(gnn2_out_channels, gcn_layer3_hidden_channels, lin_layer1_hidden_channels, lin=False)
+
             gnn3_out_channels = gcn_layer3_hidden_channels * (gnn_depth - 1) + lin_layer1_hidden_channels
-
-            # DNN Layers for statistics
-            self.dnn = DNN(num_stats, dnn_hidden_channels, dnn_output_channels)
-            dnn_final_channels = dnn_hidden_channels * (dnn_depth - 1) + dnn_output_channels
-
-            # LSTM Layers for branch time sequences
-            self.lstm = LSTM(in_channels=1, hidden_channels=lstm_hidden_channels, out_channels=lstm_output_channels)
-
-            # Final Readout Layers
-            self.lin1 = torch.nn.Linear(gnn3_out_channels + dnn_final_channels + lstm_output_channels, lin_layer2_hidden_channels)
+            self.lin1 = torch.nn.Linear(gnn3_out_channels, lin_layer2_hidden_channels)
             self.lin2 = torch.nn.Linear(lin_layer2_hidden_channels, n_predicted_values)
 
-        def forward(self, x, adj, mask=None, graph_sizes=None, stats=None, brts=None):
-            # Forward pass through the DiffPool layer 1
+        def forward(self, x, adj, mask=None):
             s = self.gnn1_pool(x, adj, mask)
             x = self.gnn1_embed(x, adj, mask)
+
             x, adj, l1, e1 = dense_diff_pool(x, adj, s, mask)
 
-            if self.verbose:
-                print("DiffPool Layer 1 Completed...")
-
-            # Forward pass through the DiffPool layer 2
             s = self.gnn2_pool(x, adj)
             x = self.gnn2_embed(x, adj)
+
             x, adj, l2, e2 = dense_diff_pool(x, adj, s)
 
-            if self.verbose:
-                print("DiffPool Layer 2 Completed...")
-
-            # Forward pass through the DiffPool layer 3
             x = self.gnn3_embed(x, adj)
 
-            if self.verbose:
-                print("DiffPool Layer 3 Completed...")
-
-            # Global pooling after the final GNN layer
             if global_pooling_method == "mean":
                 x = x.mean(dim=1)
             elif global_pooling_method == "max":
@@ -660,47 +640,17 @@ def main():
             else:
                 raise ValueError("Invalid global pooling method.")
 
-            if self.verbose:
-                print("Global Pooling Completed...")
-
-            # Whether to normalize the graph representation by dividing by the graph sizes
             if normalize_graph_representation:
                 self.graph_sizes = graph_sizes.view(-1, 1).to(device)
                 x = x / self.graph_sizes
 
-            if self.verbose and normalize_graph_representation:
-                print("Graph Representation Normalized...")
-
-            # Here process the statistics and branch time sequences
-            processed_stats = self.dnn(stats)
-            if self.verbose:
-                print("Statistics Processed by DNN...")
-            lengths_brts = torch.sum(brts != 0, dim=1).cpu().tolist()
-            brts_cpu = brts.cpu()
-            brts_cpu = brts_cpu.unsqueeze(-1)
-            packed_brts = pack_padded_sequence(brts_cpu, lengths_brts, batch_first=True, enforce_sorted=False).to(device)
-            processed_brts = self.lstm(packed_brts)
-            if self.verbose:
-                print("Branching Time Sequences Processed by LSTM...")
-
-            # Concatenate the processed statistics and branch time sequences with the graph representation
-            x = torch.cat((x, processed_stats, processed_brts), dim=1).to(device)
-            if self.verbose:
-                print("Feature Concatenation Completed...")
-
-            # Forward pass through the readout layers
             x = F.dropout(x, p=dropout_ratio, training=self.training)
             x = self.lin1(x)
             x = F.gelu(x)
             x = F.dropout(x, p=dropout_ratio, training=self.training)
             x = self.lin2(x)
             # x = F.relu(x)
-            if self.verbose:
-                print("Readout Layers Completed...")
-                print("Forward Pass Completed...")
-                print("Epoch Completed...")
 
-            # Return the final output along with the DiffPool layer losses
             return x, l1 + l2, e1 + e2
 
     class EarlyStopper:
@@ -721,65 +671,223 @@ def main():
             return False
 
     def train():
-        model.train()
+        model_gnn.train()
+        model_dnn.train()
+        model_lstm.train()
 
-        loss_all = 0  # Keep track of the loss
+        loss_all_gnn = 0  # Keep track of the GNN loss
+        loss_all_dnn = 0  # Keep track of the DNN loss
+        loss_all_lstm = 0  # Keep track of the LSTM loss
+
         for data in train_loader:
             data.to(device)
-            graph_sizes = data.num_nodes
-            optimizer.zero_grad()
-            out, l, e = model(data.x, data.adj, data.mask, graph_sizes, data.stats, data.brts)
-            loss = criterion(out, data.y.view(data.num_nodes.__len__(), n_predicted_values))
-            loss = loss + l * 100000 + e * 0.1
-            loss.backward()
-            loss_all += loss.item() * data.num_nodes.__len__()
-            optimizer.step()
 
-        return loss_all / len(train_loader.dataset)
+            # Initialize the optimizer gradients
+            optimizer_gnn.zero_grad()
+            optimizer_dnn.zero_grad()
+            optimizer_lstm.zero_grad()
+
+            # Get GNN outputs and compute loss, backpropagate, and update weights
+            out_gnn, l, e = model_gnn(data.x, data.adj, data.mask)
+            loss_gnn = criterion(out_gnn, data.y.view(data.num_nodes.__len__(), n_predicted_values))
+            loss_gnn = loss_gnn + l * 100000 + e * 0.1
+            loss_gnn.backward()
+            loss_all_gnn += loss_gnn.item() * data.num_nodes.__len__()
+            optimizer_gnn.step()
+
+            # Get DNN outputs and compute loss, backpropagate, and update weights
+            out_dnn = model_dnn(data.stats)
+            loss_dnn = criterion(out_dnn, data.y.view(data.num_nodes.__len__(), n_predicted_values))
+            loss_dnn.backward()
+            loss_all_dnn += loss_dnn.item() * data.num_nodes.__len__()
+            optimizer_dnn.step()
+
+            # Get LSTM outputs and compute loss, backpropagate, and update weights
+            lengths_brts = torch.sum(data.brts != 0, dim=1).cpu().tolist()
+            brts_cpu = data.brts.cpu()
+            brts_cpu = brts_cpu.unsqueeze(-1)
+            packed_brts = pack_padded_sequence(brts_cpu, lengths_brts, batch_first=True, enforce_sorted=False).to(device)
+            out_lstm = model_lstm(packed_brts)
+            loss_lstm = criterion(out_lstm, data.y.view(data.num_nodes.__len__(), n_predicted_values))
+            loss_lstm.backward()
+            loss_all_lstm += loss_lstm.item() * data.num_nodes.__len__()
+            optimizer_lstm.step()
+
+        return (loss_all_gnn / len(train_loader.dataset),
+                loss_all_dnn / len(train_loader.dataset),
+                loss_all_lstm / len(train_loader.dataset))
 
     @torch.no_grad()
     def test_diff(loader):
-        model.eval()
+        model_gnn.eval()
+        model_dnn.eval()
+        model_lstm.eval()
 
-        diffs_all = torch.tensor([], dtype=torch.float, device=device)
-        outputs_all = torch.tensor([], dtype=torch.float, device=device)  # To store all outputs
+        # Initialize tensors to store the differences, outputs, and y values for GNN model
+        diffs_all_gnn = torch.tensor([], dtype=torch.float, device=device)
+        outputs_all_gnn = torch.tensor([], dtype=torch.float, device=device)  # To store all outputs
+
+        # Initialize tensors to store the differences, outputs, and y values for DNN model
+        diffs_all_dnn = torch.tensor([], dtype=torch.float, device=device)
+        outputs_all_dnn = torch.tensor([], dtype=torch.float, device=device)  # To store all outputs
+
+        # Initialize tensors to store the differences, outputs, and y values for LSTM model
+        diffs_all_lstm = torch.tensor([], dtype=torch.float, device=device)
+        outputs_all_lstm = torch.tensor([], dtype=torch.float, device=device)  # To store all outputs
+
+        # Initialize tensors to store common y values and node indices
         y_all = torch.tensor([], dtype=torch.float, device=device)  # To store all y
         nodes_all = torch.tensor([], dtype=torch.long, device=device)
 
+        # Initialize tensors to store differences and predictions of mean, median, min, max of
+        # the predictions from GNN, DNN, and LSTM models
+        diffs_mean = torch.tensor([], dtype=torch.float, device=device)
+        outputs_mean = torch.tensor([], dtype=torch.float, device=device)
+        diffs_median = torch.tensor([], dtype=torch.float, device=device)
+        outputs_median = torch.tensor([], dtype=torch.float, device=device)
+        diffs_min = torch.tensor([], dtype=torch.float, device=device)
+        outputs_min = torch.tensor([], dtype=torch.float, device=device)
+        diffs_max = torch.tensor([], dtype=torch.float, device=device)
+        outputs_max = torch.tensor([], dtype=torch.float, device=device)
+
         for data in loader:
             data.to(device)
-            graph_sizes = data.num_nodes
-            out, _, _ = model(data.x, data.adj, data.mask, graph_sizes, data.stats, data.brts)
-            diffs = torch.abs(out - data.y.view(data.num_nodes.__len__(), n_predicted_values))
-            diffs_all = torch.cat((diffs_all, diffs), dim=0)
-            outputs_all = torch.cat((outputs_all, out), dim=0)
+
+            # Record common y values and node indices
             y_all = torch.cat((y_all, data.y.view(data.num_nodes.__len__(), n_predicted_values)), dim=0)
             nodes_all = torch.cat((nodes_all, data.num_nodes), dim=0)
 
-        print(f"diffs_all length: {len(diffs_all)}; test_loader.dataset length: {len(test_loader.dataset)}; Equal: {len(diffs_all) == len(test_loader.dataset)}")
-        mean_diffs = torch.sum(diffs_all, dim=0) / len(test_loader.dataset)
-        return mean_diffs.cpu().detach().numpy(), diffs_all.cpu().detach().numpy(), outputs_all.cpu().detach().numpy(), y_all.cpu().detach().numpy(), nodes_all.cpu().detach().numpy()
+            # Compute the GNN model outputs and differences
+            out_gnn, _, _ = model_gnn(data.x, data.adj, data.mask)
+            diffs_gnn = torch.abs(out_gnn - data.y.view(data.num_nodes.__len__(), n_predicted_values))
+            diffs_all_gnn = torch.cat((diffs_all_gnn, diffs_gnn), dim=0)
+            outputs_all_gnn = torch.cat((outputs_all_gnn, out_gnn), dim=0)
+
+            # Compute the DNN model outputs and differences
+            out_dnn = model_dnn(data.stats)
+            diffs_dnn = torch.abs(out_dnn - data.y.view(data.num_nodes.__len__(), n_predicted_values))
+            diffs_all_dnn = torch.cat((diffs_all_dnn, diffs_dnn), dim=0)
+            outputs_all_dnn = torch.cat((outputs_all_dnn, out_dnn), dim=0)
+
+            # Compute the LSTM model outputs and differences
+            lengths_brts = torch.sum(data.brts != 0, dim=1).cpu().tolist()
+            brts_cpu = data.brts.cpu()
+            brts_cpu = brts_cpu.unsqueeze(-1)
+            packed_brts = pack_padded_sequence(brts_cpu, lengths_brts, batch_first=True, enforce_sorted=False).to(device)
+            out_lstm = model_lstm(packed_brts)
+            diffs_lstm = torch.abs(out_lstm - data.y.view(data.num_nodes.__len__(), n_predicted_values))
+            diffs_all_lstm = torch.cat((diffs_all_lstm, diffs_lstm), dim=0)
+            outputs_all_lstm = torch.cat((outputs_all_lstm, out_lstm), dim=0)
+
+            # Compute the mean, median, min, and max of the predictions
+            mean_pred = torch.mean(torch.stack((out_gnn, out_dnn, out_lstm), dim=0), dim=0)
+            median_pred = torch.median(torch.stack((out_gnn, out_dnn, out_lstm), dim=0), dim=0).values
+            min_pred = torch.min(torch.stack((out_gnn, out_dnn, out_lstm), dim=0), dim=0).values
+            max_pred = torch.max(torch.stack((out_gnn, out_dnn, out_lstm), dim=0), dim=0).values
+
+            # Compute the differences for mean, median, min, and max predictions
+            diffs_mean = torch.cat((diffs_mean, torch.abs(mean_pred - data.y.view(data.num_nodes.__len__(), n_predicted_values))), dim=0)
+            outputs_mean = torch.cat((outputs_mean, mean_pred), dim=0)
+            diffs_median = torch.cat((diffs_median, torch.abs(median_pred - data.y.view(data.num_nodes.__len__(), n_predicted_values))), dim=0)
+            outputs_median = torch.cat((outputs_median, median_pred), dim=0)
+            diffs_min = torch.cat((diffs_min, torch.abs(min_pred - data.y.view(data.num_nodes.__len__(), n_predicted_values))), dim=0)
+            outputs_min = torch.cat((outputs_min, min_pred), dim=0)
+            diffs_max = torch.cat((diffs_max, torch.abs(max_pred - data.y.view(data.num_nodes.__len__(), n_predicted_values))), dim=0)
+            outputs_max = torch.cat((outputs_max, max_pred), dim=0)
+
+        print(f"diffs_all_gnn length: {len(diffs_all_gnn)}; test_loader.dataset length: {len(test_loader.dataset)}; Equal: {len(diffs_all_gnn) == len(test_loader.dataset)}")
+        print(f"diffs_all_dnn length: {len(diffs_all_dnn)}; test_loader.dataset length: {len(test_loader.dataset)}; Equal: {len(diffs_all_dnn) == len(test_loader.dataset)}")
+        print(f"diffs_all_lstm length: {len(diffs_all_lstm)}; test_loader.dataset length: {len(test_loader.dataset)}; Equal: {len(diffs_all_lstm) == len(test_loader.dataset)}")
+        print(f"diffs_mean length: {len(diffs_mean)}; test_loader.dataset length: {len(test_loader.dataset)}; Equal: {len(diffs_mean) == len(test_loader.dataset)}")
+        print(f"diffs_median length: {len(diffs_median)}; test_loader.dataset length: {len(test_loader.dataset)}; Equal: {len(diffs_median) == len(test_loader.dataset)}")
+        print(f"diffs_min length: {len(diffs_min)}; test_loader.dataset length: {len(test_loader.dataset)}; Equal: {len(diffs_min) == len(test_loader.dataset)}")
+        print(f"diffs_max length: {len(diffs_max)}; test_loader.dataset length: {len(test_loader.dataset)}; Equal: {len(diffs_max) == len(test_loader.dataset)}")
+
+        mean_diffs_gnn = torch.sum(diffs_all_gnn, dim=0) / len(test_loader.dataset)
+        mean_diffs_dnn = torch.sum(diffs_all_dnn, dim=0) / len(test_loader.dataset)
+        mean_diffs_lstm = torch.sum(diffs_all_lstm, dim=0) / len(test_loader.dataset)
+        mean_diffs_mean = torch.sum(diffs_mean, dim=0) / len(test_loader.dataset)
+        mean_diffs_median = torch.sum(diffs_median, dim=0) / len(test_loader.dataset)
+        mean_diffs_min = torch.sum(diffs_min, dim=0) / len(test_loader.dataset)
+        mean_diffs_max = torch.sum(diffs_max, dim=0) / len(test_loader.dataset)
+
+        return (y_all.cpu().detach().numpy(), nodes_all.cpu().detach().numpy(),
+                mean_diffs_gnn.cpu().detach().numpy(),
+                diffs_all_gnn.cpu().detach().numpy(),
+                outputs_all_gnn.cpu().detach().numpy(),
+                mean_diffs_dnn.cpu().detach().numpy(),
+                diffs_all_dnn.cpu().detach().numpy(),
+                outputs_all_dnn.cpu().detach().numpy(),
+                mean_diffs_lstm.cpu().detach().numpy(),
+                diffs_all_lstm.cpu().detach().numpy(),
+                outputs_all_lstm.cpu().detach().numpy(),
+                mean_diffs_mean.cpu().detach().numpy(),
+                diffs_mean.cpu().detach().numpy(),
+                outputs_mean.cpu().detach().numpy(),
+                mean_diffs_median.cpu().detach().numpy(),
+                diffs_median.cpu().detach().numpy(),
+                outputs_median.cpu().detach().numpy(),
+                mean_diffs_min.cpu().detach().numpy(),
+                diffs_min.cpu().detach().numpy(),
+                outputs_min.cpu().detach().numpy(),
+                mean_diffs_max.cpu().detach().numpy(),
+                diffs_max.cpu().detach().numpy(),
+                outputs_max.cpu().detach().numpy())
 
     @torch.no_grad()
     def compute_test_loss():
-        model.eval()  # Set the model to evaluation mode
-        loss_all = 0  # Keep track of the loss
+        # Set the model to evaluation mode
+        model_gnn.eval()
+        model_dnn.eval()
+        model_lstm.eval()
+
+        # Keep track of the losses
+        loss_all_gnn = 0
+        loss_all_dnn = 0
+        loss_all_lstm = 0
+
         for data in test_loader:
             data.to(device)
-            graph_sizes = data.num_nodes
-            out, l, e = model(data.x, data.adj, data.mask, graph_sizes, data.stats, data.brts)
-            loss = criterion(out, data.y.view(data.num_nodes.__len__(), n_predicted_values))
-            loss = loss + l * 100000 + e * 0.1
-            loss_all += loss.item() * data.num_nodes.__len__()
 
-        return loss_all / len(train_loader.dataset)
+            # Compute the GNN model outputs and losses
+            out_gnn, l, e = model_gnn(data.x, data.adj, data.mask)
+            loss_gnn = criterion(out_gnn, data.y.view(data.num_nodes.__len__(), n_predicted_values))
+            loss_gnn = loss_gnn + l * 100000 + e * 0.1
+            loss_all_gnn += loss_gnn.item() * data.num_nodes.__len__()
+
+            # Compute the DNN model outputs and losses
+            out_dnn = model_dnn(data.stats)
+            loss_dnn = criterion(out_dnn, data.y.view(data.num_nodes.__len__(), n_predicted_values))
+            loss_all_dnn += loss_dnn.item() * data.num_nodes.__len__()
+
+            # Compute the LSTM model outputs and losses
+            lengths_brts = torch.sum(data.brts != 0, dim=1).cpu().tolist()
+            brts_cpu = data.brts.cpu()
+            brts_cpu = brts_cpu.unsqueeze(-1)
+            packed_brts = pack_padded_sequence(brts_cpu, lengths_brts, batch_first=True, enforce_sorted=False).to(device)
+            out_lstm = model_lstm(packed_brts)
+            loss_lstm = criterion(out_lstm, data.y.view(data.num_nodes.__len__(), n_predicted_values))
+            loss_all_lstm += loss_lstm.item() * data.num_nodes.__len__()
+
+        return (loss_all_gnn / len(train_loader.dataset),
+                loss_all_dnn / len(train_loader.dataset),
+                loss_all_lstm / len(train_loader.dataset))
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Training using {device}")
 
-    model = DiffPool()
-    model = model.to(device)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
+    model_gnn = DiffPool()
+    model_gnn = model_gnn.to(device)
+    optimizer_gnn = torch.optim.AdamW(model_gnn.parameters(), lr=learning_rate)
+
+    model_dnn = DNN(num_stats, dnn_hidden_channels, dnn_output_channels)
+    model_dnn = model_dnn.to(device)
+    optimizer_dnn = torch.optim.AdamW(model_dnn.parameters(), lr=learning_rate)
+
+    model_lstm = LSTM(in_channels=1, hidden_channels=lstm_hidden_channels, out_channels=lstm_output_channels)
+    model_lstm = model_lstm.to(device)
+    optimizer_lstm = torch.optim.AdamW(model_lstm.parameters(), lr=learning_rate)
+
     criterion = torch.nn.HuberLoss(delta=huber_delta).to(device)
 
     def shape_check(dataset, max_nodes):
@@ -812,24 +920,34 @@ def main():
     print(train_loader.dataset.transform)
     print(test_loader.dataset.transform)
 
-    print(model)
+    print(model_gnn)
+    print(model_dnn)
+    print(model_lstm)
 
-    test_mean_diffs_history = []
-    train_loss_history = []
-    test_loss_history = []
-    final_test_diffs = []
-    final_test_predictions = []
+    # Initialize common history lists
     final_test_y = []
     final_test_nodes = []
 
-    train_dir = os.path.join(name, task_type, "training")
-    test_dir = os.path.join(name, task_type, "testing")
+    # Initialize the history lists for the GNN differences and losses
+    train_loss_history_gnn = []
+    test_loss_history_gnn = []
+    final_test_predictions_gnn = []
 
-    # Check and create directories if not exist
-    if not os.path.exists(train_dir):
-        os.makedirs(train_dir)
-    if not os.path.exists(test_dir):
-        os.makedirs(test_dir)
+    # Initialize the history lists for the DNN differences and losses
+    train_loss_history_dnn = []
+    test_loss_history_dnn = []
+    final_test_predictions_dnn = []
+
+    # Initialize the history lists for the LSTM differences and losses
+    train_loss_history_lstm = []
+    test_loss_history_lstm = []
+    final_test_predictions_lstm = []
+
+    # Initialize the history lists for the mean, median, min, and max from models
+    final_test_predictions_mean = []
+    final_test_predictions_median = []
+    final_test_predictions_min = []
+    final_test_predictions_max = []
 
     # Set up the early stopper
     # early_stopper = EarlyStopper(patience=3, min_delta=0.05)
@@ -838,59 +956,121 @@ def main():
     train_test_ratio = len(train_loader.dataset) / len(test_loader.dataset)
 
     for epoch in range(1, epoch_number):
-
         actual_epoch = epoch
-        train_loss_all = train()
-        test_loss_all = compute_test_loss()
-        test_loss_all = test_loss_all * train_test_ratio
-        test_mean_diffs, test_diffs_all, test_predictions, test_y, test_nodes_all = test_diff(test_loader)
-        test_mean_diffs[2] = test_mean_diffs[2] * cap_norm_factor
-        print(f'Epoch: {epoch:03d}, Par 1 Mean Diff: {test_mean_diffs[0]:.4f}, Par 2 Mean Diff: {test_mean_diffs[1]:.4f}, Par 3 Mean Diff: {test_mean_diffs[2]:.4f}, Train Loss: {train_loss_all:.4f}, Test Loss: {test_loss_all:.4f}')
+        train_loss_all_gnn, train_loss_all_dnn, train_loss_all_lstm = train()
+
+        test_loss_all_gnn, test_loss_all_dnn, test_loss_all_lstm = compute_test_loss()
+        test_loss_all_gnn = test_loss_all_gnn * train_test_ratio
+        test_loss_all_dnn = test_loss_all_dnn * train_test_ratio
+        test_loss_all_lstm = test_loss_all_lstm * train_test_ratio
+
+        test_y_all, test_nodes_all, \
+            test_mean_diffs_gnn, test_diffs_all_gnn, test_predictions_gnn, \
+            test_mean_diffs_dnn, test_diffs_all_dnn, test_predictions_dnn, \
+            test_mean_diffs_lstm, test_diffs_all_lstm, test_predictions_lstm, \
+            test_mean_diffs_mean, test_diffs_mean, test_predictions_mean, \
+            test_mean_diffs_median, test_diffs_median, test_predictions_median, \
+            test_mean_diffs_min, test_diffs_min, test_predictions_min, \
+            test_mean_diffs_max, test_diffs_max, test_predictions_max = test_diff(test_loader)
+
+        test_mean_diffs_gnn[2] = test_mean_diffs_gnn[2] * cap_norm_factor
+        test_mean_diffs_dnn[2] = test_mean_diffs_dnn[2] * cap_norm_factor
+        test_mean_diffs_lstm[2] = test_mean_diffs_lstm[2] * cap_norm_factor
+        test_mean_diffs_mean[2] = test_mean_diffs_mean[2] * cap_norm_factor
+        test_mean_diffs_median[2] = test_mean_diffs_median[2] * cap_norm_factor
+        test_mean_diffs_min[2] = test_mean_diffs_min[2] * cap_norm_factor
+        test_mean_diffs_max[2] = test_mean_diffs_max[2] * cap_norm_factor
+
+        print(f'GNN, Epoch: {epoch:03d}, Par 1 Mean Diff: {test_mean_diffs_gnn[0]:.4f}, '
+              f'Par 2 Mean Diff: {test_mean_diffs_gnn[1]:.4f}, Par 3 Mean Diff: {test_mean_diffs_gnn[2]:.4f}, '
+              f'Train Loss: {train_loss_all_gnn:.4f}, Test Loss: {test_loss_all_gnn:.4f}')
+        print(f'DNN, Epoch: {epoch:03d}, Par 1 Mean Diff: {test_mean_diffs_dnn[0]:.4f}, '
+              f'Par 2 Mean Diff: {test_mean_diffs_dnn[1]:.4f}, Par 3 Mean Diff: {test_mean_diffs_dnn[2]:.4f}, '
+              f'Train Loss: {train_loss_all_dnn:.4f}, Test Loss: {test_loss_all_dnn:.4f}')
+        print(f'LSTM, Epoch: {epoch:03d}, Par 1 Mean Diff: {test_mean_diffs_lstm[0]:.4f}, '
+              f'Par 2 Mean Diff: {test_mean_diffs_lstm[1]:.4f}, Par 3 Mean Diff: {test_mean_diffs_lstm[2]:.4f}, '
+              f'Train Loss: {train_loss_all_lstm:.4f}, Test Loss: {test_loss_all_lstm:.4f}')
+        print(f'Mean, Epoch: {epoch:03d}, Par 1 Mean Diff: {test_mean_diffs_mean[0]:.4f}, '
+              f'Par 2 Mean Diff: {test_mean_diffs_mean[1]:.4f}, Par 3 Mean Diff: {test_mean_diffs_mean[2]:.4f}')
+        print(f'Median, Epoch: {epoch:03d}, Par 1 Mean Diff: {test_mean_diffs_median[0]:.4f}, '
+              f'Par 2 Mean Diff: {test_mean_diffs_median[1]:.4f}, Par 3 Mean Diff: {test_mean_diffs_median[2]:.4f}')
+        print(f'Min, Epoch: {epoch:03d}, Par 1 Mean Diff: {test_mean_diffs_min[0]:.4f}, '
+              f'Par 2 Mean Diff: {test_mean_diffs_min[1]:.4f}, Par 3 Mean Diff: {test_mean_diffs_min[2]:.4f}')
+        print(f'Max, Epoch: {epoch:03d}, Par 1 Mean Diff: {test_mean_diffs_max[0]:.4f}, '
+              f'Par 2 Mean Diff: {test_mean_diffs_max[1]:.4f}, Par 3 Mean Diff: {test_mean_diffs_max[2]:.4f}')
 
         # Record the values
-        test_mean_diffs_history.append(test_mean_diffs)
-        train_loss_history.append(train_loss_all)
-        test_loss_history.append(test_loss_all)
-        final_test_diffs = test_diffs_all
-        final_test_predictions = test_predictions
-        final_test_y = test_y
+        final_test_y = test_y_all
         final_test_nodes = test_nodes_all
-        print(f"Final test diffs length: {len(final_test_diffs)}")
-        print(f"Final predictions length: {len(final_test_predictions)}")
+        train_loss_history_gnn.append(train_loss_all_gnn)
+        test_loss_history_gnn.append(test_loss_all_gnn)
+        final_test_predictions_gnn = test_predictions_gnn
+        train_loss_history_dnn.append(train_loss_all_dnn)
+        test_loss_history_dnn.append(test_loss_all_dnn)
+        final_test_predictions_dnn = test_predictions_dnn
+        train_loss_history_lstm.append(train_loss_all_lstm)
+        test_loss_history_lstm.append(test_loss_all_lstm)
+        final_test_predictions_lstm = test_predictions_lstm
+        final_test_predictions_mean = test_predictions_mean
+        final_test_predictions_median = test_predictions_median
+        final_test_predictions_min = test_predictions_min
+        final_test_predictions_max = test_predictions_max
+
         print(f"Final y length: {len(final_test_y)}")
         print(f"Final nodes length: {len(final_test_nodes)}")
+        print(f"Final GNN predictions length: {len(final_test_predictions_gnn)}")
+        print(f"Final DNN predictions length: {len(final_test_predictions_dnn)}")
+        print(f"Final LSTM predictions length: {len(final_test_predictions_lstm)}")
+        print(f"Final mean predictions length: {len(final_test_predictions_mean)}")
+        print(f"Final median predictions length: {len(final_test_predictions_median)}")
+        print(f"Final min predictions length: {len(final_test_predictions_min)}")
+        print(f"Final max predictions length: {len(final_test_predictions_max)}")
 
         #  if early_stopper.early_stop(test_loss_all):
         #      print(f"Early stopping at epoch {epoch}")
         #      break
 
     # Save the model
-    print(f"Saving model to {os.path.join(name, task_type, f'{task_type}_model_diffpool_{gnn_depth}.pt')}")
-    torch.save(model.state_dict(), os.path.join(name, task_type, f"{task_type}_model_diffpool_{gnn_depth}.pt"))
+    print(f"Saving GNN and corresponding DNN, LSTM models to {os.path.join(name, task_type)}")
+    torch.save(model_gnn.state_dict(), os.path.join(name, task_type, f"{task_type}_model_diffpool_{gnn_depth}.pt"))
+    torch.save(model_dnn.state_dict(), os.path.join(name, task_type, f"{task_type}_model_dnn_diffpool_{gnn_depth}.pt"))
+    torch.save(model_lstm.state_dict(), os.path.join(name, task_type, f"{task_type}_model_lstm_diffpool_{gnn_depth}.pt"))
 
-    # After the loop, create a dictionary to hold the data
-    data_dict = {"lambda_diff": [], "mu_diff": [], "cap_diff": []}
-    # Iterate through test_mean_diffs_history
-    for array in test_mean_diffs_history:
-        # It's assumed that the order of elements in the array corresponds to the keys in data_dict
-        data_dict["lambda_diff"].append(array[0])
-        data_dict["mu_diff"].append(array[1])
-        data_dict["cap_diff"].append(array[2])
-    data_dict["Epoch"] = list(range(1, actual_epoch + 1))
-    data_dict["Train_Loss"] = train_loss_history
-    data_dict["Test_Loss"] = test_loss_history
+    # After the loop, create dictionaries to hold the training and testing performances
+    data_dict = {"Epoch": list(range(1, actual_epoch + 1)), "Train_Loss_GNN": train_loss_history_gnn,
+                 "Test_Loss_GNN": test_loss_history_gnn, "Train_Loss_DNN": train_loss_history_dnn,
+                 "Test_Loss_DNN": test_loss_history_dnn, "Train_Loss_LSTM": train_loss_history_lstm,
+                 "Test_Loss_LSTM": test_loss_history_lstm}
 
     # Convert the dictionary to a pandas DataFrame
     model_performance = pd.DataFrame(data_dict)
-    final_differences = pd.DataFrame(final_test_diffs, columns=["lambda_diff", "mu_diff", "cap_diff"])
-    final_predictions = pd.DataFrame(final_test_predictions, columns=["lambda_pred", "mu_pred", "cap_pred"])
     final_y = pd.DataFrame(final_test_y, columns=["lambda", "mu", "cap"])
-    final_differences["num_nodes"] = final_test_nodes
+    final_predictions_gnn = pd.DataFrame(final_test_predictions_gnn, columns=["lambda_pred", "mu_pred", "cap_pred"])
+    final_predictions_gnn["num_nodes"] = final_test_nodes
+    final_predictions_dnn = pd.DataFrame(final_test_predictions_dnn, columns=["lambda_pred", "mu_pred", "cap_pred"])
+    final_predictions_dnn["num_nodes"] = final_test_nodes
+    final_predictions_lstm = pd.DataFrame(final_test_predictions_lstm, columns=["lambda_pred", "mu_pred", "cap_pred"])
+    final_predictions_lstm["num_nodes"] = final_test_nodes
+    final_predictions_mean = pd.DataFrame(final_test_predictions_mean, columns=["lambda_pred", "mu_pred", "cap_pred"])
+    final_predictions_mean["num_nodes"] = final_test_nodes
+    final_predictions_median = pd.DataFrame(final_test_predictions_median, columns=["lambda_pred", "mu_pred", "cap_pred"])
+    final_predictions_median["num_nodes"] = final_test_nodes
+    final_predictions_min = pd.DataFrame(final_test_predictions_min, columns=["lambda_pred", "mu_pred", "cap_pred"])
+    final_predictions_min["num_nodes"] = final_test_nodes
+    final_predictions_max = pd.DataFrame(final_test_predictions_max, columns=["lambda_pred", "mu_pred", "cap_pred"])
+    final_predictions_max["num_nodes"] = final_test_nodes
+
     # Save the data to a file using pyreadr
     pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_diffpool_{gnn_depth}.rds"), model_performance)
-    pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_diffs_diffpool_{gnn_depth}.rds"), final_differences)
-    pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_predictions_diffpool_{gnn_depth}.rds"), final_predictions)
     pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_y_diffpool_{gnn_depth}.rds"), final_y)
+    pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_predictions_diffpool_{gnn_depth}_gnn.rds"), final_predictions_gnn)
+    pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_predictions_diffpool_{gnn_depth}_dnn.rds"), final_predictions_dnn)
+    pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_predictions_diffpool_{gnn_depth}_lstm.rds"), final_predictions_lstm)
+    pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_predictions_diffpool_{gnn_depth}_mean.rds"), final_predictions_mean)
+    pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_predictions_diffpool_{gnn_depth}_median.rds"), final_predictions_median)
+    pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_predictions_diffpool_{gnn_depth}_min.rds"), final_predictions_min)
+    pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_predictions_diffpool_{gnn_depth}_max.rds"), final_predictions_max)
+
 
 
 if __name__ == '__main__':
