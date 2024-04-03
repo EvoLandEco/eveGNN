@@ -551,7 +551,8 @@ def main():
                 self.dropouts.append(torch.nn.Dropout(dropout_rate))
 
             # Initialize readout layers
-            self.readout = torch.nn.Linear(out_channels, n_predicted_values)
+            readout_in_channels = hidden_channels * (dnn_depth - 1) + out_channels
+            self.readout = torch.nn.Linear(readout_in_channels, n_predicted_values)
 
         def forward(self, x):
             outputs = []  # Initialize a list to store outputs at each step
@@ -609,10 +610,10 @@ def main():
             num_nodes2 = ceil(diffpool_ratio * num_nodes1)
             gnn1_out_channels = gcn_layer1_hidden_channels * (gnn_depth - 1) + gcn_layer2_hidden_channels
             self.gnn2_pool = GNN(gnn1_out_channels, gcn_layer2_hidden_channels, num_nodes2)
-            self.gnn2_embed = GNN(gnn1_out_channels, gcn_layer2_hidden_channels, gcn_layer3_hidden_channels, lin=False)
+            self.gnn2_embed = GNN(gnn1_out_channels, gcn_layer2_hidden_channels, gcn_layer3_hidden_channels)
 
             gnn2_out_channels = gcn_layer2_hidden_channels * (gnn_depth - 1) + gcn_layer3_hidden_channels
-            self.gnn3_embed = GNN(gnn2_out_channels, gcn_layer3_hidden_channels, lin_layer1_hidden_channels, lin=False)
+            self.gnn3_embed = GNN(gnn2_out_channels, gcn_layer3_hidden_channels, lin_layer1_hidden_channels)
 
             gnn3_out_channels = gcn_layer3_hidden_channels * (gnn_depth - 1) + lin_layer1_hidden_channels
             self.lin1 = torch.nn.Linear(gnn3_out_channels, lin_layer2_hidden_channels)
@@ -639,10 +640,6 @@ def main():
                 x = x.sum(dim=1)
             else:
                 raise ValueError("Invalid global pooling method.")
-
-            if normalize_graph_representation:
-                self.graph_sizes = graph_sizes.view(-1, 1).to(device)
-                x = x / self.graph_sizes
 
             x = F.dropout(x, p=dropout_ratio, training=self.training)
             x = self.lin1(x)
@@ -1045,31 +1042,22 @@ def main():
     # Convert the dictionary to a pandas DataFrame
     model_performance = pd.DataFrame(data_dict)
     final_y = pd.DataFrame(final_test_y, columns=["lambda", "mu", "cap"])
-    final_predictions_gnn = pd.DataFrame(final_test_predictions_gnn, columns=["lambda_pred", "mu_pred", "cap_pred"])
+    final_predictions_gnn = pd.DataFrame(final_test_predictions_gnn, columns=["lambda_pred_gnn", "mu_pred_gnn", "cap_pred_gnn"])
     final_predictions_gnn["num_nodes"] = final_test_nodes
-    final_predictions_dnn = pd.DataFrame(final_test_predictions_dnn, columns=["lambda_pred", "mu_pred", "cap_pred"])
-    final_predictions_dnn["num_nodes"] = final_test_nodes
-    final_predictions_lstm = pd.DataFrame(final_test_predictions_lstm, columns=["lambda_pred", "mu_pred", "cap_pred"])
-    final_predictions_lstm["num_nodes"] = final_test_nodes
-    final_predictions_mean = pd.DataFrame(final_test_predictions_mean, columns=["lambda_pred", "mu_pred", "cap_pred"])
-    final_predictions_mean["num_nodes"] = final_test_nodes
-    final_predictions_median = pd.DataFrame(final_test_predictions_median, columns=["lambda_pred", "mu_pred", "cap_pred"])
-    final_predictions_median["num_nodes"] = final_test_nodes
-    final_predictions_min = pd.DataFrame(final_test_predictions_min, columns=["lambda_pred", "mu_pred", "cap_pred"])
-    final_predictions_min["num_nodes"] = final_test_nodes
-    final_predictions_max = pd.DataFrame(final_test_predictions_max, columns=["lambda_pred", "mu_pred", "cap_pred"])
-    final_predictions_max["num_nodes"] = final_test_nodes
+    final_predictions_dnn = pd.DataFrame(final_test_predictions_dnn, columns=["lambda_pred_dnn", "mu_pred_dnn", "cap_pred_dnn"])
+    final_predictions_lstm = pd.DataFrame(final_test_predictions_lstm, columns=["lambda_pred_lstm", "mu_pred_lstm", "cap_pred_lstm"])
+    final_predictions_mean = pd.DataFrame(final_test_predictions_mean, columns=["lambda_pred_mean", "mu_pred_mean", "cap_pred_mean"])
+    final_predictions_median = pd.DataFrame(final_test_predictions_median, columns=["lambda_pred_median", "mu_pred_median", "cap_pred_median"])
+    final_predictions_min = pd.DataFrame(final_test_predictions_min, columns=["lambda_pred_min", "mu_pred_min", "cap_pred_min"])
+    final_predictions_max = pd.DataFrame(final_test_predictions_max, columns=["lambda_pred_max", "mu_pred_max", "cap_pred_max"])
+
+    # Combine the dataframes except for model_performance
+    final_data = pd.concat([final_y, final_predictions_gnn, final_predictions_dnn, final_predictions_lstm,
+                            final_predictions_mean, final_predictions_median, final_predictions_min, final_predictions_max], axis=1)
 
     # Save the data to a file using pyreadr
     pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_diffpool_{gnn_depth}.rds"), model_performance)
-    pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_y_diffpool_{gnn_depth}.rds"), final_y)
-    pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_predictions_diffpool_{gnn_depth}_gnn.rds"), final_predictions_gnn)
-    pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_predictions_diffpool_{gnn_depth}_dnn.rds"), final_predictions_dnn)
-    pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_predictions_diffpool_{gnn_depth}_lstm.rds"), final_predictions_lstm)
-    pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_predictions_diffpool_{gnn_depth}_mean.rds"), final_predictions_mean)
-    pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_predictions_diffpool_{gnn_depth}_median.rds"), final_predictions_median)
-    pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_predictions_diffpool_{gnn_depth}_min.rds"), final_predictions_min)
-    pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_predictions_diffpool_{gnn_depth}_max.rds"), final_predictions_max)
+    pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_diffpool_{gnn_depth}_data.rds"), final_data)
 
 
 if __name__ == '__main__':
