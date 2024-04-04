@@ -19,7 +19,8 @@ tryCatch(
       soc = 2,
       cond = 1,
       ddmodel = 1,
-      num_cycles = Inf
+      num_cycles = Inf,
+      optimmethod = 'simplex'
     )
     # If an error occurred, ml will be NA and we return NA right away.
     if (length(ml) == 1 && is.na(ml)) {
@@ -58,7 +59,8 @@ tryCatch(
       btorph = 0,
       soc = 2,
       cond = 1,
-      ddmodel = 1
+      ddmodel = 1,
+      optimmethod = 'simplex'
     )
     # If an error occurred, ml will be NA and we return NA right away.
     if (length(ml) == 1 && is.na(ml)) {
