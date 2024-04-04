@@ -11,6 +11,7 @@ import torch_geometric.transforms as T
 import torch.nn.functional as F
 import yaml
 from math import ceil
+from torch.utils.data import TensorDataset, DataLoader
 from torch_geometric.data import InMemoryDataset, Data
 from torch_geometric.loader import DenseDataLoader
 from torch_geometric.nn import DenseGCNConv as GCNConv, dense_diff_pool
@@ -25,7 +26,9 @@ with open("../Config/ddd_train_diffpool.yaml", "r") as ymlfile:
 
 # Set global variables
 cap_norm_factor = global_params["cap_norm_factor"]
-epoch_number = global_params["epoch_number"]
+epoch_number_gnn = global_params["epoch_number_gnn"]
+epoch_number_dnn = global_params["epoch_number_dnn"]
+epoch_number_lstm = global_params["epoch_number_lstm"]
 diffpool_ratio = global_params["diffpool_ratio"]
 dropout_ratio = global_params["dropout_ratio"]
 learning_rate = global_params["learning_rate"]
@@ -148,7 +151,8 @@ def check_file_consistency(files_tree, files_el, files_st, files_bt):
 
 def check_params_consistency(params_tree_list, params_el_list, params_st_list, params_bt_list):
     # Check if all corresponding elements in the four lists are equal
-    is_consistent = all(a == b == c == d for a, b, c, d in zip(params_tree_list, params_el_list, params_st_list, params_bt_list))
+    is_consistent = all(
+        a == b == c == d for a, b, c, d in zip(params_tree_list, params_el_list, params_st_list, params_bt_list))
 
     if is_consistent:
         print("Parameters are consistent across the tree, EL, ST, and BT datasets.")
@@ -550,25 +554,20 @@ def main():
                 # Initialize dropout modules
                 self.dropouts.append(torch.nn.Dropout(dropout_rate))
 
-        def forward(self, x):
-            outputs = []  # Initialize a list to store outputs at each step
-            for step in range(len(self.lins)):
-                x = F.gelu(self.lins[step](x))
-                x = self.dropouts[step](x)  # Apply dropout after activation
-                x = self.bns[step](x)
-                outputs.append(x)
-
-            x_concatenated = torch.cat(outputs, dim=-1)
-            return x_concatenated
+            # Initialize readout layers
+            readout_in_channels = hidden_channels * (dnn_depth - 1) + out_channels
+            self.readout = torch.nn.Linear(readout_in_channels, n_predicted_values)
 
     # The LSTM model class with variable number of layers to process variable-length branch time sequences
     class LSTM(torch.nn.Module):
         def __init__(self, in_channels, hidden_channels, out_channels, lstm_depth=1, dropout_rate=0.5):
             super(LSTM, self).__init__()
 
-            self.lstm = torch.nn.LSTM(input_size = in_channels, hidden_size = hidden_channels, num_layers=lstm_depth, batch_first=True, dropout=dropout_ratio if lstm_depth > 1 else 0)
+            self.lstm = torch.nn.LSTM(input_size=in_channels, hidden_size=hidden_channels, num_layers=lstm_depth,
+                                      batch_first=True, dropout=dropout_ratio if lstm_depth > 1 else 0)
             self.dropout = torch.nn.Dropout(dropout_rate)  # Dropout layer after LSTM
             self.lin = torch.nn.Linear(hidden_channels, out_channels)
+            self.readout = torch.nn.Linear(out_channels, n_predicted_values)
 
         def forward(self, x):
             out, (h_n, c_n) = self.lstm(x)
@@ -583,6 +582,9 @@ def main():
 
             x = self.dropout(x)  # Apply dropout after LSTM and activation
             x = self.lin(x)
+            x = F.gelu(x)
+            x = self.dropout(x)
+            x = self.readout(x)
             return x
 
     # Differential pooling model class
@@ -603,7 +605,8 @@ def main():
             # DiffPool Layer 1
             num_nodes1 = ceil(diffpool_ratio * max_nodes)
             self.gnn1_pool = GNN(training_dataset.num_node_features, gcn_layer1_hidden_channels, num_nodes1)
-            self.gnn1_embed = GNN(training_dataset.num_node_features, gcn_layer1_hidden_channels, gcn_layer2_hidden_channels)
+            self.gnn1_embed = GNN(training_dataset.num_node_features, gcn_layer1_hidden_channels,
+                                  gcn_layer2_hidden_channels)
 
             # DiffPool Layer 2
             num_nodes2 = ceil(diffpool_ratio * num_nodes1)
@@ -616,18 +619,11 @@ def main():
             self.gnn3_embed = GNN(gnn2_out_channels, gcn_layer3_hidden_channels, lin_layer1_hidden_channels)
             gnn3_out_channels = gcn_layer3_hidden_channels * (gnn_depth - 1) + lin_layer1_hidden_channels
 
-            # DNN Layers for statistics
-            self.dnn = DNN(num_stats, dnn_hidden_channels, dnn_output_channels)
-            dnn_final_channels = dnn_hidden_channels * (dnn_depth - 1) + dnn_output_channels
-
-            # LSTM Layers for branch time sequences
-            self.lstm = LSTM(in_channels=1, hidden_channels=lstm_hidden_channels, out_channels=lstm_output_channels)
-
             # Final Readout Layers
-            self.lin1 = torch.nn.Linear(gnn3_out_channels + dnn_final_channels + lstm_output_channels, lin_layer2_hidden_channels)
+            self.lin1 = torch.nn.Linear(gnn3_out_channels, lin_layer2_hidden_channels)
             self.lin2 = torch.nn.Linear(lin_layer2_hidden_channels, n_predicted_values)
 
-        def forward(self, x, adj, mask=None, graph_sizes=None, stats=None, brts=None):
+        def forward(self, x, adj, mask=None):
             # Forward pass through the DiffPool layer 1
             s = self.gnn1_pool(x, adj, mask)
             x = self.gnn1_embed(x, adj, mask)
@@ -663,31 +659,6 @@ def main():
             if self.verbose:
                 print("Global Pooling Completed...")
 
-            # Whether to normalize the graph representation by dividing by the graph sizes
-            if normalize_graph_representation:
-                self.graph_sizes = graph_sizes.view(-1, 1).to(device)
-                x = x / self.graph_sizes
-
-            if self.verbose and normalize_graph_representation:
-                print("Graph Representation Normalized...")
-
-            # Here process the statistics and branch time sequences
-            processed_stats = self.dnn(stats)
-            if self.verbose:
-                print("Statistics Processed by DNN...")
-            lengths_brts = torch.sum(brts != 0, dim=1).cpu().tolist()
-            brts_cpu = brts.cpu()
-            brts_cpu = brts_cpu.unsqueeze(-1)
-            packed_brts = pack_padded_sequence(brts_cpu, lengths_brts, batch_first=True, enforce_sorted=False).to(device)
-            processed_brts = self.lstm(packed_brts)
-            if self.verbose:
-                print("Branching Time Sequences Processed by LSTM...")
-
-            # Concatenate the processed statistics and branch time sequences with the graph representation
-            x = torch.cat((x, processed_stats, processed_brts), dim=1).to(device)
-            if self.verbose:
-                print("Feature Concatenation Completed...")
-
             # Forward pass through the readout layers
             x = F.dropout(x, p=dropout_ratio, training=self.training)
             x = self.lin1(x)
@@ -720,15 +691,14 @@ def main():
                     return True
             return False
 
-    def train():
-        model.train()
+    def train_gnn():
+        model_gnn.train()
 
         loss_all = 0  # Keep track of the loss
         for data in train_loader:
             data.to(device)
-            graph_sizes = data.num_nodes
             optimizer.zero_grad()
-            out, l, e = model(data.x, data.adj, data.mask, graph_sizes, data.stats, data.brts)
+            out, l, e = model_gnn(data.x, data.adj, data.mask)
             loss = criterion(out, data.y.view(data.num_nodes.__len__(), n_predicted_values))
             loss = loss + l * 100000 + e * 0.1
             loss.backward()
@@ -738,8 +708,8 @@ def main():
         return loss_all / len(train_loader.dataset)
 
     @torch.no_grad()
-    def test_diff(loader):
-        model.eval()
+    def test_diff_gnn(loader):
+        model_gnn.eval()
 
         diffs_all = torch.tensor([], dtype=torch.float, device=device)
         outputs_all = torch.tensor([], dtype=torch.float, device=device)  # To store all outputs
@@ -748,26 +718,26 @@ def main():
 
         for data in loader:
             data.to(device)
-            graph_sizes = data.num_nodes
-            out, _, _ = model(data.x, data.adj, data.mask, graph_sizes, data.stats, data.brts)
+            out, _, _ = model_gnn(data.x, data.adj, data.mask)
             diffs = torch.abs(out - data.y.view(data.num_nodes.__len__(), n_predicted_values))
             diffs_all = torch.cat((diffs_all, diffs), dim=0)
             outputs_all = torch.cat((outputs_all, out), dim=0)
             y_all = torch.cat((y_all, data.y.view(data.num_nodes.__len__(), n_predicted_values)), dim=0)
             nodes_all = torch.cat((nodes_all, data.num_nodes), dim=0)
 
-        print(f"diffs_all length: {len(diffs_all)}; test_loader.dataset length: {len(test_loader.dataset)}; Equal: {len(diffs_all) == len(test_loader.dataset)}")
+        print(
+            f"diffs_all length: {len(diffs_all)}; test_loader.dataset length: {len(test_loader.dataset)}; Equal: {len(diffs_all) == len(test_loader.dataset)}")
         mean_diffs = torch.sum(diffs_all, dim=0) / len(test_loader.dataset)
         return mean_diffs.cpu().detach().numpy(), diffs_all.cpu().detach().numpy(), outputs_all.cpu().detach().numpy(), y_all.cpu().detach().numpy(), nodes_all.cpu().detach().numpy()
 
     @torch.no_grad()
-    def compute_test_loss():
-        model.eval()  # Set the model to evaluation mode
+    def compute_test_loss_gnn():
+        model_gnn.eval()  # Set the model to evaluation mode
         loss_all = 0  # Keep track of the loss
         for data in test_loader:
             data.to(device)
             graph_sizes = data.num_nodes
-            out, l, e = model(data.x, data.adj, data.mask, graph_sizes, data.stats, data.brts)
+            out, l, e = model_gnn(data.x, data.adj, data.mask, graph_sizes, data.stats, data.brts)
             loss = criterion(out, data.y.view(data.num_nodes.__len__(), n_predicted_values))
             loss = loss + l * 100000 + e * 0.1
             loss_all += loss.item() * data.num_nodes.__len__()
@@ -777,9 +747,9 @@ def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Training using {device}")
 
-    model = DiffPool()
-    model = model.to(device)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
+    model_gnn = DiffPool()
+    model_gnn = model_gnn.to(device)
+    optimizer = torch.optim.AdamW(model_gnn.parameters(), lr=learning_rate)
     criterion = torch.nn.HuberLoss(delta=huber_delta).to(device)
 
     def shape_check(dataset, max_nodes):
@@ -812,7 +782,7 @@ def main():
     print(train_loader.dataset.transform)
     print(test_loader.dataset.transform)
 
-    print(model)
+    print(model_gnn)
 
     test_mean_diffs_history = []
     train_loss_history = []
@@ -822,30 +792,23 @@ def main():
     final_test_y = []
     final_test_nodes = []
 
-    train_dir = os.path.join(name, task_type, "training")
-    test_dir = os.path.join(name, task_type, "testing")
-
-    # Check and create directories if not exist
-    if not os.path.exists(train_dir):
-        os.makedirs(train_dir)
-    if not os.path.exists(test_dir):
-        os.makedirs(test_dir)
-
     # Set up the early stopper
     # early_stopper = EarlyStopper(patience=3, min_delta=0.05)
-    actual_epoch = 0
+    actual_epoch_gnn = 0
     # The losses are summed over each data point in the batch, thus we should normalize the losses accordingly
     train_test_ratio = len(train_loader.dataset) / len(test_loader.dataset)
 
-    for epoch in range(1, epoch_number):
+    print("Now training GNN model...")
 
-        actual_epoch = epoch
-        train_loss_all = train()
-        test_loss_all = compute_test_loss()
+    for epoch in range(1, epoch_number_gnn):
+        actual_epoch_gnn = epoch
+        train_loss_all = train_gnn()
+        test_loss_all = compute_test_loss_gnn()
         test_loss_all = test_loss_all * train_test_ratio
-        test_mean_diffs, test_diffs_all, test_predictions, test_y, test_nodes_all = test_diff(test_loader)
+        test_mean_diffs, test_diffs_all, test_predictions, test_y, test_nodes_all = test_diff_gnn(test_loader)
         test_mean_diffs[2] = test_mean_diffs[2] * cap_norm_factor
-        print(f'Epoch: {epoch:03d}, Par 1 Mean Diff: {test_mean_diffs[0]:.4f}, Par 2 Mean Diff: {test_mean_diffs[1]:.4f}, Par 3 Mean Diff: {test_mean_diffs[2]:.4f}, Train Loss: {train_loss_all:.4f}, Test Loss: {test_loss_all:.4f}')
+        print(
+            f'Epoch: {epoch:03d}, Par 1 Mean Diff: {test_mean_diffs[0]:.4f}, Par 2 Mean Diff: {test_mean_diffs[1]:.4f}, Par 3 Mean Diff: {test_mean_diffs[2]:.4f}, Train Loss: {train_loss_all:.4f}, Test Loss: {test_loss_all:.4f}')
 
         # Record the values
         test_mean_diffs_history.append(test_mean_diffs)
@@ -865,8 +828,12 @@ def main():
         #      break
 
     # Save the model
-    print(f"Saving model to {os.path.join(name, task_type, f'{task_type}_model_diffpool_{gnn_depth}.pt')}")
-    torch.save(model.state_dict(), os.path.join(name, task_type, f"{task_type}_model_diffpool_{gnn_depth}.pt"))
+    print("Saving GNN model...")
+    # Create the directory if it doesn't exist
+    if not os.path.exists(os.path.join(name, task_type, "STBO")):
+        os.makedirs(os.path.join(name, task_type, "STBO"))
+    torch.save(model_gnn.state_dict(),
+               os.path.join(name, task_type, "STBO", f"{task_type}_model_diffpool_{gnn_depth}_gnn.pt"))
 
     # After the loop, create a dictionary to hold the data
     data_dict = {"lambda_diff": [], "mu_diff": [], "cap_diff": []}
@@ -876,7 +843,7 @@ def main():
         data_dict["lambda_diff"].append(array[0])
         data_dict["mu_diff"].append(array[1])
         data_dict["cap_diff"].append(array[2])
-    data_dict["Epoch"] = list(range(1, actual_epoch + 1))
+    data_dict["Epoch"] = list(range(1, actual_epoch_gnn + 1))
     data_dict["Train_Loss"] = train_loss_history
     data_dict["Test_Loss"] = test_loss_history
 
@@ -887,10 +854,455 @@ def main():
     final_y = pd.DataFrame(final_test_y, columns=["lambda", "mu", "cap"])
     final_differences["num_nodes"] = final_test_nodes
     # Save the data to a file using pyreadr
-    pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_diffpool_{gnn_depth}.rds"), model_performance)
-    pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_diffs_diffpool_{gnn_depth}.rds"), final_differences)
-    pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_predictions_diffpool_{gnn_depth}.rds"), final_predictions)
-    pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_y_diffpool_{gnn_depth}.rds"), final_y)
+    pyreadr.write_rds(os.path.join(name, task_type, "STBO", f"{task_type}_diffpool_{gnn_depth}.rds"), model_performance)
+    pyreadr.write_rds(os.path.join(name, task_type, "STBO", f"{task_type}_final_diffs_diffpool_{gnn_depth}.rds"),
+                      final_differences)
+    pyreadr.write_rds(os.path.join(name, task_type, "STBO", f"{task_type}_final_predictions_diffpool_{gnn_depth}.rds"),
+                      final_predictions)
+    pyreadr.write_rds(os.path.join(name, task_type, "STBO", f"{task_type}_final_y_diffpool_{gnn_depth}.rds"), final_y)
+
+    # Next phase, test trained GNN model on the same training dataset, collect residuals to train DNN
+    model_dnn = DNN(in_channels=n_predicted_values, hidden_channels=dnn_hidden_channels,
+                    out_channels=dnn_output_channels)
+    optimizer_dnn = torch.optim.AdamW(model_dnn.parameters(), lr=learning_rate)
+
+    # Compute residuals from GNN training dataset for training the DNN
+    residuals_train = []
+    stats_train = []
+    brts_train = []
+    with torch.no_grad():
+        for data in train_loader:
+            data.to(device)
+            predictions = model_gnn(data.x, data.adj, data.mask)
+            residual = data.y - predictions
+            residuals_train.append(residual)
+            stats_train.append(data.stats)
+            brts_train.append(data.brts)
+
+    # Construct a new dataset with stats as x, residuals as y
+    residuals_training_dataset_for_dnn = TensorDataset(torch.tensor(stats_train),
+                                                       torch.tensor(residuals_train),
+                                                       torch.tensor(brts_train))
+    residuals_train_loader_for_dnn = DataLoader(residuals_training_dataset_for_dnn, batch_size=256, shuffle=False)
+
+    # Compute residuals from GNN testing dataset for testing the DNN
+    residuals_test = []
+    stats_test = []
+    brts_test = []
+    with torch.no_grad():
+        for data in test_loader:
+            data.to(device)
+            predictions = model_gnn(data.x, data.adj, data.mask)
+            residual = data.y - predictions
+            residuals_test.append(residual)
+            stats_test.append(data.stats)
+            brts_test.append(data.brts)
+
+    # Construct a new dataset with stats as x, residuals as y
+    residuals_testing_dataset_for_dnn = TensorDataset(torch.tensor(stats_test),
+                                                      torch.tensor(residuals_test),
+                                                      torch.tensor(brts_test))
+    residuals_test_loader_for_dnn = DataLoader(residuals_testing_dataset_for_dnn, batch_size=256, shuffle=False)
+
+    # Train DNN on the residuals from GNN
+    def train_dnn():
+        model_dnn.train()
+
+        loss_all = 0
+        for data in residuals_train_loader_for_dnn:
+            data[0] = data[0].to(device)
+            data[1] = data[1].to(device)
+            optimizer_dnn.zero_grad()
+            out = model_dnn(data[0])
+            loss = criterion(out, data[1])
+            loss.backward()
+            loss_all += loss.item()
+            optimizer_dnn.step()
+
+        return loss_all / len(residuals_train_loader_for_dnn.dataset)
+
+    # Test DNN on the residuals from GNN
+    def test_dnn():
+        model_dnn.eval()
+
+        loss_all = 0
+        for data in residuals_test_loader_for_dnn:
+            data[0] = data[0].to(device)
+            data[1] = data[1].to(device)
+            out = model_dnn(data[0])
+            loss = criterion(out, data[1])
+            loss_all += loss.item()
+
+        return loss_all / len(residuals_test_loader_for_dnn.dataset)
+
+    # Train the DNN model
+    dnn_train_loss_history = []
+    dnn_test_loss_history = []
+
+    actual_epoch_dnn = 0
+    # The losses are summed over each data point in the batch, thus we should normalize the losses accordingly
+    train_test_ratio_dnn = len(train_loader.dataset) / len(test_loader.dataset)
+
+    print("Now training DNN model...")
+
+    for epoch in range(1, epoch_number_dnn):
+        actual_epoch_dnn = epoch
+        train_loss = train_dnn()
+        test_loss = test_dnn()
+        test_loss = test_loss * train_test_ratio_dnn
+        print(f'Epoch: {epoch:03d}, Train Loss: {train_loss:.4f}, Test Loss: {test_loss:.4f}')
+        dnn_train_loss_history.append(train_loss)
+        dnn_test_loss_history.append(test_loss)
+
+    # Save the DNN model
+    print("Saving DNN model...")
+    # Create the directory if it doesn't exist
+    if not os.path.exists(os.path.join(name, task_type, "STBO")):
+        os.makedirs(os.path.join(name, task_type, "STBO"))
+    torch.save(model_dnn.state_dict(),
+               os.path.join(name, task_type, "STBO", f"{task_type}_gnn_{gnn_depth}_model_dnn.pt"))
+
+    # Save the DNN training and testing loss history with epoch numbers
+    dnn_performance_dict = {"Epoch": list(range(1, actual_epoch_dnn + 1)), "Train_Loss": dnn_train_loss_history,
+                            "Test_Loss": dnn_test_loss_history}
+    dnn_performance_df = pd.DataFrame(dnn_performance_dict)
+    pyreadr.write_rds(os.path.join(name, task_type, "STBO", f"{task_type}_gnn_{gnn_depth}_dnn_performance.rds"),
+                      dnn_performance_df)
+
+    # Use the trained DNN model to compensate the GNN model, and test the compensated model
+    residuals_before_dnn = []
+    residuals_after_dnn = []
+    predicted_residuals_dnn = []
+    predictions_before_dnn = []
+    predictions_after_dnn = []
+    y_original = []
+    num_nodes_original = []
+
+    with torch.no_grad():
+        for data in test_loader:
+            data.to(device)
+            predictions = model_gnn(data.x, data.adj, data.mask)
+            residual_before = data.y - predictions
+            residuals_before_dnn.append(residual_before)
+            num_nodes_original.append(data.num_nodes)
+            y_original.append(data.y)
+            predictions_before_dnn.append(predictions)
+            data.stats = data.stats.to(device)
+            predicted_residual = model_dnn(data.stats)
+            predicted_residuals_dnn.append(predicted_residual)
+            residual_after = residual_before - predicted_residual
+            residuals_after_dnn.append(residual_after)
+            predictions_after_dnn.append(predictions + predicted_residual)
+
+    # Save the data for the DNN compensation
+    dnn_compensation_data_dict = {"residual_before": residuals_before_dnn,
+                                  "residual_after": residuals_after_dnn,
+                                  "predicted_residual": predicted_residuals_dnn,
+                                  "prediction_before": predictions_before_dnn,
+                                  "prediction_after": predictions_after_dnn,
+                                  "y_original": y_original,
+                                  "num_nodes": num_nodes_original}
+
+    dnn_compensation_data_df = pd.DataFrame(dnn_compensation_data_dict)
+    pyreadr.write_rds(os.path.join(name, task_type, "STBO", f"{task_type}_gnn_{gnn_depth}_dnn_compensation.rds"),
+                      dnn_compensation_data_df)
+
+    # also train LSTM on the residuals from GNN
+    model_lstm = LSTM(in_channels=n_predicted_values, hidden_channels=lstm_hidden_channels,
+                      out_channels=lstm_output_channels, lstm_depth=lstm_depth)
+    optimizer_lstm = torch.optim.AdamW(model_lstm.parameters(), lr=learning_rate)
+
+    # Use the same datasets
+    residuals_train_loader_for_lstm = residuals_train_loader_for_dnn
+    residuals_test_loader_for_lstm = residuals_test_loader_for_dnn
+
+    # Train LSTM on the residuals from GNN
+    def train_lstm():
+        model_lstm.train()
+
+        loss_all = 0
+        for data in residuals_train_loader_for_lstm:
+            lengths_brts = torch.sum(data[2] != 0, dim=1).cpu().tolist()
+            brts_cpu = data[2].cpu()
+            brts_cpu = brts_cpu.unsqueeze(-1)
+            packed_brts = pack_padded_sequence(brts_cpu, lengths_brts, batch_first=True, enforce_sorted=False).to(
+                device)
+            data[1] = data[1].to(device)
+            optimizer_lstm.zero_grad()
+            out = model_lstm(packed_brts)
+            loss = criterion(out, data[1])
+            loss.backward()
+            loss_all += loss.item()
+            optimizer_lstm.step()
+
+        return loss_all / len(residuals_train_loader_for_lstm.dataset)
+
+    # Test LSTM on the residuals from GNN
+    def test_lstm():
+        model_lstm.eval()
+
+        loss_all = 0
+        for data in residuals_test_loader_for_lstm:
+            lengths_brts = torch.sum(data[2] != 0, dim=1).cpu().tolist()
+            brts_cpu = data[2].cpu()
+            brts_cpu = brts_cpu.unsqueeze(-1)
+            packed_brts = pack_padded_sequence(brts_cpu, lengths_brts, batch_first=True, enforce_sorted=False).to(
+                device)
+            data[1] = data[1].to(device)
+            out = model_lstm(packed_brts)
+            loss = criterion(out, data[1])
+            loss_all += loss.item()
+
+        return loss_all / len(residuals_test_loader_for_lstm.dataset)
+
+    # Train the LSTM model
+    lstm_train_loss_history = []
+    lstm_test_loss_history = []
+
+    actual_epoch_lstm = 0
+    # The losses are summed over each data point in the batch, thus we should normalize the losses accordingly
+    train_test_ratio_lstm = len(train_loader.dataset) / len(test_loader.dataset)
+
+    print("Now training LSTM model...")
+
+    for epoch in range(1, epoch_number_lstm):
+        actual_epoch_lstm = epoch
+        train_loss = train_lstm()
+        test_loss = test_lstm()
+        test_loss = test_loss * train_test_ratio_lstm
+        print(f'Epoch: {epoch:03d}, Train Loss: {train_loss:.4f}, Test Loss: {test_loss:.4f}')
+        lstm_train_loss_history.append(train_loss)
+        lstm_test_loss_history.append(test_loss)
+
+    # Save the LSTM model
+    print("Saving LSTM model...")
+    # Create the directory if it doesn't exist
+    if not os.path.exists(os.path.join(name, task_type, "STBO")):
+        os.makedirs(os.path.join(name, task_type, "STBO"))
+    torch.save(model_lstm.state_dict(),
+               os.path.join(name, task_type, "STBO", f"{task_type}_gnn_{gnn_depth}_model_lstm.pt"))
+
+    # Save the LSTM training and testing loss history with epoch numbers
+    lstm_performance_dict = {"Epoch": list(range(1, actual_epoch_lstm + 1)), "Train_Loss": lstm_train_loss_history,
+                             "Test_Loss": lstm_test_loss_history}
+    lstm_performance_df = pd.DataFrame(lstm_performance_dict)
+    pyreadr.write_rds(os.path.join(name, task_type, "STBO", f"{task_type}_gnn_{gnn_depth}_lstm_performance.rds"),
+                      lstm_performance_df)
+
+    # Use the trained LSTM model to compensate the GNN model, and test the compensated model
+    residuals_before_lstm = []
+    residuals_after_lstm = []
+    predicted_residuals_lstm = []
+    predictions_before_lstm = []
+    predictions_after_lstm = []
+    y_original = []
+    num_nodes_original = []
+
+    with torch.no_grad():
+        for data in test_loader:
+            data.to(device)
+            predictions = model_gnn(data.x, data.adj, data.mask)
+            residual_before = data.y - predictions
+            residuals_before_lstm.append(residual_before)
+            num_nodes_original.append(data.num_nodes)
+            y_original.append(data.y)
+            predictions_before_lstm.append(predictions)
+            lengths_brts = torch.sum(data.brts != 0, dim=1).cpu().tolist()
+            brts_cpu = data.brts.cpu()
+            brts_cpu = brts_cpu.unsqueeze(-1)
+            packed_brts = pack_padded_sequence(brts_cpu, lengths_brts, batch_first=True, enforce_sorted=False).to(
+                device)
+            predicted_residual = model_lstm(packed_brts)
+            predicted_residuals_lstm.append(predicted_residual)
+            residual_after = residual_before - predicted_residual
+            residuals_after_lstm.append(residual_after)
+            predictions_after_lstm.append(predictions + predicted_residual)
+
+    # Save the data for the LSTM compensation
+    lstm_compensation_data_dict = {"residual_before": residuals_before_lstm,
+                                   "residual_after": residuals_after_lstm,
+                                   "predicted_residual": predicted_residuals_lstm,
+                                   "prediction_before": predictions_before_lstm,
+                                   "prediction_after": predictions_after_lstm,
+                                   "y_original": y_original,
+                                   "num_nodes": num_nodes_original}
+
+    lstm_compensation_data_df = pd.DataFrame(lstm_compensation_data_dict)
+    pyreadr.write_rds(os.path.join(name, task_type, "STBO", f"{task_type}_gnn_{gnn_depth}_lstm_compensation.rds"),
+                      lstm_compensation_data_df)
+
+    # Next phase, train LSTM on the residuals from DNN compensated GNN on the training dataset
+    # Compute residuals from GNN training dataset after DNN compensation for training the LSTM
+    residuals_train_dnn_lstm = []
+    stats_train_dnn_lstm = []
+    brts_train_dnn_lstm = []
+    with torch.no_grad():
+        for data in train_loader:
+            data.to(device)
+            predictions = model_gnn(data.x, data.adj, data.mask)
+            predicted_residual = model_dnn(data.stats)
+            residual = data.y - predictions - predicted_residual
+            residuals_train_dnn_lstm.append(residual)
+            stats_train_dnn_lstm.append(data.stats)
+            brts_train_dnn_lstm.append(data.brts)
+
+    # Construct a new dataset
+    residuals_training_dataset_for_lstm = TensorDataset(torch.tensor(stats_train_dnn_lstm),
+                                                        torch.tensor(residuals_train_dnn_lstm),
+                                                        torch.tensor(brts_train_dnn_lstm))
+    residuals_train_loader_for_lstm = DataLoader(residuals_training_dataset_for_lstm, batch_size=256, shuffle=False)
+
+    # Compute residuals from GNN testing dataset after DNN compensation for testing the LSTM
+    residuals_test_dnn_lstm = []
+    stats_test_dnn_lstm = []
+    brts_test_dnn_lstm = []
+    with torch.no_grad():
+        for data in test_loader:
+            data.to(device)
+            predictions = model_gnn(data.x, data.adj, data.mask)
+            predicted_residual = model_dnn(data.stats)
+            residual = data.y - predictions - predicted_residual
+            residuals_test_dnn_lstm.append(residual)
+            stats_test_dnn_lstm.append(data.stats)
+            brts_test_dnn_lstm.append(data.brts)
+
+    # Construct a new dataset
+    residuals_testing_dataset_for_lstm = TensorDataset(torch.tensor(stats_test_dnn_lstm),
+                                                       torch.tensor(residuals_test_dnn_lstm),
+                                                       torch.tensor(brts_test_dnn_lstm))
+    residuals_test_loader_for_lstm = DataLoader(residuals_testing_dataset_for_lstm, batch_size=256, shuffle=False)
+
+    # Train LSTM on the residuals from GNN after DNN compensation
+    model_lstm.reset_parameters()
+    optimizer_lstm = torch.optim.AdamW(model_lstm.parameters(), lr=learning_rate)
+
+    def train_lstm_dnn():
+        model_lstm.train()
+
+        loss_all = 0
+        for data in residuals_train_loader_for_lstm:
+            lengths_brts = torch.sum(data[2] != 0, dim=1).cpu().tolist()
+            brts_cpu = data[2].cpu()
+            brts_cpu = brts_cpu.unsqueeze(-1)
+            packed_brts = pack_padded_sequence(brts_cpu, lengths_brts, batch_first=True, enforce_sorted=False).to(
+                device)
+            data[1] = data[1].to(device)
+            optimizer_lstm.zero_grad()
+            out = model_lstm(packed_brts)
+            loss = criterion(out, data[1])
+            loss.backward()
+            loss_all += loss.item()
+            optimizer_lstm.step()
+
+        return loss_all / len(residuals_train_loader_for_lstm.dataset)
+
+    # Test LSTM on the residuals from GNN after DNN compensation
+    def test_lstm_dnn():
+        model_lstm.eval()
+
+        loss_all = 0
+        for data in residuals_test_loader_for_lstm:
+            lengths_brts = torch.sum(data[2] != 0, dim=1).cpu().tolist()
+            brts_cpu = data[2].cpu()
+            brts_cpu = brts_cpu.unsqueeze(-1)
+            packed_brts = pack_padded_sequence(brts_cpu, lengths_brts, batch_first=True, enforce_sorted=False).to(
+                device)
+            data[1] = data[1].to(device)
+            out = model_lstm(packed_brts)
+            loss = criterion(out, data[1])
+            loss_all += loss.item()
+
+        return loss_all / len(residuals_test_loader_for_lstm.dataset)
+
+    # Train the LSTM model after DNN compensation
+    lstm_train_loss_history_after_dnn = []
+    lstm_test_loss_history_after_dnn = []
+
+    actual_epoch_lstm_after_dnn = 0
+    # The losses are summed over each data point in the batch, thus we should normalize the losses accordingly
+    train_test_ratio_lstm_after_dnn = len(train_loader.dataset) / len(test_loader.dataset)
+
+    print("Now training LSTM model after DNN compensation...")
+
+    for epoch in range(1, epoch_number_lstm):
+        actual_epoch_lstm_after_dnn = epoch
+        train_loss = train_lstm_dnn()
+        test_loss = test_lstm_dnn()
+        test_loss = test_loss * train_test_ratio_lstm_after_dnn
+        print(f'Epoch: {epoch:03d}, Train Loss: {train_loss:.4f}, Test Loss: {test_loss:.4f}')
+        lstm_train_loss_history_after_dnn.append(train_loss)
+        lstm_test_loss_history_after_dnn.append(test_loss)
+
+    # Save the LSTM model after DNN compensation
+    print("Saving LSTM model after DNN compensation...")
+    # Create the directory if it doesn't exist
+    if not os.path.exists(os.path.join(name, task_type, "STBO")):
+        os.makedirs(os.path.join(name, task_type, "STBO"))
+    torch.save(model_lstm.state_dict(),
+               os.path.join(name, task_type, "STBO", f"{task_type}_gnn_{gnn_depth}_model_lstm_after_dnn.pt"))
+
+    # Save the LSTM training and testing loss history with epoch numbers after DNN compensation
+    lstm_performance_dict_after_dnn = {"Epoch": list(range(1, actual_epoch_lstm_after_dnn + 1)),
+                                       "Train_Loss": lstm_train_loss_history_after_dnn,
+                                       "Test_Loss": lstm_test_loss_history_after_dnn}
+    lstm_performance_df_after_dnn = pd.DataFrame(lstm_performance_dict_after_dnn)
+    pyreadr.write_rds(
+        os.path.join(name, task_type, "STBO", f"{task_type}_gnn_{gnn_depth}_lstm_performance_after_dnn.rds"),
+        lstm_performance_df_after_dnn)
+
+    # Use the trained LSTM model after DNN compensation to compensate the GNN model, and test the compensated model
+    residuals_before_lstm_before_dnn = []
+    residuals_before_lstm_after_dnn = []
+    residuals_after_lstm_after_dnn = []
+    predicted_residuals_dnn = []
+    predicted_residuals_lstm_after_dnn = []
+    predictions_before_lstm_before_dnn = []
+    predictions_before_lstm_after_dnn = []
+    predictions_after_lstm_after_dnn = []
+    y_original = []
+    num_nodes_original = []
+
+    with torch.no_grad():
+        for data in test_loader:
+            data.to(device)
+            predictions = model_gnn(data.x, data.adj, data.mask)
+            residuals_old = data.y - predictions
+            residuals_before_lstm_before_dnn.append(residuals_old)
+            num_nodes_original.append(data.num_nodes)
+            y_original.append(data.y)
+            predictions_before_lstm_before_dnn.append(predictions)
+            residuals_dnn = model_dnn(data.stats)
+            predicted_residuals_dnn.append(residuals_dnn)
+            residuals_after_dnn = residuals_old - residuals_dnn
+            residuals_before_lstm_after_dnn.append(residuals_after_dnn)
+            predictions_before_lstm_after_dnn.append(predictions + residuals_dnn)
+            lengths_brts = torch.sum(data.brts != 0, dim=1).cpu().tolist()
+            brts_cpu = data.brts.cpu()
+            brts_cpu = brts_cpu.unsqueeze(-1)
+            packed_brts = pack_padded_sequence(brts_cpu, lengths_brts, batch_first=True, enforce_sorted=False).to(
+                device)
+            residuals_lstm = model_lstm(packed_brts)
+            predicted_residuals_lstm_after_dnn.append(residuals_lstm)
+            residuals_after_lstm = residuals_after_dnn - residuals_lstm
+            residuals_after_lstm_after_dnn.append(residuals_after_lstm)
+            predictions_after_lstm_after_dnn.append(predictions + residuals_dnn + residuals_lstm)
+
+    # Save the data for the LSTM compensation after DNN compensation
+    lstm_compensation_data_dict_after_dnn = {"residuals_before_lstm_before_dnn": residuals_before_lstm_before_dnn,
+                                             "residuals_before_lstm_after_dnn": residuals_before_lstm_after_dnn,
+                                             "residuals_after_lstm_after_dnn": residuals_after_lstm_after_dnn,
+                                             "predicted_residual_dnn": predicted_residuals_dnn,
+                                             "predicted_residual_lstm_after_dnn": predicted_residuals_lstm_after_dnn,
+                                             "prediction_before_lstm_before_dnn": predictions_before_lstm_before_dnn,
+                                             "prediction_before_lstm_after_dnn": predictions_before_lstm_after_dnn,
+                                             "prediction_after_lstm_after_dnn": predictions_after_lstm_after_dnn,
+                                             "y_original": y_original,
+                                             "num_nodes": num_nodes_original}
+
+    lstm_compensation_data_df_after_dnn = pd.DataFrame(lstm_compensation_data_dict_after_dnn)
+    pyreadr.write_rds(
+        os.path.join(name, task_type, "STBO", f"{task_type}_gnn_{gnn_depth}_lstm_compensation_after_dnn.rds"),
+        lstm_compensation_data_df_after_dnn)
 
 
 if __name__ == '__main__':
