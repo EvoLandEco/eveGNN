@@ -881,7 +881,7 @@ def main():
     # Next phase, test trained GNN model on the same training dataset, collect residuals to train DNN
     num_stats = training_dataset[0].stats.shape[0]
     model_dnn = DNN(in_channels=num_stats, hidden_channels=dnn_hidden_channels,
-                    out_channels=dnn_output_channels)
+                    out_channels=dnn_output_channels).to(device)
     optimizer_dnn = torch.optim.AdamW(model_dnn.parameters(), lr=learning_rate)
 
     # Compute residuals from GNN training dataset for training the DNN
@@ -1056,7 +1056,7 @@ def main():
 
     # also train LSTM on the residuals from GNN
     model_lstm = LSTM(in_channels=1, hidden_channels=lstm_hidden_channels,
-                      out_channels=lstm_output_channels, lstm_depth=lstm_depth)
+                      out_channels=lstm_output_channels, lstm_depth=lstm_depth).to(device)
     optimizer_lstm = torch.optim.AdamW(model_lstm.parameters(), lr=learning_rate)
 
     # Use the same datasets
@@ -1250,7 +1250,7 @@ def main():
 
     # Train LSTM on the residuals from GNN after DNN compensation
     model_lstm_dnn = LSTM(in_channels=1, hidden_channels=lstm_hidden_channels,
-                          out_channels=lstm_output_channels, lstm_depth=lstm_depth)
+                          out_channels=lstm_output_channels, lstm_depth=lstm_depth).to(device)
     optimizer_lstm_dnn = torch.optim.AdamW(model_lstm_dnn.parameters(), lr=learning_rate)
 
     def train_lstm_dnn():
