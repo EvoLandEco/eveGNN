@@ -794,96 +794,92 @@ def main():
 
     print(model_gnn)
 
-    # before training, first detect if model already exists
-    if os.path.exists(os.path.join(name, task_type, "STBO", f"{task_type}_model_diffpool_{gnn_depth}_gnn.pt")):
-        print("GNN Model already exists, skipping training")
-        # Load the model
-        model_gnn.load_state_dict(torch.load(os.path.join(name, task_type, "STBO", f"{task_type}_model_diffpool_{gnn_depth}_gnn.pt")))
-    else:
-        print("GNN Model does not exist, training")
-        test_mean_diffs_history = []
-        train_loss_history = []
-        test_loss_history = []
-        final_test_diffs = []
-        final_test_predictions = []
-        final_test_y = []
-        final_test_nodes = []
+    test_mean_diffs_history = []
+    train_loss_history = []
+    test_loss_history = []
+    final_test_diffs = []
+    final_test_predictions = []
+    final_test_y = []
+    final_test_nodes = []
 
-        # Set up the early stopper
-        # early_stopper = EarlyStopper(patience=3, min_delta=0.05)
-        actual_epoch_gnn = 0
-        # The losses are summed over each data point in the batch, thus we should normalize the losses accordingly
-        train_test_ratio = len(train_loader.dataset) / len(test_loader.dataset)
+    # Set up the early stopper
+    # early_stopper = EarlyStopper(patience=3, min_delta=0.05)
+    actual_epoch_gnn = 0
+    # The losses are summed over each data point in the batch, thus we should normalize the losses accordingly
+    train_test_ratio = len(train_loader.dataset) / len(test_loader.dataset)
 
-        print("Now training GNN model...")
+    print("Now training GNN model...")
 
-        for epoch in range(1, epoch_number_gnn):
-            actual_epoch_gnn = epoch
-            train_loss_all = train_gnn()
-            test_loss_all = compute_test_loss_gnn()
-            test_loss_all = test_loss_all * train_test_ratio
-            test_mean_diffs, test_diffs_all, test_predictions, test_y, test_nodes_all = test_diff_gnn(test_loader)
-            test_mean_diffs[2] = test_mean_diffs[2] * cap_norm_factor
-            print(
-                f'Epoch: {epoch:03d}, Par 1 Mean Diff: {test_mean_diffs[0]:.4f}, Par 2 Mean Diff: {test_mean_diffs[1]:.4f}, Par 3 Mean Diff: {test_mean_diffs[2]:.4f}, Train Loss: {train_loss_all:.4f}, Test Loss: {test_loss_all:.4f}')
+    for epoch in range(1, epoch_number_gnn):
+        actual_epoch_gnn = epoch
+        train_loss_all = train_gnn()
+        test_loss_all = compute_test_loss_gnn()
+        test_loss_all = test_loss_all * train_test_ratio
+        test_mean_diffs, test_diffs_all, test_predictions, test_y, test_nodes_all = test_diff_gnn(test_loader)
+        test_mean_diffs[2] = test_mean_diffs[2] * cap_norm_factor
+        print(
+            f'Epoch: {epoch:03d}, Par 1 Mean Diff: {test_mean_diffs[0]:.4f}, Par 2 Mean Diff: {test_mean_diffs[1]:.4f}, Par 3 Mean Diff: {test_mean_diffs[2]:.4f}, Train Loss: {train_loss_all:.4f}, Test Loss: {test_loss_all:.4f}')
 
-            # Record the values
-            test_mean_diffs_history.append(test_mean_diffs)
-            train_loss_history.append(train_loss_all)
-            test_loss_history.append(test_loss_all)
-            final_test_diffs = test_diffs_all
-            final_test_predictions = test_predictions
-            final_test_y = test_y
-            final_test_nodes = test_nodes_all
-            print(f"Final test diffs length: {len(final_test_diffs)}")
-            print(f"Final predictions length: {len(final_test_predictions)}")
-            print(f"Final y length: {len(final_test_y)}")
-            print(f"Final nodes length: {len(final_test_nodes)}")
+        # Record the values
+        test_mean_diffs_history.append(test_mean_diffs)
+        train_loss_history.append(train_loss_all)
+        test_loss_history.append(test_loss_all)
+        final_test_diffs = test_diffs_all
+        final_test_predictions = test_predictions
+        final_test_y = test_y
+        final_test_nodes = test_nodes_all
+        print(f"Final test diffs length: {len(final_test_diffs)}")
+        print(f"Final predictions length: {len(final_test_predictions)}")
+        print(f"Final y length: {len(final_test_y)}")
+        print(f"Final nodes length: {len(final_test_nodes)}")
 
-            #  if early_stopper.early_stop(test_loss_all):
-            #      print(f"Early stopping at epoch {epoch}")
-            #      break
+        #  if early_stopper.early_stop(test_loss_all):
+        #      print(f"Early stopping at epoch {epoch}")
+        #      break
 
-        # Save the model
-        print("Saving GNN model...")
-        # Create the directory if it doesn't exist
-        if not os.path.exists(os.path.join(name, task_type, "STBO")):
-            os.makedirs(os.path.join(name, task_type, "STBO"))
-        torch.save(model_gnn.state_dict(),
-                   os.path.join(name, task_type, "STBO", f"{task_type}_model_diffpool_{gnn_depth}_gnn.pt"))
+    # Save the model
+    print("Saving GNN model...")
+    # Create the directory if it doesn't exist
+    if not os.path.exists(os.path.join(name, task_type, "STBO")):
+        os.makedirs(os.path.join(name, task_type, "STBO"))
+    torch.save(model_gnn.state_dict(),
+               os.path.join(name, task_type, "STBO", f"{task_type}_model_diffpool_{gnn_depth}_gnn.pt"))
 
-        # After the loop, create a dictionary to hold the data
-        data_dict = {"lambda_diff": [], "mu_diff": [], "cap_diff": []}
-        # Iterate through test_mean_diffs_history
-        for array in test_mean_diffs_history:
-            # It's assumed that the order of elements in the array corresponds to the keys in data_dict
-            data_dict["lambda_diff"].append(array[0])
-            data_dict["mu_diff"].append(array[1])
-            data_dict["cap_diff"].append(array[2])
-        data_dict["Epoch"] = list(range(1, actual_epoch_gnn + 1))
-        data_dict["Train_Loss"] = train_loss_history
-        data_dict["Test_Loss"] = test_loss_history
+    # After the loop, create a dictionary to hold the data
+    data_dict = {"lambda_diff": [], "mu_diff": [], "cap_diff": []}
+    # Iterate through test_mean_diffs_history
+    for array in test_mean_diffs_history:
+        # It's assumed that the order of elements in the array corresponds to the keys in data_dict
+        data_dict["lambda_diff"].append(array[0])
+        data_dict["mu_diff"].append(array[1])
+        data_dict["cap_diff"].append(array[2])
+    data_dict["Epoch"] = list(range(1, actual_epoch_gnn + 1))
+    data_dict["Train_Loss"] = train_loss_history
+    data_dict["Test_Loss"] = test_loss_history
 
-        # Convert the dictionary to a pandas DataFrame
-        model_performance = pd.DataFrame(data_dict)
-        final_differences = pd.DataFrame(final_test_diffs, columns=["lambda_diff", "mu_diff", "cap_diff"])
-        final_predictions = pd.DataFrame(final_test_predictions, columns=["lambda_pred", "mu_pred", "cap_pred"])
-        final_y = pd.DataFrame(final_test_y, columns=["lambda", "mu", "cap"])
-        final_differences["num_nodes"] = final_test_nodes
+    # Convert the dictionary to a pandas DataFrame
+    model_performance = pd.DataFrame(data_dict)
+    final_differences = pd.DataFrame(final_test_diffs, columns=["lambda_diff", "mu_diff", "cap_diff"])
+    final_predictions = pd.DataFrame(final_test_predictions, columns=["lambda_pred", "mu_pred", "cap_pred"])
+    final_y = pd.DataFrame(final_test_y, columns=["lambda", "mu", "cap"])
+    final_differences["num_nodes"] = final_test_nodes
 
-        # Workaround to get rid of the dtype incompatible issue
-        model_performance = model_performance.astype(object)
-        final_differences = final_differences.astype(object)
-        final_predictions = final_predictions.astype(object)
-        final_y = final_y.astype(object)
+    print("Final differences:")
+    print(abs(final_differences[["lambda_diff", "mu_diff", "cap_diff"]]).mean())
 
-        # Save the data to a file using pyreadr
-        pyreadr.write_rds(os.path.join(name, task_type, "STBO", f"{task_type}_diffpool_{gnn_depth}.rds"), model_performance)
-        pyreadr.write_rds(os.path.join(name, task_type, "STBO", f"{task_type}_final_diffs_diffpool_{gnn_depth}.rds"),
-                          final_differences)
-        pyreadr.write_rds(os.path.join(name, task_type, "STBO", f"{task_type}_final_predictions_diffpool_{gnn_depth}.rds"),
-                          final_predictions)
-        pyreadr.write_rds(os.path.join(name, task_type, "STBO", f"{task_type}_final_y_diffpool_{gnn_depth}.rds"), final_y)
+    # Workaround to get rid of the dtype incompatible issue
+    model_performance = model_performance.astype(object)
+    final_differences = final_differences.astype(object)
+    final_predictions = final_predictions.astype(object)
+    final_y = final_y.astype(object)
+
+    # Save the data to a file using pyreadr
+    pyreadr.write_rds(os.path.join(name, task_type, "STBO", f"{task_type}_diffpool_{gnn_depth}.rds"), model_performance)
+    pyreadr.write_rds(os.path.join(name, task_type, "STBO", f"{task_type}_final_diffs_diffpool_{gnn_depth}.rds"),
+                      final_differences)
+    pyreadr.write_rds(os.path.join(name, task_type, "STBO", f"{task_type}_final_predictions_diffpool_{gnn_depth}.rds"),
+                      final_predictions)
+    pyreadr.write_rds(os.path.join(name, task_type, "STBO", f"{task_type}_final_y_diffpool_{gnn_depth}.rds"), final_y)
 
     # Next phase, test trained GNN model on the same training dataset, collect residuals to train DNN
     num_stats = training_dataset[0].stats.shape[0]
@@ -908,6 +904,8 @@ def main():
     residuals_training_dataset_for_dnn = TensorDataset(stats_train.clone().detach(),
                                                        residuals_train.clone().detach(),
                                                        brts_train.clone().detach())
+    print("Mean residuals for training dataset:")
+    print(torch.mean(abs(residuals_training_dataset_for_dnn.tensors[1]), dim=0))
     residuals_train_loader_for_dnn = DataLoader(residuals_training_dataset_for_dnn, batch_size=256, shuffle=False)
     print(f"Residuals training dataset DNN length: {len(residuals_train_loader_for_dnn.dataset)}")
 
@@ -928,6 +926,8 @@ def main():
     residuals_testing_dataset_for_dnn = TensorDataset(stats_test.clone().detach(),
                                                       residuals_test.clone().detach(),
                                                       brts_test.clone().detach())
+    print("Mean residuals for testing dataset:")
+    print(torch.mean(abs(residuals_testing_dataset_for_dnn.tensors[1]), dim=0))
     residuals_test_loader_for_dnn = DataLoader(residuals_testing_dataset_for_dnn, batch_size=256, shuffle=False)
     print(f"Residuals testing dataset DNN length: {len(residuals_test_loader_for_dnn.dataset)}")
 
@@ -1035,6 +1035,12 @@ def main():
     y_original = y_original.cpu().detach().numpy()
     num_nodes_original = num_nodes_original.cpu().detach().numpy()
 
+    # compute column-wise mean of residuals
+    print("Mean residuals before DNN compensation:")
+    print(np.mean(abs(residuals_before_dnn), axis=0))
+    print("Mean residuals after DNN compensation:")
+    print(np.mean(abs(residuals_after_dnn), axis=0))
+
     dnn_compensation_data_dict = {"res_lambda_before": residuals_before_dnn[:, 0],
                                   "res_mu_before": residuals_before_dnn[:, 1],
                                   "res_cap_before": residuals_before_dnn[:, 2],
@@ -1071,8 +1077,12 @@ def main():
     # Use the same datasets
     residuals_train_loader_for_lstm = residuals_train_loader_for_dnn
     print(f"Residuals training dataset LSTM length: {len(residuals_train_loader_for_lstm.dataset)}")
+    print("Mean residuals for training dataset:")
+    print(torch.mean(abs(residuals_train_loader_for_lstm.dataset.tensors[1]), dim=0))
     residuals_test_loader_for_lstm = residuals_test_loader_for_dnn
     print(f"Residuals testing dataset LSTM length: {len(residuals_test_loader_for_lstm.dataset)}")
+    print("Mean residuals for testing dataset:")
+    print(torch.mean(abs(residuals_test_loader_for_lstm.dataset.tensors[1]), dim=0))
 
     # Train LSTM on the residuals from GNN
     def train_lstm():
@@ -1190,6 +1200,12 @@ def main():
     y_original = y_original.cpu().detach().numpy()
     num_nodes_original = num_nodes_original.cpu().detach().numpy()
 
+    # compute column-wise mean of residuals
+    print("Mean residuals before LSTM compensation:")
+    print(np.mean(abs(residuals_before_lstm), axis=0))
+    print("Mean residuals after LSTM compensation:")
+    print(np.mean(abs(residuals_after_lstm), axis=0))
+
     lstm_compensation_data_dict = {"res_lambda_before": residuals_before_lstm[:, 0],
                                    "res_mu_before": residuals_before_lstm[:, 1],
                                    "res_cap_before": residuals_before_lstm[:, 2],
@@ -1211,6 +1227,12 @@ def main():
                                    "num_nodes": num_nodes_original}
 
     lstm_compensation_data_df = pd.DataFrame(lstm_compensation_data_dict)
+
+    # compute column-wise mean of residuals
+    print("Mean residuals before LSTM compensation:")
+    print(np.mean(abs(residuals_before_lstm), axis=0))
+    print("Mean residuals after LSTM compensation:")
+    print(np.mean(abs(residuals_after_lstm), axis=0))
 
     # Workaround to get rid of the dtype incompatible issue
     lstm_compensation_data_df = lstm_compensation_data_df.astype(object)
@@ -1237,6 +1259,9 @@ def main():
     residuals_training_dataset_for_lstm_dnn = TensorDataset(stats_train_dnn_lstm.clone().detach(),
                                                         residuals_train_dnn_lstm.clone().detach(),
                                                         brts_train_dnn_lstm.clone().detach())
+    # compute column-wise mean of residuals
+    print("Mean residuals for training dataset LSTM after DNN compensation:")
+    print(torch.mean(abs(residuals_training_dataset_for_lstm_dnn.tensors[1]), dim=0))
     residuals_train_loader_for_lstm_dnn = DataLoader(residuals_training_dataset_for_lstm_dnn, batch_size=256, shuffle=False)
     print(f"Residuals training dataset LSTM after DNN length: {len(residuals_train_loader_for_lstm_dnn.dataset)}")
 
@@ -1258,6 +1283,9 @@ def main():
     residuals_testing_dataset_for_lstm_dnn = TensorDataset(stats_test_dnn_lstm.clone().detach(),
                                                        residuals_test_dnn_lstm.clone().detach(),
                                                        brts_test_dnn_lstm.clone().detach())
+    # compute column-wise mean of residuals
+    print("Mean residuals for testing dataset LSTM after DNN compensation:")
+    print(torch.mean(abs(residuals_testing_dataset_for_lstm_dnn.tensors[1]), dim=0))
     residuals_test_loader_for_lstm_dnn = DataLoader(residuals_testing_dataset_for_lstm_dnn, batch_size=256, shuffle=False)
     print(f"Residuals testing dataset LSTM after DNN length: {len(residuals_test_loader_for_lstm_dnn.dataset)}")
 
@@ -1394,6 +1422,14 @@ def main():
     y_original = y_original.cpu().detach().numpy()
     num_nodes_original = num_nodes_original.cpu().detach().numpy()
 
+    # compute column-wise mean of residuals
+    print("Mean residuals before LSTM compensation before DNN compensation:")
+    print(np.mean(abs(residuals_before_lstm_before_dnn), axis=0))
+    print("Mean residuals before LSTM compensation after DNN compensation:")
+    print(np.mean(abs(residuals_before_lstm_after_dnn), axis=0))
+    print("Mean residuals after LSTM compensation after DNN compensation:")
+    print(np.mean(abs(residuals_after_lstm_after_dnn), axis=0))
+
     lstm_compensation_data_dict_after_dnn = {"res_lambda_before_lstm_before_dnn": residuals_before_lstm_before_dnn[:, 0],
                                              "res_mu_before_lstm_before_dnn": residuals_before_lstm_before_dnn[:, 1],
                                             "res_cap_before_lstm_before_dnn": residuals_before_lstm_before_dnn[:, 2],
@@ -1424,6 +1460,14 @@ def main():
                                             "num_nodes": num_nodes_original}
 
     lstm_compensation_data_df_after_dnn = pd.DataFrame(lstm_compensation_data_dict_after_dnn)
+
+    # compute column-wise mean of residuals
+    print("Mean residuals before LSTM compensation before DNN compensation:")
+    print(np.mean(abs(residuals_before_lstm_before_dnn), axis=0))
+    print("Mean residuals before LSTM compensation after DNN compensation:")
+    print(np.mean(abs(residuals_before_lstm_after_dnn), axis=0))
+    print("Mean residuals after LSTM compensation after DNN compensation:")
+    print(np.mean(abs(residuals_after_lstm_after_dnn), axis=0))
 
     # Workaround to get rid of the dtype incompatible issue
     lstm_compensation_data_df_after_dnn = lstm_compensation_data_df_after_dnn.astype(object)
