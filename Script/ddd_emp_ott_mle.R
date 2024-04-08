@@ -8,7 +8,9 @@ data <- readRDS(file.path(name, "EMP_DATA/OTT_trees.rds"))
 setwd(name)
 setwd("DDD_EMP_MLE")
 
-brts <- sort(treestats::branching_times(data[[i]]), decreasing = TRUE)
+tree <- data[[i]]
+tree <- eveGNN::rescale_crown_age(tree, 10)
+brts <- sort(treestats::branching_times(tree), decreasing = TRUE)
 
 ml <- DDD::dd_ML(
   brts = brts,
