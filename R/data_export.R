@@ -42,6 +42,31 @@ export_to_gnn_empirical <- function(data, meta, path, undirected = FALSE) {
 }
 
 
+#' @export export_to_gnn_ott
+export_to_gnn_ott <- function(data, index, path, undirected = FALSE) {
+  path <- file.path(path, "GNN/tree/")
+  path_EL <- file.path(path, "EL/")
+  path_ST <- file.path(path, "ST/")
+  path_BT <- file.path(path, "BT/")
+  eve:::check_path(path)
+  eve:::check_path(path_EL)
+  eve:::check_path(path_ST)
+  eve:::check_path(path_BT)
+
+  file_name <- paste0(path, "/tree_", index, ".rds")
+  saveRDS(tree_to_connectivity(data, undirected = undirected), file = file_name)
+
+  file_name_el <- paste0(path_EL, "/EL_", index, ".rds")
+  saveRDS(tree_to_adj_mat(data), file = file_name_el)
+
+  file_name_st <- paste0(path_ST, "/ST_", index, ".rds")
+  saveRDS(tree_to_stats(data), file = file_name_st)
+
+  file_name_bt <- paste0(path_BT, "/BT_", index, ".rds")
+  saveRDS(tree_to_brts(data), file = file_name_bt)
+}
+
+
 #' @export export_to_gnn_bootstrap
 export_to_gnn_bootstrap <- function(data, meta, index, path, undirected = FALSE) {
   path <- file.path(path, "GNN/tree/")
