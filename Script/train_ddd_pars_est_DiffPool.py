@@ -45,7 +45,7 @@ lstm_output_channels = global_params["lstm_output_channels"]
 lstm_depth = global_params["lstm_depth"]
 lin_layer1_hidden_channels = global_params["lin_layer1_hidden_channels"]
 lin_layer2_hidden_channels = global_params["lin_layer2_hidden_channels"]
-n_predicted_values = global_params["n_predicted_values"]
+n_predicted_values = global_params["n_predicted_values"] + 1  # Add 1 for the additional target
 batch_size_reduce_factor = global_params["batch_size_reduce_factor"]
 max_nodes_limit = global_params["max_nodes_limit"]
 normalize_edge_length = global_params["normalize_edge_length"]
@@ -190,6 +190,20 @@ def check_list_count(count, data_list, length_list, params_list, stats_list, brt
     print("Count check passed")
 
 
+# Function to create additional target for the model, for DDD trees, using the first three parameters to
+# calculate (lambda - mu) / K
+def create_additional_target(params):
+    # Extract the parameters
+    lambda_val = params[0]
+    mu_val = params[1]
+    K_val = params[2]
+
+    # Calculate the additional target value
+    additional_target = (lambda_val - mu_val) / K_val
+
+    return additional_target
+
+
 def read_rds_to_pytorch(path, count, normalize=False):
     # List all files in the directory
     files_tree = [f for f in os.listdir(os.path.join(path, 'GNN', 'tree'))
@@ -264,8 +278,12 @@ def read_rds_to_pytorch(path, count, normalize=False):
         params_list.append(params)
 
     # Normalize carrying capacity by dividing by a factor
+    # Also create the additional target for the model, which is (lambda - mu) / K
+    # This snippet is specific to the DDD dataset
     for vector in params_list:
         vector[2] = vector[2] / cap_norm_factor
+        vector = vector[0:3]  # Keep only the first three elements
+        vector.append(create_additional_target(vector))  # Append the additional target
 
     check_list_count(count, data_list, length_list, params_list, stats_list, brts_list)
 
@@ -746,7 +764,6 @@ def main():
         loss_all = 0  # Keep track of the loss
         for data in test_loader:
             data.to(device)
-            graph_sizes = data.num_nodes
             out, l, e = model_gnn(data.x, data.adj, data.mask)
             loss = criterion(out, data.y.view(data.num_nodes.__len__(), n_predicted_values))
             loss = loss + l * 100000 + e * 0.1
@@ -818,7 +835,7 @@ def main():
         test_mean_diffs, test_diffs_all, test_predictions, test_y, test_nodes_all = test_diff_gnn(test_loader)
         test_mean_diffs[2] = test_mean_diffs[2] * cap_norm_factor
         print(
-            f'Epoch: {epoch:03d}, Par 1 Mean Diff: {test_mean_diffs[0]:.4f}, Par 2 Mean Diff: {test_mean_diffs[1]:.4f}, Par 3 Mean Diff: {test_mean_diffs[2]:.4f}, Train Loss: {train_loss_all:.4f}, Test Loss: {test_loss_all:.4f}')
+            f'Epoch: {epoch:03d}, Par 1 Mean Diff: {test_mean_diffs[0]:.4f}, Par 2 Mean Diff: {test_mean_diffs[1]:.4f}, Par 3 Mean Diff: {test_mean_diffs[2]:.4f}, Par 3 Mean Diff: {test_mean_diffs[2]:.4f}, Par 4 Mean Diff: {test_mean_diffs[3]:.4f}, Train Loss: {train_loss_all:.4f}, Test Loss: {test_loss_all:.4f}')
 
         # Record the values
         test_mean_diffs_history.append(test_mean_diffs)
@@ -846,26 +863,27 @@ def main():
                os.path.join(name, task_type, "STBO", f"{task_type}_model_diffpool_{gnn_depth}_gnn.pt"))
 
     # After the loop, create a dictionary to hold the data
-    data_dict = {"lambda_diff": [], "mu_diff": [], "cap_diff": []}
+    data_dict = {"lambda_diff": [], "mu_diff": [], "cap_diff": [], "add_diff": []}
     # Iterate through test_mean_diffs_history
     for array in test_mean_diffs_history:
         # It's assumed that the order of elements in the array corresponds to the keys in data_dict
         data_dict["lambda_diff"].append(array[0])
         data_dict["mu_diff"].append(array[1])
         data_dict["cap_diff"].append(array[2])
+        data_dict["add_diff"].append(array[3])
     data_dict["Epoch"] = list(range(1, actual_epoch_gnn + 1))
     data_dict["Train_Loss"] = train_loss_history
     data_dict["Test_Loss"] = test_loss_history
 
     # Convert the dictionary to a pandas DataFrame
     model_performance = pd.DataFrame(data_dict)
-    final_differences = pd.DataFrame(final_test_diffs, columns=["lambda_diff", "mu_diff", "cap_diff"])
-    final_predictions = pd.DataFrame(final_test_predictions, columns=["lambda_pred", "mu_pred", "cap_pred"])
-    final_y = pd.DataFrame(final_test_y, columns=["lambda", "mu", "cap"])
+    final_differences = pd.DataFrame(final_test_diffs, columns=["lambda_diff", "mu_diff", "cap_diff", "add_diff"])
+    final_predictions = pd.DataFrame(final_test_predictions, columns=["lambda_pred", "mu_pred", "cap_pred", "add_pred"])
+    final_y = pd.DataFrame(final_test_y, columns=["lambda", "mu", "cap", "add"])
     final_differences["num_nodes"] = final_test_nodes
 
     print("Final differences:")
-    print(abs(final_differences[["lambda_diff", "mu_diff", "cap_diff"]]).mean())
+    print(abs(final_differences[["lambda_diff", "mu_diff", "cap_diff", "add_diff"]]).mean())
 
     # Workaround to get rid of the dtype incompatible issue
     model_performance = model_performance.astype(object)
@@ -1044,21 +1062,27 @@ def main():
     dnn_compensation_data_dict = {"res_lambda_before": residuals_before_dnn[:, 0],
                                   "res_mu_before": residuals_before_dnn[:, 1],
                                   "res_cap_before": residuals_before_dnn[:, 2],
+                                  "res_add_before": residuals_before_dnn[:, 3],
                                   "res_lambda_after": residuals_after_dnn[:, 0],
                                   "res_mu_after": residuals_after_dnn[:, 1],
                                   "res_cap_after": residuals_after_dnn[:, 2],
+                                  "res_add_after": residuals_after_dnn[:, 3],
                                   "pred_res_lambda": predicted_residuals_dnn[:, 0],
                                   "pred_res_mu": predicted_residuals_dnn[:, 1],
                                   "pred_res_cap": predicted_residuals_dnn[:, 2],
+                                  "pred_res_add": predicted_residuals_dnn[:, 3],
                                   "pred_lambda_before": predictions_before_dnn[:, 0],
                                   "pred_mu_before": predictions_before_dnn[:, 1],
                                   "pred_cap_before": predictions_before_dnn[:, 2],
+                                  "pred_add_before": predictions_before_dnn[:, 3],
                                   "pred_lambda_after": predictions_after_dnn[:, 0],
                                   "pred_mu_after": predictions_after_dnn[:, 1],
                                   "pred_cap_after": predictions_after_dnn[:, 2],
+                                  "pred_add_after": predictions_after_dnn[:, 3],
                                   "lambda": y_original[:, 0],
                                   "mu": y_original[:, 1],
                                   "cap": y_original[:, 2],
+                                  "add": y_original[:, 3],
                                   "num_nodes": num_nodes_original}
 
     dnn_compensation_data_df = pd.DataFrame(dnn_compensation_data_dict)
@@ -1209,21 +1233,27 @@ def main():
     lstm_compensation_data_dict = {"res_lambda_before": residuals_before_lstm[:, 0],
                                    "res_mu_before": residuals_before_lstm[:, 1],
                                    "res_cap_before": residuals_before_lstm[:, 2],
+                                   "res_add_before": residuals_before_lstm[:, 3],
                                    "res_lambda_after": residuals_after_lstm[:, 0],
                                    "res_mu_after": residuals_after_lstm[:, 1],
                                    "res_cap_after": residuals_after_lstm[:, 2],
+                                   "res_add_after": residuals_after_lstm[:, 3],
                                    "pred_res_lambda": predicted_residuals_lstm[:, 0],
                                    "pred_res_mu": predicted_residuals_lstm[:, 1],
                                    "pred_res_cap": predicted_residuals_lstm[:, 2],
+                                   "pred_res_add": predicted_residuals_lstm[:, 3],
                                    "pred_lambda_before": predictions_before_lstm[:, 0],
                                    "pred_mu_before": predictions_before_lstm[:, 1],
                                    "pred_cap_before": predictions_before_lstm[:, 2],
+                                   "pred_add_before": predictions_before_lstm[:, 3],
                                    "pred_lambda_after": predictions_after_lstm[:, 0],
                                    "pred_mu_after": predictions_after_lstm[:, 1],
                                    "pred_cap_after": predictions_after_lstm[:, 2],
+                                   "pred_add_after": predictions_after_lstm[:, 3],
                                    "lambda": y_original[:, 0],
                                    "mu": y_original[:, 1],
                                    "cap": y_original[:, 2],
+                                   "add": y_original[:, 3],
                                    "num_nodes": num_nodes_original}
 
     lstm_compensation_data_df = pd.DataFrame(lstm_compensation_data_dict)
@@ -1257,12 +1287,13 @@ def main():
 
     # Construct a new dataset
     residuals_training_dataset_for_lstm_dnn = TensorDataset(stats_train_dnn_lstm.clone().detach(),
-                                                        residuals_train_dnn_lstm.clone().detach(),
-                                                        brts_train_dnn_lstm.clone().detach())
+                                                            residuals_train_dnn_lstm.clone().detach(),
+                                                            brts_train_dnn_lstm.clone().detach())
     # compute column-wise mean of residuals
     print("Mean residuals for training dataset LSTM after DNN compensation:")
     print(torch.mean(abs(residuals_training_dataset_for_lstm_dnn.tensors[1]), dim=0))
-    residuals_train_loader_for_lstm_dnn = DataLoader(residuals_training_dataset_for_lstm_dnn, batch_size=256, shuffle=False)
+    residuals_train_loader_for_lstm_dnn = DataLoader(residuals_training_dataset_for_lstm_dnn, batch_size=256,
+                                                     shuffle=False)
     print(f"Residuals training dataset LSTM after DNN length: {len(residuals_train_loader_for_lstm_dnn.dataset)}")
 
     # Compute residuals from GNN testing dataset after DNN compensation for testing the LSTM
@@ -1281,12 +1312,13 @@ def main():
 
     # Construct a new dataset
     residuals_testing_dataset_for_lstm_dnn = TensorDataset(stats_test_dnn_lstm.clone().detach(),
-                                                       residuals_test_dnn_lstm.clone().detach(),
-                                                       brts_test_dnn_lstm.clone().detach())
+                                                           residuals_test_dnn_lstm.clone().detach(),
+                                                           brts_test_dnn_lstm.clone().detach())
     # compute column-wise mean of residuals
     print("Mean residuals for testing dataset LSTM after DNN compensation:")
     print(torch.mean(abs(residuals_testing_dataset_for_lstm_dnn.tensors[1]), dim=0))
-    residuals_test_loader_for_lstm_dnn = DataLoader(residuals_testing_dataset_for_lstm_dnn, batch_size=256, shuffle=False)
+    residuals_test_loader_for_lstm_dnn = DataLoader(residuals_testing_dataset_for_lstm_dnn, batch_size=256,
+                                                    shuffle=False)
     print(f"Residuals testing dataset LSTM after DNN length: {len(residuals_test_loader_for_lstm_dnn.dataset)}")
 
     # Train LSTM on the residuals from GNN after DNN compensation
@@ -1398,7 +1430,8 @@ def main():
             predicted_residuals_dnn = torch.cat((predicted_residuals_dnn, residuals_dnn), dim=0)
             residuals_after_dnn = residuals_old - residuals_dnn
             residuals_before_lstm_after_dnn = torch.cat((residuals_before_lstm_after_dnn, residuals_after_dnn), dim=0)
-            predictions_before_lstm_after_dnn = torch.cat((predictions_before_lstm_after_dnn, predictions + residuals_dnn), dim=0)
+            predictions_before_lstm_after_dnn = torch.cat(
+                (predictions_before_lstm_after_dnn, predictions + residuals_dnn), dim=0)
             lengths_brts = torch.sum(data.brts != 0, dim=1).cpu().tolist()
             brts_cpu = data.brts.cpu()
             brts_cpu = brts_cpu.unsqueeze(-1)
@@ -1408,7 +1441,8 @@ def main():
             predicted_residuals_lstm_after_dnn = torch.cat((predicted_residuals_lstm_after_dnn, residuals_lstm), dim=0)
             residuals_after_lstm = residuals_after_dnn - residuals_lstm
             residuals_after_lstm_after_dnn = torch.cat((residuals_after_lstm_after_dnn, residuals_after_lstm), dim=0)
-            predictions_after_lstm_after_dnn = torch.cat((predictions_after_lstm_after_dnn, predictions + residuals_dnn + residuals_lstm), dim=0)
+            predictions_after_lstm_after_dnn = torch.cat(
+                (predictions_after_lstm_after_dnn, predictions + residuals_dnn + residuals_lstm), dim=0)
 
     # Save the data for the LSTM compensation after DNN compensation
     residuals_before_lstm_before_dnn = residuals_before_lstm_before_dnn.cpu().detach().numpy()
@@ -1430,34 +1464,43 @@ def main():
     print("Mean residuals after LSTM compensation after DNN compensation:")
     print(np.mean(abs(residuals_after_lstm_after_dnn), axis=0))
 
-    lstm_compensation_data_dict_after_dnn = {"res_lambda_before_lstm_before_dnn": residuals_before_lstm_before_dnn[:, 0],
-                                             "res_mu_before_lstm_before_dnn": residuals_before_lstm_before_dnn[:, 1],
-                                            "res_cap_before_lstm_before_dnn": residuals_before_lstm_before_dnn[:, 2],
-                                            "res_lambda_before_lstm_after_dnn": residuals_before_lstm_after_dnn[:, 0],
-                                            "res_mu_before_lstm_after_dnn": residuals_before_lstm_after_dnn[:, 1],
-                                            "res_cap_before_lstm_after_dnn": residuals_before_lstm_after_dnn[:, 2],
-                                            "res_lambda_after_lstm_after_dnn": residuals_after_lstm_after_dnn[:, 0],
-                                            "res_mu_after_lstm_after_dnn": residuals_after_lstm_after_dnn[:, 1],
-                                            "res_cap_after_lstm_after_dnn": residuals_after_lstm_after_dnn[:, 2],
-                                            "pred_res_lambda_dnn": predicted_residuals_dnn[:, 0],
-                                            "pred_res_mu_dnn": predicted_residuals_dnn[:, 1],
-                                            "pred_res_cap_dnn": predicted_residuals_dnn[:, 2],
-                                            "pred_res_lambda_lstm_after_dnn": predicted_residuals_lstm_after_dnn[:, 0],
-                                            "pred_res_mu_lstm_after_dnn": predicted_residuals_lstm_after_dnn[:, 1],
-                                            "pred_res_cap_lstm_after_dnn": predicted_residuals_lstm_after_dnn[:, 2],
-                                            "pred_lambda_before_lstm_before_dnn": predictions_before_lstm_before_dnn[:, 0],
-                                            "pred_mu_before_lstm_before_dnn": predictions_before_lstm_before_dnn[:, 1],
-                                            "pred_cap_before_lstm_before_dnn": predictions_before_lstm_before_dnn[:, 2],
-                                            "pred_lambda_before_lstm_after_dnn": predictions_before_lstm_after_dnn[:, 0],
-                                            "pred_mu_before_lstm_after_dnn": predictions_before_lstm_after_dnn[:, 1],
-                                            "pred_cap_before_lstm_after_dnn": predictions_before_lstm_after_dnn[:, 2],
-                                            "pred_lambda_after_lstm_after_dnn": predictions_after_lstm_after_dnn[:, 0],
-                                            "pred_mu_after_lstm_after_dnn": predictions_after_lstm_after_dnn[:, 1],
-                                            "pred_cap_after_lstm_after_dnn": predictions_after_lstm_after_dnn[:, 2],
-                                            "lambda": y_original[:, 0],
-                                            "mu": y_original[:, 1],
-                                            "cap": y_original[:, 2],
-                                            "num_nodes": num_nodes_original}
+    lstm_compensation_data_dict_after_dnn = {
+        "res_lambda_before_lstm_before_dnn": residuals_before_lstm_before_dnn[:, 0],
+        "res_mu_before_lstm_before_dnn": residuals_before_lstm_before_dnn[:, 1],
+        "res_cap_before_lstm_before_dnn": residuals_before_lstm_before_dnn[:, 2],
+        "res_add_before_lstm_before_dnn": residuals_before_lstm_before_dnn[:, 3],
+        "res_lambda_before_lstm_after_dnn": residuals_before_lstm_after_dnn[:, 0],
+        "res_mu_before_lstm_after_dnn": residuals_before_lstm_after_dnn[:, 1],
+        "res_cap_before_lstm_after_dnn": residuals_before_lstm_after_dnn[:, 2],
+        "res_add_before_lstm_after_dnn": residuals_before_lstm_after_dnn[:, 3],
+        "res_lambda_after_lstm_after_dnn": residuals_after_lstm_after_dnn[:, 0],
+        "res_mu_after_lstm_after_dnn": residuals_after_lstm_after_dnn[:, 1],
+        "res_cap_after_lstm_after_dnn": residuals_after_lstm_after_dnn[:, 2],
+        "res_add_after_lstm_after_dnn": residuals_after_lstm_after_dnn[:, 3],
+        "pred_res_lambda_dnn": predicted_residuals_dnn[:, 0],
+        "pred_res_mu_dnn": predicted_residuals_dnn[:, 1],
+        "pred_res_cap_dnn": predicted_residuals_dnn[:, 2],
+        "pred_res_add_dnn": predicted_residuals_dnn[:, 3],
+        "pred_res_lambda_lstm_after_dnn": predicted_residuals_lstm_after_dnn[:, 0],
+        "pred_res_mu_lstm_after_dnn": predicted_residuals_lstm_after_dnn[:, 1],
+        "pred_res_cap_lstm_after_dnn": predicted_residuals_lstm_after_dnn[:, 2],
+        "pred_res_add_lstm_after_dnn": predicted_residuals_lstm_after_dnn[:, 3],
+        "pred_lambda_before_lstm_before_dnn": predictions_before_lstm_before_dnn[:, 0],
+        "pred_mu_before_lstm_before_dnn": predictions_before_lstm_before_dnn[:, 1],
+        "pred_cap_before_lstm_before_dnn": predictions_before_lstm_before_dnn[:, 2],
+        "pred_add_before_lstm_before_dnn": predictions_before_lstm_before_dnn[:, 3],
+        "pred_lambda_before_lstm_after_dnn": predictions_before_lstm_after_dnn[:, 0],
+        "pred_mu_before_lstm_after_dnn": predictions_before_lstm_after_dnn[:, 1],
+        "pred_cap_before_lstm_after_dnn": predictions_before_lstm_after_dnn[:, 2],
+        "pred_add_before_lstm_after_dnn": predictions_before_lstm_after_dnn[:, 3],
+        "pred_lambda_after_lstm_after_dnn": predictions_after_lstm_after_dnn[:, 0],
+        "pred_mu_after_lstm_after_dnn": predictions_after_lstm_after_dnn[:, 1],
+        "pred_cap_after_lstm_after_dnn": predictions_after_lstm_after_dnn[:, 2],
+        "pred_add_after_lstm_after_dnn": predictions_after_lstm_after_dnn[:, 3],
+        "lambda": y_original[:, 0],
+        "mu": y_original[:, 1],
+        "cap": y_original[:, 2],
+        "num_nodes": num_nodes_original}
 
     lstm_compensation_data_df_after_dnn = pd.DataFrame(lstm_compensation_data_dict_after_dnn)
 
@@ -1498,13 +1541,14 @@ def main():
 
     # Construct a new dataset
     residuals_training_dataset_for_dnn_lstm = TensorDataset(stats_train_lstm_dnn.clone().detach(),
-                                                        residuals_train_lstm_dnn.clone().detach(),
-                                                        brts_train_lstm_dnn.clone().detach())
+                                                            residuals_train_lstm_dnn.clone().detach(),
+                                                            brts_train_lstm_dnn.clone().detach())
 
     # compute column-wise mean of residuals
     print("Mean residuals for training dataset DNN after LSTM compensation:")
     print(torch.mean(abs(residuals_training_dataset_for_dnn_lstm.tensors[1]), dim=0))
-    residuals_train_loader_for_dnn_lstm = DataLoader(residuals_training_dataset_for_dnn_lstm, batch_size=256, shuffle=False)
+    residuals_train_loader_for_dnn_lstm = DataLoader(residuals_training_dataset_for_dnn_lstm, batch_size=256,
+                                                     shuffle=False)
     print(f"Residuals training dataset DNN after LSTM length: {len(residuals_train_loader_for_dnn_lstm.dataset)}")
 
     # Compute residuals from GNN testing dataset after LSTM compensation for testing the DNN
@@ -1528,13 +1572,14 @@ def main():
 
     # Construct a new dataset
     residuals_testing_dataset_for_dnn_lstm = TensorDataset(stats_test_lstm_dnn.clone().detach(),
-                                                       residuals_test_lstm_dnn.clone().detach(),
-                                                       brts_test_lstm_dnn.clone().detach())
+                                                           residuals_test_lstm_dnn.clone().detach(),
+                                                           brts_test_lstm_dnn.clone().detach())
 
     # compute column-wise mean of residuals
     print("Mean residuals for testing dataset DNN after LSTM compensation:")
     print(torch.mean(abs(residuals_testing_dataset_for_dnn_lstm.tensors[1]), dim=0))
-    residuals_test_loader_for_dnn_lstm = DataLoader(residuals_testing_dataset_for_dnn_lstm, batch_size=256, shuffle=False)
+    residuals_test_loader_for_dnn_lstm = DataLoader(residuals_testing_dataset_for_dnn_lstm, batch_size=256,
+                                                    shuffle=False)
     print(f"Residuals testing dataset DNN after LSTM length: {len(residuals_test_loader_for_dnn_lstm.dataset)}")
 
     # Train DNN on the residuals from LSTM compensated GNN
@@ -1642,12 +1687,14 @@ def main():
             predicted_residuals_lstm = torch.cat((predicted_residuals_lstm, residuals_lstm), dim=0)
             residuals_after_lstm = residuals_old - residuals_lstm
             residuals_before_dnn_after_lstm = torch.cat((residuals_before_dnn_after_lstm, residuals_after_lstm), dim=0)
-            predictions_before_dnn_after_lstm = torch.cat((predictions_before_dnn_after_lstm, predictions + residuals_lstm), dim=0)
+            predictions_before_dnn_after_lstm = torch.cat(
+                (predictions_before_dnn_after_lstm, predictions + residuals_lstm), dim=0)
             residuals_dnn = model_dnn_lstm(data.stats)
             predicted_residuals_dnn_after_lstm = torch.cat((predicted_residuals_dnn_after_lstm, residuals_dnn), dim=0)
             residuals_after_dnn = residuals_after_lstm - residuals_dnn
             residuals_after_dnn_after_lstm = torch.cat((residuals_after_dnn_after_lstm, residuals_after_dnn), dim=0)
-            predictions_after_dnn_after_lstm = torch.cat((predictions_after_dnn_after_lstm, predictions + residuals_lstm + residuals_dnn), dim=0)
+            predictions_after_dnn_after_lstm = torch.cat(
+                (predictions_after_dnn_after_lstm, predictions + residuals_lstm + residuals_dnn), dim=0)
 
     # Save the data for the DNN compensation after LSTM compensation
     residuals_before_dnn_before_lstm = residuals_before_dnn_before_lstm.cpu().detach().numpy()
@@ -1669,34 +1716,44 @@ def main():
     print("Mean residuals after DNN compensation after LSTM compensation:")
     print(np.mean(abs(residuals_after_dnn_after_lstm), axis=0))
 
-    dnn_compensation_data_dict_after_lstm = {"res_lambda_before_dnn_before_lstm": residuals_before_dnn_before_lstm[:, 0],
-                                                "res_mu_before_dnn_before_lstm": residuals_before_dnn_before_lstm[:, 1],
-                                                "res_cap_before_dnn_before_lstm": residuals_before_dnn_before_lstm[:, 2],
-                                                "res_lambda_before_dnn_after_lstm": residuals_before_dnn_after_lstm[:, 0],
-                                                "res_mu_before_dnn_after_lstm": residuals_before_dnn_after_lstm[:, 1],
-                                                "res_cap_before_dnn_after_lstm": residuals_before_dnn_after_lstm[:, 2],
-                                                "res_lambda_after_dnn_after_lstm": residuals_after_dnn_after_lstm[:, 0],
-                                                "res_mu_after_dnn_after_lstm": residuals_after_dnn_after_lstm[:, 1],
-                                                "res_cap_after_dnn_after_lstm": residuals_after_dnn_after_lstm[:, 2],
-                                                "pred_res_lambda_lstm": predicted_residuals_lstm[:, 0],
-                                                "pred_res_mu_lstm": predicted_residuals_lstm[:, 1],
-                                                "pred_res_cap_lstm": predicted_residuals_lstm[:, 2],
-                                                "pred_res_lambda_dnn_after_lstm": predicted_residuals_dnn_after_lstm[:, 0],
-                                                "pred_res_mu_dnn_after_lstm": predicted_residuals_dnn_after_lstm[:, 1],
-                                                "pred_res_cap_dnn_after_lstm": predicted_residuals_dnn_after_lstm[:, 2],
-                                                "pred_lambda_before_dnn_before_lstm": predictions_before_dnn_before_lstm[:, 0],
-                                                "pred_mu_before_dnn_before_lstm": predictions_before_dnn_before_lstm[:, 1],
-                                                "pred_cap_before_dnn_before_lstm": predictions_before_dnn_before_lstm[:, 2],
-                                                "pred_lambda_before_dnn_after_lstm": predictions_before_dnn_after_lstm[:, 0],
-                                                "pred_mu_before_dnn_after_lstm": predictions_before_dnn_after_lstm[:, 1],
-                                                "pred_cap_before_dnn_after_lstm": predictions_before_dnn_after_lstm[:, 2],
-                                                "pred_lambda_after_dnn_after_lstm": predictions_after_dnn_after_lstm[:, 0],
-                                                "pred_mu_after_dnn_after_lstm": predictions_after_dnn_after_lstm[:, 1],
-                                                "pred_cap_after_dnn_after_lstm": predictions_after_dnn_after_lstm[:, 2],
-                                                "lambda": y_original[:, 0],
-                                                "mu": y_original[:, 1],
-                                                "cap": y_original[:, 2],
-                                                "num_nodes": num_nodes_original}
+    dnn_compensation_data_dict_after_lstm = {
+        "res_lambda_before_dnn_before_lstm": residuals_before_dnn_before_lstm[:, 0],
+        "res_mu_before_dnn_before_lstm": residuals_before_dnn_before_lstm[:, 1],
+        "res_cap_before_dnn_before_lstm": residuals_before_dnn_before_lstm[:, 2],
+        "res_add_before_dnn_before_lstm": residuals_before_dnn_before_lstm[:, 3],
+        "res_lambda_before_dnn_after_lstm": residuals_before_dnn_after_lstm[:, 0],
+        "res_mu_before_dnn_after_lstm": residuals_before_dnn_after_lstm[:, 1],
+        "res_cap_before_dnn_after_lstm": residuals_before_dnn_after_lstm[:, 2],
+        "res_add_before_dnn_after_lstm": residuals_before_dnn_after_lstm[:, 3],
+        "res_lambda_after_dnn_after_lstm": residuals_after_dnn_after_lstm[:, 0],
+        "res_mu_after_dnn_after_lstm": residuals_after_dnn_after_lstm[:, 1],
+        "res_cap_after_dnn_after_lstm": residuals_after_dnn_after_lstm[:, 2],
+        "res_add_after_dnn_after_lstm": residuals_after_dnn_after_lstm[:, 3],
+        "pred_res_lambda_lstm": predicted_residuals_lstm[:, 0],
+        "pred_res_mu_lstm": predicted_residuals_lstm[:, 1],
+        "pred_res_cap_lstm": predicted_residuals_lstm[:, 2],
+        "pred_res_add_lstm": predicted_residuals_lstm[:, 3],
+        "pred_res_lambda_dnn_after_lstm": predicted_residuals_dnn_after_lstm[:, 0],
+        "pred_res_mu_dnn_after_lstm": predicted_residuals_dnn_after_lstm[:, 1],
+        "pred_res_cap_dnn_after_lstm": predicted_residuals_dnn_after_lstm[:, 2],
+        "pred_res_add_dnn_after_lstm": predicted_residuals_dnn_after_lstm[:, 3],
+        "pred_lambda_before_dnn_before_lstm": predictions_before_dnn_before_lstm[:, 0],
+        "pred_mu_before_dnn_before_lstm": predictions_before_dnn_before_lstm[:, 1],
+        "pred_cap_before_dnn_before_lstm": predictions_before_dnn_before_lstm[:, 2],
+        "pred_add_before_dnn_before_lstm": predictions_before_dnn_before_lstm[:, 3],
+        "pred_lambda_before_dnn_after_lstm": predictions_before_dnn_after_lstm[:, 0],
+        "pred_mu_before_dnn_after_lstm": predictions_before_dnn_after_lstm[:, 1],
+        "pred_cap_before_dnn_after_lstm": predictions_before_dnn_after_lstm[:, 2],
+        "pred_add_before_dnn_after_lstm": predictions_before_dnn_after_lstm[:, 3],
+        "pred_lambda_after_dnn_after_lstm": predictions_after_dnn_after_lstm[:, 0],
+        "pred_mu_after_dnn_after_lstm": predictions_after_dnn_after_lstm[:, 1],
+        "pred_cap_after_dnn_after_lstm": predictions_after_dnn_after_lstm[:, 2],
+        "pred_add_after_dnn_after_lstm": predictions_after_dnn_after_lstm[:, 3],
+        "lambda": y_original[:, 0],
+        "mu": y_original[:, 1],
+        "cap": y_original[:, 2],
+        "add": y_original[:, 3],
+        "num_nodes": num_nodes_original}
 
     dnn_compensation_data_df_after_lstm = pd.DataFrame(dnn_compensation_data_dict_after_lstm)
 
