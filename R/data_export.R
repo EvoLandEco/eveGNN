@@ -262,8 +262,12 @@ export_to_gnn_with_params_eve <- function(data, which = "tas", undirected = FALS
 export_to_gnn_with_params_pbd <- function(data, which = "tes", undirected = FALSE) {
   path <- file.path("GNN/tree/")
   path_EL <- file.path("GNN/tree/EL/")
+  path_ST <- file.path("GNN/tree/ST/")
+  path_BT <- file.path("GNN/tree/BT/")
   eve:::check_path(path)
   eve:::check_path(path_EL)
+  eve:::check_path(path_ST)
+  eve:::check_path(path_BT)
 
   if (which == "tas") {
     for (i in seq_along(data$tas)) {
@@ -286,6 +290,26 @@ export_to_gnn_with_params_pbd <- function(data, which = "tes", undirected = FALS
       file_name <- paste0(path_EL, "/EL_", la1, "_", la2, "_", la3, "_", mu1, "_", mu2, "_", age, "_", i, ".rds")
       saveRDS(tree_to_adj_mat(data$tas[[i]]), file = file_name)
     }
+    for (i in seq_along(data$tas)) {
+      la1 <- data$pars[[i]][1]
+      la2 <- data$pars[[i]][2]
+      la3 <- data$pars[[i]][3]
+      mu1 <- data$pars[[i]][4]
+      mu2 <- data$pars[[i]][5]
+      age <- data$age[[i]]
+      file_name <- paste0(path_ST, "/ST_", la1, "_", la2, "_", la3, "_", mu1, "_", mu2, "_", age, "_", i, ".rds")
+      saveRDS(tree_to_stats(data$tas[[i]]), file = file_name)
+    }
+    for (i in seq_along(data$tas)) {
+      la1 <- data$pars[[i]][1]
+      la2 <- data$pars[[i]][2]
+      la3 <- data$pars[[i]][3]
+      mu1 <- data$pars[[i]][4]
+      mu2 <- data$pars[[i]][5]
+      age <- data$age[[i]]
+      file_name <- paste0(path_BT, "/BT_", la1, "_", la2, "_", la3, "_", mu1, "_", mu2, "_", age, "_", i, ".rds")
+      saveRDS(tree_to_brts(data$tas[[i]]), file = file_name)
+    }
   } else if (which == "tes") {
     for (i in seq_along(data$tes)) {
       la1 <- data$pars[[i]][1]
@@ -306,6 +330,26 @@ export_to_gnn_with_params_pbd <- function(data, which = "tes", undirected = FALS
       age <- data$age[[i]]
       file_name <- paste0(path_EL, "/EL_", la1, "_", la2, "_", la3, "_", mu1, "_", mu2, "_", age, "_", i, ".rds")
       saveRDS(tree_to_adj_mat(data$tes[[i]]), file = file_name)
+    }
+    for (i in seq_along(data$tes)) {
+      la1 <- data$pars[[i]][1]
+      la2 <- data$pars[[i]][2]
+      la3 <- data$pars[[i]][3]
+      mu1 <- data$pars[[i]][4]
+      mu2 <- data$pars[[i]][5]
+      age <- data$age[[i]]
+      file_name <- paste0(path_ST, "/ST_", la1, "_", la2, "_", la3, "_", mu1, "_", mu2, "_", age, "_", i, ".rds")
+      saveRDS(tree_to_stats(data$tes[[i]]), file = file_name)
+    }
+    for (i in seq_along(data$tes)) {
+      la1 <- data$pars[[i]][1]
+      la2 <- data$pars[[i]][2]
+      la3 <- data$pars[[i]][3]
+      mu1 <- data$pars[[i]][4]
+      mu2 <- data$pars[[i]][5]
+      age <- data$age[[i]]
+      file_name <- paste0(path_BT, "/BT_", la1, "_", la2, "_", la3, "_", mu1, "_", mu2, "_", age, "_", i, ".rds")
+      saveRDS(tree_to_brts(data$tes[[i]]), file = file_name)
     }
   }
 }

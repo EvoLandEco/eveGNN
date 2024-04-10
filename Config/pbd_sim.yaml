@@ -2,7 +2,7 @@ dists:
   - distribution: uniform
     'n': 1
     min: 0.1
-    max: 0.8
+    max: 2.0
   - distribution: log10
     'n': 1
     min: 0.001
@@ -10,18 +10,19 @@ dists:
   - distribution: uniform
     'n': 1
     min: 0.1
-    max: 0.8
+    max: 2.0
+max_mu: 1.0
 within_ranges:
-  - - 0.18
-    - 0.72
-  - - 0.002
-    - 5
-  - - 0.18
-    - 0.72
-  - - 0.060
-    - 0.580
-  - - 0.060
-    - 0.580
+  - - 0.10
+    - 2.00
+  - - 0.001
+    - 10
+  - - 0.10
+    - 2.00
+  - - 0.0
+    - 1.0
+  - - 0.0
+    - 1.0
 nrep: 100000
 age: 10
 proportion: 0.05
