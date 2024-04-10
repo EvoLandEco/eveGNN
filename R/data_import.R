@@ -594,3 +594,46 @@ load_empirical_mle_result <- function(path) {
 
   return(out)
 }
+
+
+#' @export load_empirical_ott_mle_result
+load_empirical_ott_mle_result <- function(path) {
+  path_bd <- file.path(path, "EMP_RESULT","BD")
+  path_ddd <- file.path(path, "EMP_RESULT","DDD")
+  path_pbd <- file.path(path, "EMP_RESULT","PBD")
+
+  bd_file_list <- list.files(file.path(path_bd), pattern = "^BD_EMP_MLE_OTT_.*\\.rds$", full.names = TRUE)
+  ddd_file_list <- list.files(file.path(path_ddd), pattern = "^DDD_EMP_MLE_OTT_.*\\.rds$", full.names = TRUE)
+  pbd_file_list <- list.files(file.path(path_pbd), pattern = "^PBD_EMP_MLE_OTT_.*\\.rds$", full.names = TRUE)
+
+  bd_results <- list()
+  ddd_results <- list()
+  pbd_results <- list()
+
+  for (i in seq_len(length(bd_file_list))) {
+    bd_results[[i]] <- readRDS(bd_file_list[i])
+  }
+  for (i in seq_len(length(ddd_file_list))) {
+    base_name <- basename(ddd_file_list[i])
+    without_ext <- sub("\\.rds$", "", base_name)
+    index_str <- sub(".*_", "", without_ext)
+    index_num <- as.numeric(index_str)
+    ddd_results[[i]] <- readRDS(ddd_file_list[i])
+    ddd_results[[i]]$index <- index_num
+  }
+  for (i in seq_len(length(pbd_file_list))) {
+    pbd_results[[i]] <- readRDS(pbd_file_list[i])
+  }
+
+  bd_results <- dplyr::bind_rows(bd_results)
+  ddd_results <- dplyr::bind_rows(ddd_results)
+  pbd_results <- dplyr::bind_rows(pbd_results)
+
+  bd_results$Model <- "BD"
+  ddd_results$Model <- "DDD"
+  pbd_results$Model <- "PBD"
+
+  out <- list(BD = bd_results, DDD = ddd_results, PBD = pbd_results)
+
+  return(out)
+}
