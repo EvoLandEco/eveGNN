@@ -280,10 +280,11 @@ def read_rds_to_pytorch(path, count, normalize=False):
     # Normalize carrying capacity by dividing by a factor
     # Also create the additional target for the model, which is (lambda - mu) / K
     # This snippet is specific to the DDD dataset
-    for vector in params_list:
-        vector[2] = vector[2] / cap_norm_factor
-        vector = vector[0:3]  # Keep only the first three elements
-        vector.append(create_additional_target(vector))  # Append the additional target
+    for i, vector in enumerate(params_list):
+        vector[2] = vector[2] / cap_norm_factor  # Modify the third element in place
+        new_vector = vector[0:3]  # Create a new vector with the first three elements
+        new_vector.append(create_additional_target(new_vector))  # Append the additional target
+        params_list[i] = new_vector
 
     check_list_count(count, data_list, length_list, params_list, stats_list, brts_list)
 
@@ -835,7 +836,7 @@ def main():
         test_mean_diffs, test_diffs_all, test_predictions, test_y, test_nodes_all = test_diff_gnn(test_loader)
         test_mean_diffs[2] = test_mean_diffs[2] * cap_norm_factor
         print(
-            f'Epoch: {epoch:03d}, Par 1 Mean Diff: {test_mean_diffs[0]:.4f}, Par 2 Mean Diff: {test_mean_diffs[1]:.4f}, Par 3 Mean Diff: {test_mean_diffs[2]:.4f}, Par 3 Mean Diff: {test_mean_diffs[2]:.4f}, Par 4 Mean Diff: {test_mean_diffs[3]:.4f}, Train Loss: {train_loss_all:.4f}, Test Loss: {test_loss_all:.4f}')
+            f'Epoch: {epoch:03d}, Par 1 Mean Diff: {test_mean_diffs[0]:.4f}, Par 2 Mean Diff: {test_mean_diffs[1]:.4f}, Par 3 Mean Diff: {test_mean_diffs[2]:.4f}, Par 4 Mean Diff: {test_mean_diffs[3]:.4f}, Train Loss: {train_loss_all:.4f}, Test Loss: {test_loss_all:.4f}')
 
         # Record the values
         test_mean_diffs_history.append(test_mean_diffs)
@@ -1584,7 +1585,7 @@ def main():
 
     # Train DNN on the residuals from LSTM compensated GNN
     model_dnn_lstm = DNN(in_channels=num_stats, hidden_channels=dnn_hidden_channels,
-                         out_channels=dnn_output_channels, dnn_depth=dnn_depth).to(device)
+                         out_channels=dnn_output_channels).to(device)
     optimizer_dnn_lstm = torch.optim.AdamW(model_dnn_lstm.parameters(), lr=learning_rate)
 
     def train_dnn_lstm():
