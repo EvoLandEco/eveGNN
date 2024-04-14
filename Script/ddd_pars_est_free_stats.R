@@ -14,10 +14,10 @@ dists <- params$dists
 cap_range <- params$cap_range
 max_mu <- params$max_mu
 within_ranges <- params$within_ranges
-nrep <- 2000
+nrep <- 100000
 age <- params$age
 ddmodel <- params$ddmodel
-nworkers_sim <- params$nworkers_sim
+nworkers_sim <- 8
 
 future::plan("multicore", workers = nworkers_sim)
 
