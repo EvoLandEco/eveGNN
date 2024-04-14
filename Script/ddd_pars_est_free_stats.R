@@ -51,23 +51,3 @@ setwd("CORR")
 
 saveRDS(pars_cca, file = "pars.rds")
 saveRDS(stats_cca, file = "stats.rds")
-
-# Combine the parameters and stats data for correlation analysis
-combined_data <- dplyr::bind_cols(pars_cca, stats_cca)
-
-# Calculate correlations between parameters and stats
-cor_matrix <- cor(combined_data)
-
-# Extract correlations for parameters vs. stats
-param_names <- names(pars_cca)
-stats_names <- names(stats_cca)
-cor_params_stats <- cor_matrix[param_names, stats_names]
-
-# Calculate absolute values of correlations for heatmap
-abs_cor_params_stats <- abs(cor_params_stats)
-
-heatmap(abs_cor_params_stats, Rowv = NA, margins = c(9, 1))
-
-# Save the correlation matrix
-saveRDS(abs_cor_params_stats, file = "abs_cor_params_stats.rds")
-
