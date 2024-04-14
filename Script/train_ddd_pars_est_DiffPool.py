@@ -1539,7 +1539,7 @@ def main():
 
     # Train DNN on the residuals from LSTM compensated GNN
     model_dnn_lstm = DNN(in_channels=num_stats, hidden_channels=dnn_hidden_channels,
-                         out_channels=dnn_output_channels, dnn_depth=dnn_depth).to(device)
+                         out_channels=dnn_output_channels).to(device)
     optimizer_dnn_lstm = torch.optim.AdamW(model_dnn_lstm.parameters(), lr=learning_rate)
 
     def train_dnn_lstm():
