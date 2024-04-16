@@ -168,8 +168,12 @@ export_to_gnn_with_params <- function(data, which = "tas", undirected = FALSE, m
 export_to_gnn_with_params_bd <- function(data, which = "tas", undirected = FALSE) {
   path <- file.path("GNN/tree/")
   path_EL <- file.path("GNN/tree/EL/")
+  path_ST <- file.path("GNN/tree/ST/")
+  path_BT <- file.path("GNN/tree/BT/")
   eve:::check_path(path)
   eve:::check_path(path_EL)
+  eve:::check_path(path_ST)
+  eve:::check_path(path_BT)
 
   if (which == "tas") {
     for (i in seq_along(data$tas)) {
@@ -186,6 +190,20 @@ export_to_gnn_with_params_bd <- function(data, which = "tas", undirected = FALSE
       file_name <- paste0(path_EL, "/EL_", la, "_", mu, "_", age, "_", i, ".rds")
       saveRDS(tree_to_adj_mat(data$tas[[i]]), file = file_name)
     }
+    for (i in seq_along(data$tas)) {
+      la <- data$pars[[i]][1]
+      mu <- data$pars[[i]][2]
+      age <- data$age[[i]]
+      file_name <- paste0(path_ST, "/ST_", la, "_", mu, "_", age, "_", i, ".rds")
+      saveRDS(tree_to_stats(data$tas[[i]]), file = file_name)
+    }
+    for (i in seq_along(data$tas)) {
+      la <- data$pars[[i]][1]
+      mu <- data$pars[[i]][2]
+      age <- data$age[[i]]
+      file_name <- paste0(path_BT, "/BT_", la, "_", mu, "_", age, "_", i, ".rds")
+      saveRDS(tree_to_brts(data$tas[[i]]), file = file_name)
+    }
   } else if (which == "tes") {
     for (i in seq_along(data$tes)) {
       la <- data$pars[[i]][1]
@@ -200,6 +218,20 @@ export_to_gnn_with_params_bd <- function(data, which = "tas", undirected = FALSE
       age <- data$age[[i]]
       file_name <- paste0(path_EL, "/EL_", la, "_", mu, "_", age, "_", i, ".rds")
       saveRDS(tree_to_adj_mat(data$tes[[i]]), file = file_name)
+    }
+    for (i in seq_along(data$tes)) {
+      la <- data$pars[[i]][1]
+      mu <- data$pars[[i]][2]
+      age <- data$age[[i]]
+      file_name <- paste0(path_ST, "/ST_", la, "_", mu, "_", age, "_", i, ".rds")
+      saveRDS(tree_to_stats(data$tes[[i]]), file = file_name)
+    }
+    for (i in seq_along(data$tes)) {
+      la <- data$pars[[i]][1]
+      mu <- data$pars[[i]][2]
+      age <- data$age[[i]]
+      file_name <- paste0(path_BT, "/BT_", la, "_", mu, "_", age, "_", i, ".rds")
+      saveRDS(tree_to_brts(data$tes[[i]]), file = file_name)
     }
   }
 }

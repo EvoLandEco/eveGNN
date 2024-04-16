@@ -35,41 +35,41 @@ print("Exporting Training/Testing TES Data to GNN")
 
 eveGNN::export_to_gnn_with_params_bd(bd_list_all$within_range, "tes", undirected = FALSE)
 
-setwd("..")
-
-if (!dir.exists("BD_FREE_TAS")) {
-  dir.create("BD_FREE_TAS")
-}
-
-setwd("BD_FREE_TAS")
-
-print("Exporting Training/Testing TAS Data to GNN")
-
-eveGNN::export_to_gnn_with_params_bd(bd_list_all$within_range, "tas", undirected = FALSE)
-
-setwd("..")
-
-if (!dir.exists("BD_VAL_TES")) {
-  dir.create("BD_VAL_TES")
-}
-
-setwd("BD_VAL_TES")
-
-print("Exporting Validation TES Data to GNN")
-
-eveGNN::export_to_gnn_with_params_bd(bd_list_all$outside_range, "tes", undirected = FALSE)
-
-setwd("..")
-
-if (!dir.exists("BD_VAL_TAS")) {
-  dir.create("BD_VAL_TAS")
-}
-
-setwd("BD_VAL_TAS")
-
-print("Exporting Validation TAS Data to GNN")
-
-eveGNN::export_to_gnn_with_params_bd(bd_list_all$outside_range, "tas", undirected = FALSE)
+# setwd("..")
+#
+# if (!dir.exists("BD_FREE_TAS")) {
+#   dir.create("BD_FREE_TAS")
+# }
+#
+# setwd("BD_FREE_TAS")
+#
+# print("Exporting Training/Testing TAS Data to GNN")
+#
+# eveGNN::export_to_gnn_with_params_bd(bd_list_all$within_range, "tas", undirected = FALSE)
+#
+# setwd("..")
+#
+# if (!dir.exists("BD_VAL_TES")) {
+#   dir.create("BD_VAL_TES")
+# }
+#
+# setwd("BD_VAL_TES")
+#
+# print("Exporting Validation TES Data to GNN")
+#
+# eveGNN::export_to_gnn_with_params_bd(bd_list_all$outside_range, "tes", undirected = FALSE)
+#
+# setwd("..")
+#
+# if (!dir.exists("BD_VAL_TAS")) {
+#   dir.create("BD_VAL_TAS")
+# }
+#
+# setwd("BD_VAL_TAS")
+#
+# print("Exporting Validation TAS Data to GNN")
+#
+# eveGNN::export_to_gnn_with_params_bd(bd_list_all$outside_range, "tas", undirected = FALSE)
 
 setwd("..")
 
