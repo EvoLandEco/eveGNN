@@ -2,14 +2,14 @@ dists:
 - distribution: uniform
   'n': 1
   min: 0.1
-  max: 0.6
+  max: 0.8
 within_ranges:
 - - 0.10
-  - 0.60
+  - 0.80
 - - 0.00
-  - 0.54
+  - 0.72
 nrep: 100000
 age: 10
 proportion: 0.02
-nworkers_sim: 3
-nworkers_mle: 6
+nworkers_sim: 4
+nworkers_mle: 8

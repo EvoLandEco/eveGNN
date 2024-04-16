@@ -36,12 +36,18 @@ randomized_ddd_fixed_age <- function(dists, cap_range, max_mu, age, model) {
 
 #' @export randomized_bd_fixed_age
 randomized_bd_fixed_age <- function(dists, age) {
-  params <- generate_params(dists)
-  lambda <- params[[1]]
-  mu <- runif(1, min = 0, max = 0.9 * lambda)
-  tas <- ape::rlineage(birth = lambda, death = mu, Tmax = age)
-  tes <- ape::drop.fossil(tas)
+  ntip <- 0
   result <- list()
+
+  while (ntip < 10) {
+    params <- generate_params(dists)
+    lambda <- params[[1]]
+    mu <- runif(1, min = 0, max = 0.9 * lambda)
+    tas <- ape::rlineage(birth = lambda, death = mu, Tmax = age)
+    tes <- ape::drop.fossil(tas)
+    ntip <- tes$Nnode + 1
+  }
+
   result$tas <- tas
   result$tes <- tes
   result$brts <- treestats::branching_times(tes)
