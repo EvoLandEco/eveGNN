@@ -11,6 +11,9 @@ if (!dir.exists(name)) {
 setwd(name)
 
 dists <- params$dists
+max_mu1 <- params$max_mu1
+max_mu2 <- params$max_mu2
+max_mus <- c(max_mu1, max_mu2)
 within_ranges <- params$within_ranges
 nrep <- params$nrep
 age <- params$age
@@ -20,7 +23,7 @@ nworkers_mle <- params$nworkers_mle
 
 future::plan("multicore", workers = nworkers_sim)
 
-pbd_free_tes_list <- future.apply::future_replicate(nrep, eveGNN::randomized_pbd_fixed_age(dists, age = age), simplify = FALSE)
+pbd_free_tes_list <- future.apply::future_replicate(nrep, eveGNN::randomized_pbd_fixed_age(dists, max_mus = max_mus, age = age), simplify = FALSE)
 
 # Split list into training/testging data and validation (out-of-sample) data
 pbd_list_all <- eveGNN::extract_by_range(tree_list = pbd_free_tes_list, ranges = within_ranges)
