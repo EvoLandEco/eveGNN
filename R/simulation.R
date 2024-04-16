@@ -43,7 +43,22 @@ randomized_bd_fixed_age <- function(dists, age) {
     params <- generate_params(dists)
     lambda <- params[[1]]
     mu <- runif(1, min = 0, max = 0.9 * lambda)
-    tas <- ape::rlineage(birth = lambda, death = mu, Tmax = age)
+
+    # Initialize tas to NULL
+    tas <- NULL
+    error_occurred <- TRUE
+
+    # Retry until no error occurs
+    while (is.null(tas) || error_occurred) {
+      error_occurred <- FALSE
+      tas <- tryCatch({
+        ape::rlineage(birth = lambda, death = mu, Tmax = age)
+      }, error = function(e) {
+        error_occurred <- TRUE
+        NULL
+      })
+    }
+
     tes <- ape::drop.fossil(tas)
     ntip <- tes$Nnode + 1
   }
