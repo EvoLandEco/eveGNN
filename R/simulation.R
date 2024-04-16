@@ -79,13 +79,19 @@ bd_fixed_age <- function(lambda, mu, age) {
 
 #' @export randomized_pbd_fixed_age
 randomized_pbd_fixed_age <- function(dists, max_mus, age) {
-  params <- generate_params(dists)
-  b1 <- params[[1]]
-  la1 <- params[[2]]
-  b2 <- params[[3]]
-  mu1 <- runif(1, min = 0, max = min(max_mus[1], 0.8 * b1))
-  mu2 <- runif(1, min = 0, max = min(max_mus[2], 0.8 * b2))
-  result <- pbd_sim(pars = c(b1, la1, b2, mu1, mu2), age = age, soc = 2)
+  ntip <- 0
+  result <- list()
+
+  while (ntip < 10) {
+    params <- generate_params(dists)
+    b1 <- params[[1]]
+    la1 <- params[[2]]
+    b2 <- params[[3]]
+    mu1 <- runif(1, min = 0, max = min(max_mus[1], 0.8 * b1))
+    mu2 <- runif(1, min = 0, max = min(max_mus[2], 0.8 * b2))
+    result <- pbd_sim(pars = c(b1, la1, b2, mu1, mu2), age = age, soc = 2)
+    ntip <- result$tes$Nnode + 1
+  }
 
   return(result)
 }

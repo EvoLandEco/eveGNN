@@ -45,25 +45,45 @@ while (flag == TRUE) {
   for (i in 1:length(bd_free_tes_list)) {
     tree <- bd_free_tes_list[[i]]$tes
     n_nodes <- 2 * tree$Nnode + 1
-    if (n_nodes >= 10 && n_nodes < 200 && length(bd_list_bin_10_200) < bin_length) {
+    if (n_nodes >= 10 &&
+      n_nodes < 200 &&
+      length(bd_list_bin_10_200) < bin_length) {
       bd_list_bin_10_200[[length(bd_list_bin_10_200) + 1]] <- bd_free_tes_list[[i]]
-    } else if (n_nodes >= 200 && n_nodes < 400 && length(bd_list_bin_200_400) < bin_length) {
+    } else if (n_nodes >= 200 &&
+      n_nodes < 400 &&
+      length(bd_list_bin_200_400) < bin_length) {
       bd_list_bin_200_400[[length(bd_list_bin_200_400) + 1]] <- bd_free_tes_list[[i]]
-    } else if (n_nodes >= 400 && n_nodes < 600 && length(bd_list_bin_400_600) < bin_length) {
+    } else if (n_nodes >= 400 &&
+      n_nodes < 600 &&
+      length(bd_list_bin_400_600) < bin_length) {
       bd_list_bin_400_600[[length(bd_list_bin_400_600) + 1]] <- bd_free_tes_list[[i]]
-    } else if (n_nodes >= 600 && n_nodes < 800 && length(bd_list_bin_600_800) < bin_length) {
-     bd_list_bin_600_800[[length(bd_list_bin_600_800) + 1]] <- bd_free_tes_list[[i]]
-    } else if (n_nodes >= 800 && n_nodes < 1000 && length(bd_list_bin_800_1000) < bin_length) {
-    bd_list_bin_800_1000[[length(bd_list_bin_800_1000) + 1]] <- bd_free_tes_list[[i]]
-    } else if (n_nodes >= 1000 && n_nodes < 1200 && length(bd_list_bin_1000_1200) < bin_length) {
-    bd_list_bin_1000_1200[[length(bd_list_bin_1000_1200) + 1]] <- bd_free_tes_list[[i]]
-    } else if (n_nodes >= 1200 && n_nodes < 1400 && length(bd_list_bin_1200_1400) < bin_length) {
-     bd_list_bin_1200_1400[[length(bd_list_bin_1200_1400) + 1]] <- bd_free_tes_list[[i]]
-    } else if (n_nodes >= 1400 && n_nodes < 1600 && length(bd_list_bin_1400_1600) < bin_length) {
-    bd_list_bin_1400_1600[[length(bd_list_bin_1400_1600) + 1]] <- bd_free_tes_list[[i]]
-    } else if (n_nodes >= 1600 && n_nodes < 1800 && length(bd_list_bin_1600_1800) < bin_length) {
-   bd_list_bin_1600_1800[[length(bd_list_bin_1600_1800) + 1]] <- bd_free_tes_list[[i]]
-    } else if (n_nodes >= 1800 && n_nodes < 2000 && length(bd_list_bin_1800_2000) < bin_length) {
+    } else if (n_nodes >= 600 &&
+      n_nodes < 800 &&
+      length(bd_list_bin_600_800) < bin_length) {
+      bd_list_bin_600_800[[length(bd_list_bin_600_800) + 1]] <- bd_free_tes_list[[i]]
+    } else if (n_nodes >= 800 &&
+      n_nodes < 1000 &&
+      length(bd_list_bin_800_1000) < bin_length) {
+      bd_list_bin_800_1000[[length(bd_list_bin_800_1000) + 1]] <- bd_free_tes_list[[i]]
+    } else if (n_nodes >= 1000 &&
+      n_nodes < 1200 &&
+      length(bd_list_bin_1000_1200) < bin_length) {
+      bd_list_bin_1000_1200[[length(bd_list_bin_1000_1200) + 1]] <- bd_free_tes_list[[i]]
+    } else if (n_nodes >= 1200 &&
+      n_nodes < 1400 &&
+      length(bd_list_bin_1200_1400) < bin_length) {
+      bd_list_bin_1200_1400[[length(bd_list_bin_1200_1400) + 1]] <- bd_free_tes_list[[i]]
+    } else if (n_nodes >= 1400 &&
+      n_nodes < 1600 &&
+      length(bd_list_bin_1400_1600) < bin_length) {
+      bd_list_bin_1400_1600[[length(bd_list_bin_1400_1600) + 1]] <- bd_free_tes_list[[i]]
+    } else if (n_nodes >= 1600 &&
+      n_nodes < 1800 &&
+      length(bd_list_bin_1600_1800) < bin_length) {
+      bd_list_bin_1600_1800[[length(bd_list_bin_1600_1800) + 1]] <- bd_free_tes_list[[i]]
+    } else if (n_nodes >= 1800 &&
+      n_nodes < 2000 &&
+      length(bd_list_bin_1800_2000) < bin_length) {
       bd_list_bin_1800_2000[[length(bd_list_bin_1800_2000) + 1]] <- bd_free_tes_list[[i]]
     }
   }
@@ -80,7 +100,7 @@ while (flag == TRUE) {
     length(bd_list_bin_1600_1800) == bin_length &&
     length(bd_list_bin_1800_2000) == bin_length) {
     flag <- FALSE
-    }
+  }
 }
 
 # Combine all bins into a single list
