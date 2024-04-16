@@ -5,7 +5,7 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --job-name=gnn_bd_pars_free
 #SBATCH --output=logs/gnn_bd_pars_free-%j.log
-#SBATCH --mem=64GB
+#SBATCH --mem=128GB
 #SBATCH --partition=regular
 
 name=${1}
