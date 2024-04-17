@@ -410,8 +410,6 @@ main_menu() {
                                                 # Logic for Protracted Birth-Death Trees
                                                 echo "Submitting job for TES"
                                                 sbatch submit_pbd_pars_est_model_training.sh "$name" "PBD_FREE_TES"
-                                                echo "Submitting job for TAS"
-                                                sbatch submit_pbd_pars_est_model_training.sh "$name" "PBD_FREE_TAS"
                                             else
                                                 echo
                                                 echo -e "${Red}ERROR: ${NC}Missing configuration file for Protracted Birth-Death simple GNN model."
@@ -543,10 +541,10 @@ main_menu() {
                                                 for (( i=1; i<=max_gnn_depth; i++ )); do
                                                     echo "Submitting job for TES with GNN depth $i"
                                                     sbatch submit_pbd_pars_est_model_training_diffpool.sh "$name" "PBD_FREE_TES" "$i"
-                                                    sbatch submit_pbd_pars_est_model_training_diffpool_full.sh "$name" "PBD_FREE_TES" "$i"
-                                                    echo "Submitting job for TAS with GNN depth $i"
-                                                    sbatch submit_pbd_pars_est_model_training_diffpool.sh "$name" "PBD_FREE_TAS" "$i"
-                                                    sbatch submit_pbd_pars_est_model_training_diffpool_full.sh "$name" "PBD_FREE_TAS" "$i"
+                                                    #sbatch submit_pbd_pars_est_model_training_diffpool_full.sh "$name" "PBD_FREE_TES" "$i"
+                                                    #echo "Submitting job for TAS with GNN depth $i"
+                                                    #sbatch submit_pbd_pars_est_model_training_diffpool.sh "$name" "PBD_FREE_TAS" "$i"
+                                                    #sbatch submit_pbd_pars_est_model_training_diffpool_full.sh "$name" "PBD_FREE_TAS" "$i"
                                                 done
                                             else
                                                 echo
