@@ -34,6 +34,23 @@ randomized_ddd_fixed_age <- function(dists, cap_range, max_mu, age, model) {
 }
 
 
+#' @export fixed_ddd_fixed_age
+fixed_ddd_fixed_age <- function(params, age, model) {
+  ntip <- 0
+  result <- list()
+
+  while (ntip < 10) {
+    lambda <- params[[1]]
+    mu <- params[[2]]
+    cap <- params[[3]]
+    result <- dd_sim(c(lambda, mu, cap), age = age, ddmodel = model)
+    ntip <- result$tes$Nnode + 1
+  }
+
+  return(result)
+}
+
+
 #' @export randomized_bd_fixed_age
 randomized_bd_fixed_age <- function(dists, age) {
   ntip <- 0
