@@ -16,7 +16,7 @@ nworkers_sim <- 4
 # Create lists of lambda, mu, and cap values
 lambda_list <- c(1.0, 1.5, 2.0, 2.5, 3.0)
 mu_list <- c(0.2, 0.4, 0.6, 0.8)
-cap_list <- c(200, 400, 600, 700)
+cap_list <- c(200, 400, 600, 800)
 
 # Create all possible combinations of lambda, mu, and cap values
 param_list <- expand.grid(lambda = lambda_list, mu = mu_list, cap = cap_list)
