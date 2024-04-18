@@ -666,7 +666,7 @@ def main():
     # However, ToDense may create malformed data.y when the number of nodes is 3 (2 tips)
     shape_check(validation_dataset, max_nodes)
 
-    validation_loader = DenseDataLoader(validation_dataset, batch_size=1, shuffle=False)
+    validation_loader = DenseDataLoader(validation_dataset, batch_size=64, shuffle=False)
     print(f"Validation dataset length: {len(validation_loader.dataset)}")
 
     print(model_gnn)
