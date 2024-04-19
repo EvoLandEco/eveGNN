@@ -31,14 +31,24 @@ export_to_gnn <- function(data, name, which = "tas", undirected = FALSE) {
 export_to_gnn_empirical <- function(data, meta, path, undirected = FALSE) {
   path <- file.path(path, "GNN/tree/")
   path_EL <- file.path(path, "EL/")
+  path_ST <- file.path(path, "ST/")
+  path_BT <- file.path(path, "BT/")
   eve:::check_path(path)
   eve:::check_path(path_EL)
+  eve:::check_path(path_ST)
+  eve:::check_path(path_BT)
 
   file_name <- paste0(path, "/tree_", meta["Family"], "_", meta["Tree"], ".rds")
   saveRDS(tree_to_connectivity(data, undirected = undirected), file = file_name)
 
   file_name_el <- paste0(path_EL, "/EL_", meta["Family"], "_", meta["Tree"], ".rds")
   saveRDS(tree_to_adj_mat(data), file = file_name_el)
+
+  file_name_st <- paste0(path_ST, "/ST_", meta["Family"], "_", meta["Tree"], ".rds")
+  saveRDS(tree_to_stats(data), file = file_name_st)
+
+  file_name_bt <- paste0(path_BT, "/BT_", meta["Family"], "_", meta["Tree"], ".rds")
+  saveRDS(tree_to_brts(data), file = file_name_bt)
 }
 
 
