@@ -11,6 +11,13 @@ load("EMP_DATA/FamilyCrocoTurtleTrees.Rdata")
 load("EMP_DATA/FamilyMammalTrees.Rdata")
 load("EMP_DATA/FamilySquamateTrees.Rdata")
 
+load("D:\\Data\\Empirical Trees\\Condamine2019\\FamilyAmphibiaTrees.Rdata")
+load("D:\\Data\\Empirical Trees\\Condamine2019\\FamilyBirdTrees.Rdata")
+load("D:\\Data\\Empirical Trees\\Condamine2019\\FamilyCrocoTurtleTrees.Rdata")
+load("D:\\Data\\Empirical Trees\\Condamine2019\\FamilyMammalTrees.Rdata")
+load("D:\\Data\\Empirical Trees\\Condamine2019\\FamilySquamateTrees.Rdata")
+
+
 condamine_tree_list <- list(Amphibia = FamilyAmphibiaTrees,
                             Bird = FamilyBirdTrees,
                             CrocoTurtle = FamilyCrocoTurtleTrees,
@@ -40,6 +47,7 @@ for (i in 1:length(family_list)) {
     tree <- condamine_tree_list[[family_name]][[tree_name]]$tree
     tree <- eveGNN::rescale_crown_age(tree, 10)
     tree_brts <- treestats::branching_times(tree)
+    tree_brts <- sort(tree_brts, decreasing = TRUE)
     file_name <- paste0("tree_brts_", family_name, "_", tree_name, ".rds")
     saveRDS(tree_brts, file_name)
     system(paste0("sbatch ../../../../Bash/submit_ddd_emp_mle.sh ", paste0(file_name, " ", family_name, " ", tree_name)))
@@ -63,6 +71,7 @@ for (i in 1:length(family_list)) {
     tree <- condamine_tree_list[[family_name]][[tree_name]]$tree
     tree <- eveGNN::rescale_crown_age(tree, 10)
     tree_brts <- treestats::branching_times(tree)
+    tree_brts <- sort(tree_brts, decreasing = TRUE)
     ml <- DDD::bd_ML(
       brts = tree_brts,
       idparsopt = c(1, 2),
@@ -100,6 +109,7 @@ for (i in 1:length(family_list)) {
     tree <- condamine_tree_list[[family_name]][[tree_name]]$tree
     tree <- eveGNN::rescale_crown_age(tree, 10)
     tree_brts <- treestats::branching_times(tree)
+    tree_brts <- sort(tree_brts, decreasing = TRUE)
     ml <- PBD::pbd_ML(
       brts = tree_brts,
       initparsopt = c(0.2, 0.1, 1, 0.1),

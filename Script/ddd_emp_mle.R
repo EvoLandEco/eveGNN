@@ -15,7 +15,8 @@ ml <- DDD::dd_ML(
   soc = 2,
   cond = 1,
   ddmodel = 1,
-  num_cycles = 1
+  num_cycles = Inf,
+  optimmethod = 'simplex'
 )
 
 df_ddd_results <- data.frame(Family = family_name,
