@@ -11,13 +11,6 @@ load("EMP_DATA/FamilyCrocoTurtleTrees.Rdata")
 load("EMP_DATA/FamilyMammalTrees.Rdata")
 load("EMP_DATA/FamilySquamateTrees.Rdata")
 
-load("D:\\Data\\Empirical Trees\\Condamine2019\\FamilyAmphibiaTrees.Rdata")
-load("D:\\Data\\Empirical Trees\\Condamine2019\\FamilyBirdTrees.Rdata")
-load("D:\\Data\\Empirical Trees\\Condamine2019\\FamilyCrocoTurtleTrees.Rdata")
-load("D:\\Data\\Empirical Trees\\Condamine2019\\FamilyMammalTrees.Rdata")
-load("D:\\Data\\Empirical Trees\\Condamine2019\\FamilySquamateTrees.Rdata")
-
-
 condamine_tree_list <- list(Amphibia = FamilyAmphibiaTrees,
                             Bird = FamilyBirdTrees,
                             CrocoTurtle = FamilyCrocoTurtleTrees,
