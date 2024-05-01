@@ -617,8 +617,8 @@ def main():
 
     # Convert the dictionary to a pandas DataFrame
     final_y = pd.DataFrame(final_y, columns=["lambda", "mu", "cap"])
-    final_predictions_dnn["num_nodes"] = final_nodes
     final_predictions_dnn = pd.DataFrame(final_predictions_dnn, columns=["lambda_pred_dnn", "mu_pred_dnn", "cap_pred_dnn"])
+    final_predictions_dnn["num_nodes"] = final_nodes
     final_predictions_lstm = pd.DataFrame(final_predictions_lstm, columns=["lambda_pred_lstm", "mu_pred_lstm", "cap_pred_lstm"])
     # Combine the dataframes except for model_performance
     final_data = pd.concat([final_y, final_predictions_dnn, final_predictions_lstm], axis=1)
