@@ -20,7 +20,7 @@ tryCatch(
       cond = 1,
       ddmodel = 1,
       num_cycles = Inf,
-      optimmethod = 'simplex'
+      optimmethod = 'DEoptim'
     )
     # If an error occurred, ml will be NA and we return NA right away.
     if (length(ml) == 1 && is.na(ml)) {
@@ -60,7 +60,7 @@ tryCatch(
       soc = 2,
       cond = 1,
       ddmodel = 1,
-      optimmethod = 'simplex'
+      optimmethod = 'DEoptim'
     )
     # If an error occurred, ml will be NA and we return NA right away.
     if (length(ml) == 1 && is.na(ml)) {
