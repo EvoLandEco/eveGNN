@@ -409,28 +409,28 @@ def main():
     val_rds_count = check_rds_files_count(full_val_dir_tree, full_val_dir_el, full_val_dir_st, full_val_dir_bt)
     print(f'There are: {val_rds_count} trees in the validation folder.')
     print(f"Now reading validation data...")
-    current_val_dataset = read_rds_to_pytorch(val_dir, val_rds_count, normalize_edge_length)
-    validation_dataset_list.append(current_val_dataset)
+    #current_val_dataset = read_rds_to_pytorch(val_dir, val_rds_count, normalize_edge_length)
+    #validation_dataset_list.append(current_val_dataset)
 
     sum_training_data = functools.reduce(lambda x, y: x + y, training_dataset_list)
     sum_testing_data = functools.reduce(lambda x, y: x + y, testing_dataset_list)
-    sum_validation_data = functools.reduce(lambda x, y: x + y, validation_dataset_list)
+    #sum_validation_data = functools.reduce(lambda x, y: x + y, validation_dataset_list)
 
     # Filtering out trees with only 3 nodes
     # They might cause problems with ToDense
     filtered_training_data = [data for data in sum_training_data if data.edge_index.shape != torch.Size([2, 2])]
     filtered_testing_data = [data for data in sum_testing_data if data.edge_index.shape != torch.Size([2, 2])]
-    filtered_validation_data = [data for data in sum_validation_data if data.edge_index.shape != torch.Size([2, 2])]
+    #filtered_validation_data = [data for data in sum_validation_data if data.edge_index.shape != torch.Size([2, 2])]
 
     # Filtering out trees with more than 3000 nodes
     filtered_training_data = [data for data in filtered_training_data if data.num_nodes <= max_nodes_limit]
     filtered_testing_data = [data for data in filtered_testing_data if data.num_nodes <= max_nodes_limit]
-    filtered_validation_data = [data for data in filtered_validation_data if data.num_nodes <= max_nodes_limit]
+    #filtered_validation_data = [data for data in filtered_validation_data if data.num_nodes <= max_nodes_limit]
 
     # For BD trees, there might be possibility that they only have one edge. Should filter them out.
     filtered_training_data = [data for data in filtered_training_data if data.edge_index.shape != torch.Size([2, 1])]
     filtered_testing_data = [data for data in filtered_testing_data if data.edge_index.shape != torch.Size([2, 1])]
-    filtered_validation_data = [data for data in filtered_validation_data if data.edge_index.shape != torch.Size([2, 1])]
+    #filtered_validation_data = [data for data in filtered_validation_data if data.edge_index.shape != torch.Size([2, 1])]
 
     # Get the maximum number of nodes, for padding the matrices of the graphs
     max_nodes_train = max([data.num_nodes for data in filtered_training_data])
@@ -439,10 +439,6 @@ def main():
     # Get the maximum number of nodes in the validation set
     # Check if the validation set is empty
     max_nodes_val = 0
-    if len(filtered_validation_data) == 0:
-        max_nodes_val = 0
-    else:
-        max_nodes_val = max([data.num_nodes for data in filtered_validation_data])
     max_nodes = max(max_nodes_train, max_nodes_test, max_nodes_val)
     print(f"Max nodes: {max_nodes} for {task_type}")
 
@@ -453,10 +449,6 @@ def main():
     # Get the maximum length of brts sequences in the validation set
     # Check if the validation set is empty
     max_brts_len_val = 0
-    if len(filtered_validation_data) == 0:
-        max_brts_len_val = 0
-    else:
-        max_brts_len_val = max([len(data.brts) for data in filtered_validation_data])
     max_brts_len = max(max_brts_len_train, max_brts_len_test, max_brts_len_val)
     print(f"Max brts length: {max_brts_len} for {task_type}")
 
