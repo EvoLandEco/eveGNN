@@ -881,6 +881,7 @@ def main():
     stats_train = torch.tensor([], dtype=torch.float, device=device)
     brts_train = torch.tensor([], dtype=torch.float, device=device)
     with torch.no_grad():
+        model_gnn.eval()
         for data in train_loader:
             data.to(device)
             predictions, _, _ = model_gnn(data.x, data.adj, data.mask)
@@ -903,6 +904,7 @@ def main():
     stats_test = torch.tensor([], dtype=torch.float, device=device)
     brts_test = torch.tensor([], dtype=torch.float, device=device)
     with torch.no_grad():
+        model_gnn.eval()
         for data in test_loader:
             data.to(device)
             predictions, _, _ = model_gnn(data.x, data.adj, data.mask)
@@ -1000,6 +1002,8 @@ def main():
     num_nodes_original = torch.tensor([], dtype=torch.long, device=device)
 
     with torch.no_grad():
+        model_gnn.eval()
+        model_dnn.eval()
         for data in test_loader:
             data.to(device)
             predictions, _, _ = model_gnn(data.x, data.adj, data.mask)
@@ -1155,6 +1159,8 @@ def main():
     num_nodes_original = torch.tensor([], dtype=torch.long, device=device)
 
     with torch.no_grad():
+        model_gnn.eval()
+        model_lstm.eval()
         for data in test_loader:
             data.to(device)
             predictions, _, _ = model_gnn(data.x, data.adj, data.mask)
@@ -1223,6 +1229,8 @@ def main():
     stats_train_dnn_lstm = torch.tensor([], dtype=torch.float, device=device)
     brts_train_dnn_lstm = torch.tensor([], dtype=torch.float, device=device)
     with torch.no_grad():
+        model_gnn.eval()
+        model_dnn.eval()
         for data in train_loader:
             data.to(device)
             predictions, _, _ = model_gnn(data.x, data.adj, data.mask)
@@ -1247,6 +1255,8 @@ def main():
     stats_test_dnn_lstm = torch.tensor([], dtype=torch.float, device=device)
     brts_test_dnn_lstm = torch.tensor([], dtype=torch.float, device=device)
     with torch.no_grad():
+        model_gnn.eval()
+        model_dnn.eval()
         for data in test_loader:
             data.to(device)
             predictions, _, _ = model_gnn(data.x, data.adj, data.mask)
@@ -1363,6 +1373,9 @@ def main():
     num_nodes_original = torch.tensor([], dtype=torch.long, device=device)
 
     with torch.no_grad():
+        model_gnn.eval()
+        model_dnn.eval()
+        model_lstm_dnn.eval()
         for data in test_loader:
             data.to(device)
             predictions, _, _ = model_gnn(data.x, data.adj, data.mask)
@@ -1381,7 +1394,7 @@ def main():
             brts_cpu = brts_cpu.unsqueeze(-1)
             packed_brts = pack_padded_sequence(brts_cpu, lengths_brts, batch_first=True, enforce_sorted=False).to(
                 device)
-            residuals_lstm = model_lstm(packed_brts)
+            residuals_lstm = model_lstm_dnn(packed_brts)
             predicted_residuals_lstm_after_dnn = torch.cat((predicted_residuals_lstm_after_dnn, residuals_lstm), dim=0)
             residuals_after_lstm = residuals_after_dnn - residuals_lstm
             residuals_after_lstm_after_dnn = torch.cat((residuals_after_lstm_after_dnn, residuals_after_lstm), dim=0)
@@ -1450,6 +1463,8 @@ def main():
     stats_train_lstm_dnn = torch.tensor([], dtype=torch.float, device=device)
     brts_train_lstm_dnn = torch.tensor([], dtype=torch.float, device=device)
     with torch.no_grad():
+        model_gnn.eval()
+        model_lstm.eval()
         for data in train_loader:
             data.to(device)
             predictions, _, _ = model_gnn(data.x, data.adj, data.mask)
@@ -1480,6 +1495,8 @@ def main():
     stats_test_lstm_dnn = torch.tensor([], dtype=torch.float, device=device)
     brts_test_lstm_dnn = torch.tensor([], dtype=torch.float, device=device)
     with torch.no_grad():
+        model_gnn.eval()
+        model_lstm.eval()
         for data in test_loader:
             data.to(device)
             predictions, _, _ = model_gnn(data.x, data.adj, data.mask)
@@ -1593,6 +1610,9 @@ def main():
     num_nodes_original = torch.tensor([], dtype=torch.long, device=device)
 
     with torch.no_grad():
+        model_gnn.eval()
+        model_lstm.eval()
+        model_dnn_lstm.eval()
         for data in test_loader:
             data.to(device)
             predictions, _, _ = model_gnn(data.x, data.adj, data.mask)
