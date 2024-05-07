@@ -4,8 +4,8 @@ eveGNN contains functions and scripts to apply Neural Network approaches on phyl
 ## Dependency
 - Optuna >= 3.4.0
 - R >= 4.2.1
-- Python = 3.8.16
-- PyTorch Geometric = 2.4.0
+- Python >= 3.8.16
+- PyTorch Geometric >= 2.4.0
 - eveGNN (in R, run `devtools::install_github("EvoLandEco/eveGNN")`)
 
 ## How to use
