@@ -1,5 +1,5 @@
 # eveGNN
-eveGNN contains functions and scripts to apply Graph Neural Network approaches on phylogenetic trees, for evolutionary analyses like tree classification, node classification and tree parameter estimation.
+eveGNN contains functions and scripts to apply Neural Network approaches on phylogenetic trees, for tree-level parameter estimation.
 
 ## Dependency
 - Optuna >= 3.4.0
