@@ -18,7 +18,7 @@ lin_layer2_hidden_channels: 32
 lstm_depth: 5
 lstm_hidden_channels: 64
 lstm_output_channels: 32
-max_gnn_depth: 2
+max_gnn_depth: 3
 max_nodes_limit: 2500
 n_predicted_values: 2
 normalize_edge_length: False
