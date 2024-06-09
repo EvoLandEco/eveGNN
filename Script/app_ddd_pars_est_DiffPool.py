@@ -1,22 +1,18 @@
 import sys
 import os
 import pandas as pd
-import numpy as np
 import pyreadr
 import torch
 import glob
-import functools
-import random
 import torch_geometric.transforms as T
 import torch.nn.functional as F
 import yaml
 from math import ceil
-from torch.utils.data import TensorDataset, DataLoader
 from torch_geometric.data import InMemoryDataset, Data
 from torch_geometric.loader import DenseDataLoader
-from torch_geometric.nn import DenseGCNConv as GCNConv, dense_diff_pool
+from torch_geometric.nn import dense_diff_pool
 from torch_geometric.nn import DenseSAGEConv as SAGEConv
-from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence, pad_sequence, pack_sequence
+from torch.nn.utils.rnn import pack_padded_sequence
 
 # Load the global parameters from the config file
 global_params = None
@@ -108,21 +104,15 @@ def list_subdirectories(path):
 
 
 def get_params_string(filename):
-    # Remove the file extension and then get the index part
-    params = filename.rsplit('.', 1)[0].split('_')[-1]  # Split on last period to remove extension, then get the last element
-    return params
+    # Function to extract parameters from the filename
+    params = filename.split('_')[1:-1]  # Exclude the first and last elements
+    return "_".join(params)
 
 
 def get_params(filename):
-    # Extract the numeric index, assuming it can be converted directly to float
-    index = float(filename.rsplit('.', 1)[0].split('_')[-1])  # Convert the index directly to float
-    return [index]  # Return as a list if needed
-
-
-def get_sort_key(filename):
-    # Extract the numeric index as a float and return it as a tuple for sorting
-    index = float(filename.rsplit('.', 1)[0].split('_')[-1])
-    return (index,)  # Return as a tuple
+    name, _ = filename.rsplit('.', 1)  # Split at the last dot to separate the extension
+    params = name.split('_')[1:]
+    return params
 
 
 def check_params_consistency(params_tree_list, params_el_list, params_st_list, params_bt_list):
@@ -138,11 +128,6 @@ def check_params_consistency(params_tree_list, params_el_list, params_st_list, p
     return is_consistent
 
 
-def sort_files(files):
-    # Sort the files based on the parameters extracted by the get_sort_key function
-    return sorted(files, key=get_sort_key)
-
-
 def check_file_consistency(files_tree, files_el, files_st, files_bt):
     # Check if the four lists have the same length
     if not (len(files_tree) == len(files_el) == len(files_st) == len(files_bt)):
@@ -150,14 +135,8 @@ def check_file_consistency(files_tree, files_el, files_st, files_bt):
 
     # Define a function to extract parameters from filename
     def get_params_tuple(filename):
-        index_str = filename.rsplit('.', 1)[0].split('_')[-1]
-        try:
-            # Attempt to convert the index to float
-            index = float(index_str)
-        except ValueError:
-            # Handle the case where conversion is not possible
-            raise ValueError(f"Could not convert {index_str} to float in filename: {filename}")
-        return (index,)
+        # Extract the parameters as strings, not floats
+        return tuple(filename.split('_')[1:-1])
 
     # Check each quartet of files for matching parameters
     for tree_file, el_file, st_file, bt_file in zip(files_tree, files_el, files_st, files_bt):
@@ -212,12 +191,6 @@ def read_rds_to_pytorch(path, count, normalize=False):
     files_bt = [f for f in os.listdir(os.path.join(path, 'GNN', 'tree', 'BT'))
                 if f.startswith('BT_') and f.endswith('.rds')]  # Get the list of files in the new BT directory
 
-    # Sort the files based on the parameters
-    files_tree = sort_files(files_tree)
-    files_el = sort_files(files_el)
-    files_st = sort_files(files_st)
-    files_bt = sort_files(files_bt)  # Sort the files in the new BT directory
-
     # Check if the files are consistent
     check_file_consistency(files_tree, files_el, files_st, files_bt)
 
@@ -271,10 +244,8 @@ def read_rds_to_pytorch(path, count, normalize=False):
     params_list = []
 
     for filename in files_tree:
-        index = get_params(filename)
-        # convert index to int
-        index = int(index[0])
-        params_list.append(index)
+        params = get_params(filename)
+        params_list.append(params)
 
     check_list_count(count, data_list, length_list, params_list, stats_list, brts_list)
 
@@ -295,8 +266,6 @@ def read_rds_to_pytorch(path, count, normalize=False):
 
         params_current = params_list[i]
 
-        params_current_tensor = torch.tensor(params_current, dtype=torch.float)
-
         stats_tensor = torch.tensor(stats_list[i].values, dtype=torch.float)
 
         stats_tensor = stats_tensor.squeeze(1)  # Remove the extra dimension
@@ -311,27 +280,22 @@ def read_rds_to_pytorch(path, count, normalize=False):
         data = Data(x=edge_length_tensor,
                     edge_index=edge_index_tensor,
                     num_nodes=num_nodes,
-                    y=params_current_tensor,
                     stats=stats_tensor,
                     brts=brts_tensor,
-                    brts_len=brts_length)
+                    brts_len=brts_length,
+                    family=params_current[0],
+                    tree=params_current[1])
 
         # Append the Data object to the list
         pytorch_geometric_data_list.append(data)
 
-    return pytorch_geometric_data_list
+    # Exclude data with stat or brts == 0, as they are not ultrametric or binary trees
+    filtered_data_list = [
+        data for data in pytorch_geometric_data_list
+        if data.stats.shape != torch.Size([1])
+    ]
 
-
-def export_to_rds(embeddings, epoch, name, task_type, which_set):
-    # Convert to DataFrame
-    df = pd.DataFrame(embeddings, columns=[f"dim_{i}" for i in range(embeddings.shape[1])])
-
-    # Export to RDS
-    rds_path = os.path.join(name, task_type, "umap")
-    if not os.path.exists(rds_path):
-        os.makedirs(rds_path)
-    rds_filename = os.path.join(rds_path, f'{which_set}_umap_epoch_{epoch}.rds')
-    pyreadr.write_rds(rds_filename, df)
+    return filtered_data_list
 
 
 def main():
@@ -566,12 +530,18 @@ def main():
     predictions_before_lstm = torch.tensor([], dtype=torch.float, device=device)
     predictions_after_lstm = torch.tensor([], dtype=torch.float, device=device)
     num_nodes_original = torch.tensor([], dtype=torch.long, device=device)
+    family_name = []
+    tree_name = []
 
     with torch.no_grad():
+        model_gnn.eval()
+        model_lstm.eval()
         for data in emp_loader:
             data.to(device)
             predictions, _, _ = model_gnn(data.x, data.adj, data.mask)
             num_nodes_original = torch.cat((num_nodes_original, data.num_nodes), dim=0)
+            family_name.append(data.family)
+            tree_name.append(data.tree)
             predictions_before_lstm = torch.cat((predictions_before_lstm, predictions), dim=0)
             lengths_brts = torch.sum(data.brts != 0, dim=1).cpu().tolist()
             brts_cpu = data.brts.cpu()
@@ -592,7 +562,8 @@ def main():
                        "pred_lambda_after": predictions_after_lstm[:, 0],
                        "pred_mu_after": predictions_after_lstm[:, 1],
                        "pred_cap_after": predictions_after_lstm[:, 2],
-                        "index": y_original.squeeze(),
+                        "family": family_name,
+                        "tree": tree_name,
                        "num_nodes": num_nodes_original}
 
     emp_data_df = pd.DataFrame(emp_data_dict)
@@ -600,7 +571,7 @@ def main():
     # Workaround to get rid of the dtype incompatible issue
     emp_data_df = emp_data_df.astype(object)
 
-    pyreadr.write_rds(os.path.join(name, "EMP_DATA", f"empirical_gnn_{depth}_lstm_result.rds"),
+    pyreadr.write_rds(os.path.join(name, "EMP_DATA", f"ddd_empirical_gnn_{depth}_lstm_result.rds"),
                       emp_data_df)
 
 

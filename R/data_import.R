@@ -468,10 +468,13 @@ load_full_mle_result <- function(path, task_type, model_type, no_init = FALSE) {
 
   out <- list()
   for (i in seq_len(length(mle_results))) {
+    a_diffs <- mle_results[[i]]$true - mle_results[[i]]$mle
     r_diffs <- (mle_results[[i]]$true - mle_results[[i]]$mle) / mle_results[[i]]$true * 100
     out[[i]] <- list(
       lambda = mle_results[[i]]$true[1],
       mu = mle_results[[i]]$true[2],
+      lambda_a_diff = a_diffs[1],
+      mu_a_diff = a_diffs[2],
       lambda_r_diff = r_diffs[1],
       mu_r_diff = r_diffs[2],
       num_nodes = mle_results[[i]]$nnode
@@ -530,6 +533,11 @@ load_separated_mle_result <- function(path, task_type, model_type, no_init = FAL
         lambda3 = mle_results[[i]]$true[3],
         mu1 = mle_results[[i]]$true[4],
         mu2 = mle_results[[i]]$true[5],
+        lambda1_pred = mle_results[[i]]$mle[1],
+        lambda2_pred = mle_results[[i]]$mle[2],
+        lambda3_pred = mle_results[[i]]$mle[3],
+        mu1_pred = mle_results[[i]]$mle[4],
+        mu2_pred = mle_results[[i]]$mle[5],
         lambda1_r_diff = r_diffs[1],
         lambda2_r_diff = r_diffs[2],
         lambda3_r_diff = r_diffs[3],
