@@ -6,7 +6,7 @@ dnn_hidden_channels: 64
 dnn_output_channels: 32
 dropout_ratio: 0.5
 epoch_number_gnn: 41
-epoch_number_dnn: 150
+epoch_number_dnn: 100
 epoch_number_lstm: 100
 gcn_layer1_hidden_channels: 256
 gcn_layer2_hidden_channels: 128
