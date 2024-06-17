@@ -291,7 +291,13 @@ def read_rds_to_pytorch(path, count, normalize=False):
 
         params_current = params_list[i]
 
-        params_current_tensor = torch.tensor(params_current[0:n_predicted_values], dtype=torch.float)
+        # Compute (lambda - mu) / K based on the parameters
+        cap_effect_strength = (params_current[0] - params_current[1]) / params_current[2]
+
+        # Append the computed value to the parameters list
+        params_current.append(cap_effect_strength)
+
+        params_current_tensor = torch.tensor(params_current[0:(n_predicted_values)], dtype=torch.float)
 
         stats_tensor = torch.tensor(stats_list[i].values, dtype=torch.float)
 
