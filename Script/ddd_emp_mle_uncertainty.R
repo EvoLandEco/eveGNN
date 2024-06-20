@@ -11,7 +11,7 @@ dir.create("MLE_UNCERTAINTY", showWarnings = FALSE)
 
 setwd("MLE_UNCERTAINTY")
 
-sim <- DDD:dd_sim(c(lambda, mu, cap), age = 10, ddmodel = 1)
+sim <- DDD::dd_sim(c(lambda, mu, cap), age = 10, ddmodel = 1)
 
 brts <- sim$brts
 
