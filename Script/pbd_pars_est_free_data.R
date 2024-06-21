@@ -23,7 +23,7 @@ nworkers_mle <- params$nworkers_mle
 
 future::plan("multicore", workers = nworkers_sim)
 
-pbd_free_tes_list <- future.apply::future_replicate(nrep, eveGNN::randomized_pbd_fixed_age(dists, age = age), simplify = FALSE)
+pbd_free_tes_list <- future.apply::future_replicate(nrep, eveGNN::randomized_pbd_fixed_age(dists, max_mus = max_mus, age = age), simplify = FALSE)
 
 # Split list into training/testging data and validation (out-of-sample) data
 pbd_list_all <- eveGNN::extract_by_range(tree_list = pbd_free_tes_list, ranges = within_ranges)

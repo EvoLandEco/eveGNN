@@ -12,4 +12,4 @@ nrep: 100000
 age: 10
 proportion: 0.02
 nworkers_sim: 4
-nworkers_mle: 8
+nworkers_mle: 6

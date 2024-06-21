@@ -1,11 +1,11 @@
 #!/bin/bash
-#SBATCH --time=3-23:59:00
+#SBATCH --time=1-23:59:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=8
+#SBATCH --cpus-per-task=6
 #SBATCH --job-name=gnn_bd_pars_free
 #SBATCH --output=logs/gnn_bd_pars_free-%j.log
-#SBATCH --mem=128GB
+#SBATCH --mem=48GB
 #SBATCH --partition=regular
 
 name=${1}
