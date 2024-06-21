@@ -74,6 +74,12 @@ randomized_bd_fixed_age <- function(dists, age) {
         error_occurred <- TRUE
         NULL
       })
+      tryCatch({
+        ape::drop.fossil(tas)
+      }, error = function(e) {
+        error_occurred <- TRUE
+        NULL
+      })
     }
 
     tes <- ape::drop.fossil(tas)
