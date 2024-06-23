@@ -1646,7 +1646,7 @@ def main():
 
     print("Now training DNN model after LSTM compensation...")
 
-    for epoch in range(1, epoch_number_dnn):
+    for epoch in range(1, 2):
         actual_epoch_dnn_after_lstm = epoch
         train_loss = train_dnn_lstm()
         test_loss = test_dnn_lstm()
