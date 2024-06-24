@@ -11,4 +11,4 @@
 name=${1}
 
 ml R
-Rscript ../Script/bd_pars_est_free_data_rebalacned.R ${name}
+Rscript ../Script/bd_pars_est_free_data_rebalanced.R ${name}
