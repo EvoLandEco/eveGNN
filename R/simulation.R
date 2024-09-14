@@ -137,8 +137,6 @@ randomized_pbd_fixed_age <- function(dists, max_mus, age) {
 
 #' @export randomized_eve_fixed_age
 randomized_eve_fixed_age <- function(dists, age, metric, offset) {
-  ntip <- 0
-  pars_list <- NULL
   result <- list()
 
   params <- generate_params(dists)
@@ -150,6 +148,8 @@ randomized_eve_fixed_age <- function(dists, age, metric, offset) {
   gamma_phi <- params[[5]]
 
   pars_list <- c(lambda, mu, beta_n, beta_phi, gamma_n, gamma_phi)
+  print(pars_list)
+  evesim::edd_sim
   raw_result <- evesim::edd_sim(pars = pars_list,
                          age = age,
                          metric = metric,
@@ -157,13 +157,10 @@ randomized_eve_fixed_age <- function(dists, age, metric, offset) {
                          size_limit = 2000)
 
   if (is.null(raw_result$sim)) {
-    ntip <- 0
     result[["tes"]] <- NULL
   } else {
     result[["tes"]] <- evesim::SimTable.phylo(raw_result$sim, drop_extinct = TRUE)
     # result[["tas"]] <- evesim::SimTable.phylo(raw_result$sim, drop_extinct = FALSE)
-
-    ntip <- result$tes$Nnode + 1
   }
 
   result[["pars"]] <- pars_list
