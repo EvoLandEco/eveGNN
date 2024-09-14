@@ -21,6 +21,7 @@ age <- params$age
 nworkers_sim <- params$nworkers_sim
 
 future::plan("multicore", workers = nworkers_sim)
+RcppParallel::setThreadOptions(numThreads = 1)
 
 eve_free_pd_list <- future.apply::future_replicate(nrep, eveGNN::randomized_eve_fixed_age(dists_pd, age = age,
                                                                          metric = "pd", offset = "simtime"), simplify = FALSE)
