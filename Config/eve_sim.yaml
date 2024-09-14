@@ -88,6 +88,6 @@ within_ranges_nnd:
   - 0.0008
 - - -0.045
   - 0.0008
-nrep: 100000
+nrep: 80000
 age: 10
 nworkers_sim: 24
