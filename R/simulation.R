@@ -148,8 +148,7 @@ randomized_eve_fixed_age <- function(dists, age, metric, offset) {
   gamma_phi <- params[[5]]
 
   pars_list <- c(lambda, mu, beta_n, beta_phi, gamma_n, gamma_phi)
-  print(pars_list)
-  evesim::edd_sim
+  age <- as.double(age)
   raw_result <- evesim::edd_sim(pars = pars_list,
                          age = age,
                          metric = metric,
