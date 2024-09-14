@@ -712,6 +712,7 @@ tree_to_brts <- function(tree) {
   }
 
   brts <- sort(treestats::branching_times(tree), decreasing = TRUE)
+  names(brts) <- NULL
 
   return(brts)
 }
