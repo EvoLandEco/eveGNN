@@ -2,65 +2,65 @@ dists_pd:
 - distribution: uniform
   'n': 1
   min: 0.2
-  max: 0.5
+  max: 0.6
 - distribution: uniform
   'n': 1
-  min: -0.03
+  min: -0.05
   max: 0.00
 - distribution: uniform
   'n': 1
-  min: -0.03
-  max: 0.03
+  min: -0.05
+  max: 0.05
 - distribution: uniform
   'n': 1
   min: 0.00
-  max: 0.03
+  max: 0.05
 - distribution: uniform
   'n': 1
-  min: -0.001
-  max: 0.001
+  min: -0.002
+  max: 0.002
 dists_ed:
 - distribution: uniform
   'n': 1
   min: 0.2
-  max: 0.5
+  max: 0.6
 - distribution: uniform
   'n': 1
-  min: -0.03
+  min: -0.05
   max: 0.00
 - distribution: uniform
   'n': 1
-  min: -0.03
-  max: 0.03
+  min: -0.05
+  max: 0.05
 - distribution: uniform
   'n': 1
   min: 0.00
-  max: 0.03
+  max: 0.05
 - distribution: uniform
   'n': 1
-  min: -0.001
-  max: 0.001
+  min: -0.002
+  max: 0.002
 dists_nnd:
 - distribution: uniform
   'n': 1
   min: 0.2
-  max: 0.5
+  max: 0.6
 - distribution: uniform
   'n': 1
-  min: -0.03
+  min: -0.05
   max: 0.00
 - distribution: uniform
   'n': 1
-  min: -0.03
-  max: 0.03
+  min: -0.05
+  max: 0.05
 - distribution: uniform
   'n': 1
   min: 0.00
-  max: 0.03
+  max: 0.05
 - distribution: uniform
   'n': 1
-  min: -0.001
-  max: 0.001
+  min: -0.002
+  max: 0.002
 within_ranges_pd:
 - - 0.44
   - 0.76
