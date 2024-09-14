@@ -136,32 +136,39 @@ randomized_pbd_fixed_age <- function(dists, max_mus, age) {
 
 
 #' @export randomized_eve_fixed_age
-randomized_eve_fixed_age <- function(dists, age, model, metric, offset) {
+randomized_eve_fixed_age <- function(dists, age, metric, offset) {
   ntip <- 0
   pars_list <- NULL
   result <- list()
 
-  while (ntip < 10) {
-    params <- generate_params(dists)
-    lambda <- params[[1]]
-    mu <- runif(1, min = 0, max = 0.8 * lambda)
-    beta_n <- params[[2]]
-    beta_phi <- params[[3]]
+  params <- generate_params(dists)
+  lambda <- params[[1]]
+  mu <- runif(1, min = 0, max = 0.8 * lambda)
+  beta_n <- params[[2]]
+  beta_phi <- params[[3]]
+  gamma_n <- params[[4]]
+  gamma_phi <- params[[5]]
 
-    pars_list <- c(lambda, mu, beta_n, beta_phi)
+  pars_list <- c(lambda, mu, beta_n, beta_phi, gamma_n, gamma_phi)
+  raw_result <- evesim::edd_sim(pars = pars_list,
+                         age = age,
+                         metric = metric,
+                         offset = offset,
+                         size_limit = 2000)
 
-    result <- eve::edd_sim(pars_list, age = age,
-                           model = model,
-                           metric = metric,
-                           offset = offset,
-                           history = FALSE,
-                           size_limit = 1000)
+  if (is.null(raw_result$sim)) {
+    ntip <- 0
+    result[["tes"]] <- NULL
+  } else {
+    result[["tes"]] <- evesim::SimTable.phylo(raw_result$sim, drop_extinct = TRUE)
+    # result[["tas"]] <- evesim::SimTable.phylo(raw_result$sim, drop_extinct = FALSE)
+
     ntip <- result$tes$Nnode + 1
   }
 
   result[["pars"]] <- pars_list
   result[["age"]] <- age
-  result[["model"]] <- model
+  result[["model"]] <- "dsde2" # hard-coded for backward compatibility
   result[["metric"]] <- metric
   result[["offset"]] <- offset
 

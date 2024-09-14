@@ -1,41 +1,65 @@
 dists_pd:
 - distribution: uniform
   'n': 1
-  min: 0.4
-  max: 0.8
+  min: 0.2
+  max: 0.5
 - distribution: uniform
   'n': 1
-  min: -0.05
-  max: 0.003
+  min: -0.03
+  max: 0.00
 - distribution: uniform
   'n': 1
-  min: -0.05
-  max: 0.003
+  min: -0.03
+  max: 0.03
+- distribution: uniform
+  'n': 1
+  min: 0.00
+  max: 0.03
+- distribution: uniform
+  'n': 1
+  min: -0.001
+  max: 0.001
 dists_ed:
 - distribution: uniform
   'n': 1
-  min: 0.4
-  max: 0.8
+  min: 0.2
+  max: 0.5
 - distribution: uniform
   'n': 1
-  min: -0.05
-  max: 0.002
+  min: -0.03
+  max: 0.00
 - distribution: uniform
   'n': 1
-  min: -0.05
-  max: 0.002
+  min: -0.03
+  max: 0.03
+- distribution: uniform
+  'n': 1
+  min: 0.00
+  max: 0.03
+- distribution: uniform
+  'n': 1
+  min: -0.001
+  max: 0.001
 dists_nnd:
 - distribution: uniform
   'n': 1
-  min: 0.3
-  max: 0.6
+  min: 0.2
+  max: 0.5
 - distribution: uniform
   'n': 1
-  min: -0.05
-  max: 0.001
+  min: -0.03
+  max: 0.00
 - distribution: uniform
   'n': 1
-  min: -0.05
+  min: -0.03
+  max: 0.03
+- distribution: uniform
+  'n': 1
+  min: 0.00
+  max: 0.03
+- distribution: uniform
+  'n': 1
+  min: -0.001
   max: 0.001
 within_ranges_pd:
 - - 0.44
@@ -64,6 +88,6 @@ within_ranges_nnd:
   - 0.0008
 - - -0.045
   - 0.0008
-nrep: 30000
-age: 8
-nworkers_sim: 16
+nrep: 100000
+age: 10
+nworkers_sim: 24

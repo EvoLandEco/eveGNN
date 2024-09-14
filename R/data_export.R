@@ -251,8 +251,10 @@ export_to_gnn_with_params_bd <- function(data, which = "tas", undirected = FALSE
 export_to_gnn_with_params_eve <- function(data, which = "tas", undirected = FALSE) {
   path <- file.path("GNN/tree/")
   path_EL <- file.path("GNN/tree/EL/")
+  path_BT <- file.path("GNN/tree/BT/")
   eve:::check_path(path)
   eve:::check_path(path_EL)
+  eve:::check_path(path_BT)
 
   if (which == "tas") {
     for (i in seq_along(data$tas)) {
@@ -260,9 +262,11 @@ export_to_gnn_with_params_eve <- function(data, which = "tas", undirected = FALS
       mu <- data$pars[[i]][2]
       beta_n <- data$pars[[i]][3]
       beta_phi <- data$pars[[i]][4]
+      gamma_n <- data$pars[[i]][5]
+      gamma_phi <- data$pars[[i]][6]
       age <- data$age[[i]]
       metric <- data$metric[[i]]
-      file_name <- paste0(path, "/tree_", la, "_", mu, "_", beta_n, "_", beta_phi, "_", age, "_", metric, "_", i, ".rds")
+      file_name <- paste0(path, "/tree_", la, "_", mu, "_", beta_n, "_", beta_phi, "_", gamma_n, "_", gamma_phi, "_", age, "_", metric, "_", i, ".rds")
       saveRDS(tree_to_connectivity(data$tas[[i]], undirected = undirected), file = file_name)
     }
     for (i in seq_along(data$tas)) {
@@ -270,10 +274,36 @@ export_to_gnn_with_params_eve <- function(data, which = "tas", undirected = FALS
       mu <- data$pars[[i]][2]
       beta_n <- data$pars[[i]][3]
       beta_phi <- data$pars[[i]][4]
+      gamma_n <- data$pars[[i]][5]
+      gamma_phi <- data$pars[[i]][6]
       age <- data$age[[i]]
       metric <- data$metric[[i]]
-      file_name <- paste0(path_EL, "/EL_", la, "_", mu, "_", beta_n, "_", beta_phi, "_", age, "_", metric, "_", i, ".rds")
+      file_name <- paste0(path_EL, "/EL_", la, "_", mu, "_", beta_n, "_", beta_phi, "_", gamma_n, "_", gamma_phi, "_", age, "_", metric, "_", i, ".rds")
       saveRDS(tree_to_adj_mat(data$tas[[i]]), file = file_name)
+    }
+    # for (i in seq_along(data$tas)) {
+    #   la <- data$pars[[i]][1]
+    #   mu <- data$pars[[i]][2]
+    #   beta_n <- data$pars[[i]][3]
+    #   beta_phi <- data$pars[[i]][4]
+    #   gamma_n <- data$pars[[i]][5]
+    #   gamma_phi <- data$pars[[i]][6]
+    #   age <- data$age[[i]]
+    #   metric <- data$metric[[i]]
+    #   file_name <- paste0(path_ST, "/ST_", la, "_", mu, "_", beta_n, "_", beta_phi, "_", gamma_n, "_", gamma_phi, "_", age, "_", metric, "_", i, ".rds")
+    #   saveRDS(tree_to_stats(data$tas[[i]]), file = file_name)
+    # }
+    for (i in seq_along(data$tas)) {
+      la <- data$pars[[i]][1]
+      mu <- data$pars[[i]][2]
+      beta_n <- data$pars[[i]][3]
+      beta_phi <- data$pars[[i]][4]
+      gamma_n <- data$pars[[i]][5]
+      gamma_phi <- data$pars[[i]][6]
+      age <- data$age[[i]]
+      metric <- data$metric[[i]]
+      file_name <- paste0(path_BT, "/BT_", la, "_", mu, "_", beta_n, "_", beta_phi, "_", gamma_n, "_", gamma_phi, "_", age, "_", metric, "_", i, ".rds")
+      saveRDS(tree_to_brts(data$tas[[i]]), file = file_name)
     }
   } else if (which == "tes") {
     for (i in seq_along(data$tes)) {
@@ -281,9 +311,11 @@ export_to_gnn_with_params_eve <- function(data, which = "tas", undirected = FALS
       mu <- data$pars[[i]][2]
       beta_n <- data$pars[[i]][3]
       beta_phi <- data$pars[[i]][4]
+      gamma_n <- data$pars[[i]][5]
+      gamma_phi <- data$pars[[i]][6]
       age <- data$age[[i]]
       metric <- data$metric[[i]]
-      file_name <- paste0(path, "/tree_", la, "_", mu, "_", beta_n, "_", beta_phi, "_", age, "_", metric, "_", i, ".rds")
+      file_name <- paste0(path, "/tree_", la, "_", mu, "_", beta_n, "_", beta_phi, "_", gamma_n, "_", gamma_phi, "_", age, "_", metric, "_", i, ".rds")
       saveRDS(tree_to_connectivity(data$tes[[i]], undirected = undirected), file = file_name)
     }
     for (i in seq_along(data$tes)) {
@@ -291,10 +323,36 @@ export_to_gnn_with_params_eve <- function(data, which = "tas", undirected = FALS
       mu <- data$pars[[i]][2]
       beta_n <- data$pars[[i]][3]
       beta_phi <- data$pars[[i]][4]
+      gamma_n <- data$pars[[i]][5]
+      gamma_phi <- data$pars[[i]][6]
       age <- data$age[[i]]
       metric <- data$metric[[i]]
-      file_name <- paste0(path_EL, "/EL_", la, "_", mu, "_", beta_n, "_", beta_phi, "_", age, "_", metric, "_", i, ".rds")
+      file_name <- paste0(path_EL, "/EL_", la, "_", mu, "_", beta_n, "_", beta_phi, "_", gamma_n, "_", gamma_phi, "_", age, "_", metric, "_", i, ".rds")
       saveRDS(tree_to_adj_mat(data$tes[[i]]), file = file_name)
+    }
+    # for (i in seq_along(data$tes)) {
+    #   la <- data$pars[[i]][1]
+    #   mu <- data$pars[[i]][2]
+    #   beta_n <- data$pars[[i]][3]
+    #   beta_phi <- data$pars[[i]][4]
+    #   gamma_n <- data$pars[[i]][5]
+    #   gamma_phi <- data$pars[[i]][6]
+    #   age <- data$age[[i]]
+    #   metric <- data$metric[[i]]
+    #   file_name <- paste0(path_ST, "/ST_", la, "_", mu, "_", beta_n, "_", beta_phi, "_", gamma_n, "_", gamma_phi, "_", age, "_", metric, "_", i, ".rds")
+    #   saveRDS(tree_to_stats(data$tes[[i]]), file = file_name)
+    # }
+    for (i in seq_along(data$tes)) {
+      la <- data$pars[[i]][1]
+      mu <- data$pars[[i]][2]
+      beta_n <- data$pars[[i]][3]
+      beta_phi <- data$pars[[i]][4]
+      gamma_n <- data$pars[[i]][5]
+      gamma_phi <- data$pars[[i]][6]
+      age <- data$age[[i]]
+      metric <- data$metric[[i]]
+      file_name <- paste0(path_BT, "/BT_", la, "_", mu, "_", beta_n, "_", beta_phi, "_", gamma_n, "_", gamma_phi, "_", age, "_", metric, "_", i, ".rds")
+      saveRDS(tree_to_brts(data$tes[[i]]), file = file_name)
     }
   }
 }

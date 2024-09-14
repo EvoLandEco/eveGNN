@@ -46,9 +46,6 @@ element is the set of branching times of the tree of extant species.\cr }
 \description{
 Simulating the diversity-dependent diversification process
 }
-\examples{
- dd_sim(c(0.2,0.1,20),10)
-}
 \references{
 \itemize{
 \item Etienne, R.S. et al. 2012, Proc. Roy. Soc. B 279: 1300-1309,
@@ -59,4 +56,3 @@ doi: 10.1098/rspb.2011.1439 \cr - Etienne, R.S. & B. Haegeman 2012. Am. Nat.
 \author{
 Rampal S. Etienne
 }
-\keyword{models}

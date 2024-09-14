@@ -97,10 +97,6 @@ dd_lamuN <- function(ddmodel, pars, N)
 #' @references - Etienne, R.S. et al. 2012, Proc. Roy. Soc. B 279: 1300-1309,
 #' doi: 10.1098/rspb.2011.1439 \cr - Etienne, R.S. & B. Haegeman 2012. Am. Nat.
 #' 180: E75-E89, doi: 10.1086/667574
-#' @keywords models
-#' @examples
-#'  dd_sim(c(0.2,0.1,20),10)
-#' @export dd_sim
 dd_sim <- function(pars, age, ddmodel = 1)
 {
   # Simulation of diversity-dependent process
