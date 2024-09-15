@@ -12,7 +12,7 @@ ml Python/3.8.16-GCCcore-11.2.0
 source $HOME/venvs/eve/bin/activate
 
 # Check if the correct number of arguments is provided
-if [ "$#" -ne 2 ]; then
+if [ "$#" -ne 3 ]; then
     echo "Bash Command Line Error. Usage: $0 <name> <task_type> <gnn_depth>"
     exit 1
 fi
