@@ -368,7 +368,7 @@ def shuffle_data(data_list):
 
 def main():
     if len(sys.argv) != 4:
-        print(f"Usage: {sys.argv[0]} <name> <task_type> <gnn_depth>")
+        print(f"Python Command Line Error. Usage: {sys.argv[0]} <name> <task_type> <gnn_depth>")
         sys.exit(1)
 
     name = sys.argv[1]

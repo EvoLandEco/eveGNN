@@ -13,7 +13,7 @@ source $HOME/venvs/eve/bin/activate
 
 # Check if the correct number of arguments is provided
 if [ "$#" -ne 2 ]; then
-    echo "Usage: $0 <name> <task_type> <gnn_depth>"
+    echo "Bash Command Line Error. Usage: $0 <name> <task_type> <gnn_depth>"
     exit 1
 fi
 
