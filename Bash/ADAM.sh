@@ -562,6 +562,7 @@ main_menu() {
 #                                                    echo "Submitting jobs for TES with GNN depth $i"
 #                                                    sbatch submit_eve_pars_est_model_training_diffpool.sh "$name" "EVE_FREE_TES" "$i"
 #                                                done
+                                                i=$max_gnn_depth
                                                 echo "Submitting jobs for TES with GNN depth $i"
                                                 sbatch submit_eve_pars_est_model_training_diffpool.sh "$name" "EVE_FREE_TES" "$i"
                                             else
