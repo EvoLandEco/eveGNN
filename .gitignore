@@ -20,3 +20,4 @@ Script/test.py
 /stats_cca.csv
 *.png
 *.png
+*.pt

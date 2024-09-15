@@ -80,11 +80,11 @@ eveGNN::export_to_gnn_with_params_eve(eve_nnd_list_all, "tes", undirected = FALS
 # eveGNN::export_to_gnn_with_params_eve(eve_ed_list_all$within_range, "tas", undirected = FALSE)
 # eveGNN::export_to_gnn_with_params_eve(eve_nnd_list_all$within_range, "tas", undirected = FALSE)
 #
-# setwd("..")
+setwd("..")
 #
-# if (!dir.exists("EVE_VAL_TES")) {
-#   dir.create("EVE_VAL_TES")
-# }
+if (!dir.exists("EVE_VAL_TES")) {
+  dir.create("EVE_VAL_TES")
+}
 #
 # setwd("EVE_VAL_TES")
 #

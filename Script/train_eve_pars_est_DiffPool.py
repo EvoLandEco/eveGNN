@@ -1,37 +1,67 @@
 import sys
 import os
 import pandas as pd
+import numpy as np
 import pyreadr
 import torch
 import glob
 import functools
+import random
 import torch_geometric.transforms as T
 import torch.nn.functional as F
+import yaml
 from math import ceil
+from torch.utils.data import TensorDataset, DataLoader
 from torch_geometric.data import InMemoryDataset, Data
 from torch_geometric.loader import DenseDataLoader
 from torch_geometric.nn import DenseGCNConv as GCNConv, dense_diff_pool
+from torch_geometric.nn import DenseSAGEConv as SAGEConv
+from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence, pad_sequence, pack_sequence
 
-# Global variables
+# Load the global parameters from the config file
+global_params = None
+
+with open("../Config/eve_train_diffpool.yaml", "r") as ymlfile:
+    global_params = yaml.safe_load(ymlfile)
+
+# Set global variables
+epoch_number_gnn = global_params["epoch_number_gnn"]
+epoch_number_dnn = global_params["epoch_number_dnn"]
+epoch_number_lstm = global_params["epoch_number_lstm"]
+diffpool_ratio = global_params["diffpool_ratio"]
+dropout_ratio = global_params["dropout_ratio"]
+learning_rate = global_params["learning_rate"]
+train_batch_size = global_params["train_batch_size"]
+test_batch_size = global_params["test_batch_size"]
+gcn_layer1_hidden_channels = global_params["gcn_layer1_hidden_channels"]
+gcn_layer2_hidden_channels = global_params["gcn_layer2_hidden_channels"]
+gcn_layer3_hidden_channels = global_params["gcn_layer3_hidden_channels"]
+dnn_hidden_channels = global_params["dnn_hidden_channels"]
+dnn_output_channels = global_params["dnn_output_channels"]
+dnn_depth = global_params["dnn_depth"]
+lstm_hidden_channels = global_params["lstm_hidden_channels"]
+lstm_output_channels = global_params["lstm_output_channels"]
+lstm_depth = global_params["lstm_depth"]
+lin_layer1_hidden_channels = global_params["lin_layer1_hidden_channels"]
+lin_layer2_hidden_channels = global_params["lin_layer2_hidden_channels"]
+n_predicted_values = global_params["n_predicted_values"]
+n_classes = global_params["n_classes"]
+batch_size_reduce_factor = global_params["batch_size_reduce_factor"]
+max_nodes_limit = global_params["max_nodes_limit"]
+normalize_edge_length = global_params["normalize_edge_length"]
+normalize_graph_representation = global_params["normalize_graph_representation"]
+huber_delta = global_params["huber_delta"]
+global_pooling_method = global_params["global_pooling_method"]
+
+alpha= global_params["alpha"]
+beta = global_params["beta"]
 metric_to_category = {'pd': 0, 'ed': 1, 'nnd': 2}
-beta_n_norm_factor = 100
-beta_phi_norm_factor = 1000
-epoch_number = 100
-alpha = 0.25  # weight for the regression loss
-beta = 0.75  # weight for the classification loss
 
 # Check if metric_to_category is a dictionary with string keys and integer values
 assert isinstance(metric_to_category, dict), "metric_to_category should be a dictionary"
 for key, value in metric_to_category.items():
     assert isinstance(key, str), "All keys in metric_to_category should be strings"
     assert isinstance(value, int), "All values in metric_to_category should be integers"
-
-# Check if beta_n_norm_factor and beta_phi_norm_factor are positive integers
-assert isinstance(beta_n_norm_factor, int) and beta_n_norm_factor > 0, "beta_n_norm_factor should be a positive integer"
-assert isinstance(beta_phi_norm_factor, int) and beta_phi_norm_factor > 0, "beta_phi_norm_factor should be a positive integer"
-
-# Check if epoch_number is a positive integer
-assert isinstance(epoch_number, int) and epoch_number > 0, "epoch_number should be a positive integer"
 
 # Check if alpha and beta are positive floats
 assert isinstance(alpha, float) and alpha > 0, "alpha should be a positive float"
@@ -55,16 +85,17 @@ def count_rds_files(path):
     return len(rds_files)
 
 
-def check_rds_files_count(tree_path, el_path):
-    # Count the number of .rds files in both paths
+def check_rds_files_count(tree_path, el_path, bt_path):
+    # Count the number of .rds files in all four paths
     tree_count = count_rds_files(tree_path)
     el_count = count_rds_files(el_path)
+    bt_count = count_rds_files(bt_path)
 
     # Check if the counts are equal
-    if tree_count == el_count:
-        return tree_count
+    if tree_count == el_count == bt_count:
+        return tree_count  # Assuming all counts are equal, return one of them
     else:
-        raise ValueError("The number of .rds files in the two paths are not equal")
+        raise ValueError("The number of .rds files in the four paths are not equal")
 
 
 def list_subdirectories(path):
@@ -129,10 +160,10 @@ def sort_files(files):
     return sorted(files, key=get_sort_key)
 
 
-def check_file_consistency(files_tree, files_el):
-    # Check if the two lists have the same length
-    if len(files_tree) != len(files_el):
-        raise ValueError("Mismatched lengths")
+def check_file_consistency(files_tree, files_el, files_bt):
+    # Check if the four lists have the same length
+    if not (len(files_tree) == len(files_el) == len(files_bt)):
+        raise ValueError("Mismatched lengths among file lists.")
 
     # Define a function to extract parameters from filename
     def get_params_tuple(filename):
@@ -148,30 +179,37 @@ def check_file_consistency(files_tree, files_el):
         return tuple(params)
 
     # Check each pair of files for matching parameters
-    for tree_file, el_file in zip(files_tree, files_el):
+    for tree_file, el_file, bt_file in zip(files_tree, files_el, files_bt):
         tree_params = get_params_tuple(tree_file)
         el_params = get_params_tuple(el_file)
-        if tree_params != el_params:
-            raise ValueError(f"Mismatched parameters: {tree_file} vs {el_file}")
+        bt_params = get_params_tuple(bt_file)
+
+        if not (tree_params == el_params == bt_params):
+            raise ValueError(f"Mismatched parameters among files: {tree_file}, {el_file}, {bt_file}")
 
     # If we get here, all checks passed
-    print("File lists consistency check passed")
+    print("File lists consistency check passed across tree, EL, and BT datasets.")
 
 
-def check_params_consistency(params_tree_list, params_el_list):
-    is_consistent = all(a == b for a, b in zip(params_tree_list, params_el_list))
+def check_params_consistency(params_tree_list, params_el_list, params_bt_list):
+    # Check if all corresponding elements in the four lists are equal
+    is_consistent = all(
+        a == b == c for a, b, c in zip(params_tree_list, params_el_list, params_bt_list))
+
     if is_consistent:
-        print("Parameters are consistent across the tree and EL datasets.")
+        print("Parameters are consistent across the tree, EL and BT datasets.")
     else:
-        raise ValueError("Mismatch in parameters between the tree and EL datasets.")
+        raise ValueError("Mismatch in parameters between the tree, EL and BT datasets.")
+
     return is_consistent
 
 
-def check_list_count(count, data_list, length_list, params_list):
+def check_list_count(count, data_list, length_list, params_list, brts_list):
     # Get the number of elements in each list
     data_count = len(data_list)
     length_count = len(length_list)
     params_count = len(params_list)
+    brts_count = len(brts_list)  # Calculate the count for the new brts_list
 
     # Check if the count matches the number of elements in each list
     if count != data_count:
@@ -183,23 +221,29 @@ def check_list_count(count, data_list, length_list, params_list):
     if count != params_count:
         raise ValueError(f"Count mismatch: input argument count is {count}, params_list has {params_count} elements.")
 
+    if count != brts_count:  # Check for brts_list
+        raise ValueError(f"Count mismatch: input argument count is {count}, brts_list has {brts_count} elements.")
+
     # If all checks pass, print a success message
     print("Count check passed")
 
 
-def read_rds_to_pytorch(path, count):
+def read_rds_to_pytorch(path, count, normalize=False):
     # List all files in the directory
     files_tree = [f for f in os.listdir(os.path.join(path, 'GNN', 'tree'))
                   if f.startswith('tree_') and f.endswith('.rds')]
     files_el = [f for f in os.listdir(os.path.join(path, 'GNN', 'tree', 'EL'))
                 if f.startswith('EL_') and f.endswith('.rds')]
+    files_bt = [f for f in os.listdir(os.path.join(path, 'GNN', 'tree', 'BT'))
+                if f.startswith('BT_') and f.endswith('.rds')]  # Get the list of files in the new BT directory
 
     # Sort the files based on the parameters
     files_tree = sort_files(files_tree)
     files_el = sort_files(files_el)
+    files_bt = sort_files(files_bt)  # Sort the files in the new BT directory
 
     # Check if the files are consistent
-    check_file_consistency(files_tree, files_el)
+    check_file_consistency(files_tree, files_el, files_bt)
 
     # List to hold the data from each .rds file
     data_list = []
@@ -224,7 +268,18 @@ def read_rds_to_pytorch(path, count):
         length_list.append(length_data)
         params_el_list.append(get_params_string(filename))
 
-    check_params_consistency(params_tree_list, params_el_list)
+    brts_list = []
+    params_bt_list = []
+
+    # Loop through the files with the prefix 'BT_'
+    for filename in files_bt:
+        brts_file_path = os.path.join(path, 'GNN', 'tree', 'BT', filename)
+        brts_result = pyreadr.read_r(brts_file_path)
+        brts_data = brts_result[None]
+        brts_list.append(brts_data)
+        params_bt_list.append(get_params_string(filename))
+
+    check_params_consistency(params_tree_list, params_el_list, params_bt_list)
 
     params_list = []
 
@@ -232,12 +287,12 @@ def read_rds_to_pytorch(path, count):
         params = get_params(filename)
         params_list.append(params)
 
-    # Normalize beta_n and beta_phi
-    for vector in params_list:
-        vector[2] = vector[2] * beta_n_norm_factor
-        vector[3] = vector[3] * beta_phi_norm_factor
+    # # Normalize beta_n and beta_phi
+    # for vector in params_list:
+    #     vector[2] = vector[2] * beta_n_norm_factor
+    #     vector[3] = vector[3] * beta_phi_norm_factor
 
-    check_list_count(count, data_list, length_list, params_list)
+    check_list_count(count, data_list, length_list, params_list, brts_list)
 
     # List to hold the Data objects
     pytorch_geometric_data_list = []
@@ -252,20 +307,33 @@ def read_rds_to_pytorch(path, count):
         # Determine the number of nodes
         num_nodes = edge_index_tensor.max().item() + 1
 
-        edge_length_tensor = torch.tensor(length_list[i].values, dtype=torch.float)
+        if normalize:
+            # Normalize node features by dividing edge lengths by log transformed number of nodes
+            norm_length_list = length_list[i] / np.log10(len(length_list[i]))
+            edge_length_tensor = torch.tensor(norm_length_list.values, dtype=torch.float)
+        else:
+            edge_length_tensor = torch.tensor(length_list[i].values, dtype=torch.float)
 
         params_current = params_list[i]
 
-        params_current_tensor = torch.tensor(params_current[0:4], dtype=torch.float)
+        params_current_tensor = torch.tensor(params_current[0:(n_predicted_values)], dtype=torch.float)
 
-        class_current_tensor = torch.tensor(params_current[5], dtype=torch.long)
+        class_current_tensor = torch.tensor(params_current[7], dtype=torch.long)
+
+        brts_tensor = torch.tensor(brts_list[i].values, dtype=torch.float)
+
+        brts_tensor = brts_tensor.squeeze(1)  # Remove the extra dimension
+
+        brts_length = torch.tensor([len(brts_list[i].values)], dtype=torch.long)
 
         # Create a Data object with the edge index, number of nodes, and category value
         data = Data(x=edge_length_tensor,
                     edge_index=edge_index_tensor,
                     num_nodes=num_nodes,
                     y_re=params_current_tensor,
-                    y_cl=class_current_tensor)
+                    y_cl=class_current_tensor,
+                    brts=brts_tensor,
+                    brts_len=brts_length)
 
         # Append the Data object to the list
         pytorch_geometric_data_list.append(data)
@@ -290,29 +358,26 @@ def get_testing_data(data_list):
     testing_data = data_list[split_index:]
     return testing_data
 
-
-def export_to_rds(embeddings, epoch, name, task_type, which_set):
-    # Convert to DataFrame
-    df = pd.DataFrame(embeddings, columns=[f"dim_{i}" for i in range(embeddings.shape[1])])
-
-    # Export to RDS
-    rds_path = os.path.join(name, task_type, "umap")
-    if not os.path.exists(rds_path):
-        os.makedirs(rds_path)
-    rds_filename = os.path.join(rds_path, f'{which_set}_umap_epoch_{epoch}.rds')
-    pyreadr.write_rds(rds_filename, df)
+def shuffle_data(data_list):
+    # Create a copy of the data list to shuffle
+    shuffled_list = data_list.copy()
+    # Shuffle the copied list in place
+    random.shuffle(shuffled_list)
+    return shuffled_list
 
 
 def main():
-    if len(sys.argv) != 3:
-        print(f"Usage: {sys.argv[0]} <name> <task_type>")
+    if len(sys.argv) != 4:
+        print(f"Usage: {sys.argv[0]} <name> <task_type> <gnn_depth>")
         sys.exit(1)
 
     name = sys.argv[1]
     task_type = sys.argv[2]
+    gnn_depth = int(sys.argv[3])
 
     # Now you can use the variables name and set_i in your code
-    print(f'Name: {name}, Task Type: {task_type}')
+    print(f'Name: {name}, Task Type: {task_type}', f'GNN Depth: {gnn_depth}')
+    print("Now on branch Multimodal-Stacking-Boosting")
 
     training_dataset_list = []
     testing_dataset_list = []
@@ -321,29 +386,102 @@ def main():
     full_dir = os.path.join(name, task_type)
     full_dir_tree = os.path.join(full_dir, 'GNN', 'tree')
     full_dir_el = os.path.join(full_dir, 'GNN', 'tree', 'EL')
+    full_dir_bt = os.path.join(full_dir, 'GNN', 'tree', 'BT')  # Add the full path for the new BT directory
     # Call read_rds_to_pytorch with the full directory path
     print(full_dir)
     # Check if the number of .rds files in the tree and el paths are equal
-    rds_count = check_rds_files_count(full_dir_tree, full_dir_el)
+    rds_count = check_rds_files_count(full_dir_tree, full_dir_el, full_dir_bt)
     print(f'There are: {rds_count} trees in the {task_type} folder.')
     print(f"Now reading {task_type}...")
     # Read the .rds files into a list of PyTorch Geometric Data objects
-    current_dataset = read_rds_to_pytorch(full_dir, rds_count)
+    current_dataset = read_rds_to_pytorch(full_dir, rds_count, normalize_edge_length)
+    # Shuffle the data
+    current_dataset = shuffle_data(current_dataset)
     current_training_data = get_training_data(current_dataset)
     current_testing_data = get_testing_data(current_dataset)
     training_dataset_list.append(current_training_data)
     testing_dataset_list.append(current_testing_data)
 
+    validation_dataset_list = []
+    val_dir = ""
+
+    train_batch_size_adjusted = None
+    test_batch_size_adjusted = None
+
+    if task_type == "EVE_FREE_TES":
+        val_dir = os.path.join(name, "EVE_VAL_TES")
+        train_batch_size_adjusted = int(train_batch_size)
+        test_batch_size_adjusted = int(test_batch_size)
+    elif task_type == "EVE_FREE_TAS":
+        val_dir = os.path.join(name, "EVE_VAL_TAS")
+        train_batch_size_adjusted = int(ceil(train_batch_size * batch_size_reduce_factor))
+        test_batch_size_adjusted = int(ceil(test_batch_size * batch_size_reduce_factor))
+    else:
+        raise ValueError("Invalid task type.")
+
+    full_val_dir_tree = os.path.join(val_dir, 'GNN', 'tree')
+    full_val_dir_el = os.path.join(val_dir, 'GNN', 'tree', 'EL')
+    full_val_dir_bt = os.path.join(val_dir, 'GNN', 'tree', 'BT')
+    val_rds_count = check_rds_files_count(full_val_dir_tree, full_val_dir_el, full_val_dir_bt)
+    print(f'There are: {val_rds_count} trees in the validation folder.')
+    print(f"Now reading validation data...")
+    # current_val_dataset = read_rds_to_pytorch(val_dir, val_rds_count, normalize_edge_length)
+    current_val_dataset = []
+    validation_dataset_list.append(current_val_dataset)
+
     sum_training_data = functools.reduce(lambda x, y: x + y, training_dataset_list)
     sum_testing_data = functools.reduce(lambda x, y: x + y, testing_dataset_list)
+    sum_validation_data = functools.reduce(lambda x, y: x + y, validation_dataset_list)
 
     # Filtering out trees with only 3 nodes
     # They might cause problems with ToDense
     filtered_training_data = [data for data in sum_training_data if data.edge_index.shape != torch.Size([2, 2])]
     filtered_testing_data = [data for data in sum_testing_data if data.edge_index.shape != torch.Size([2, 2])]
+    filtered_validation_data = [data for data in sum_validation_data if data.edge_index.shape != torch.Size([2, 2])]
+
+    # Filtering out trees with more than 3000 nodes
+    filtered_training_data = [data for data in filtered_training_data if data.num_nodes <= max_nodes_limit]
+    filtered_testing_data = [data for data in filtered_testing_data if data.num_nodes <= max_nodes_limit]
+    filtered_validation_data = [data for data in filtered_validation_data if data.num_nodes <= max_nodes_limit]
+
+    # Get the maximum number of nodes, for padding the matrices of the graphs
+    max_nodes_train = max([data.num_nodes for data in filtered_training_data])
+    max_nodes_test = max([data.num_nodes for data in filtered_testing_data])
+
+    # Get the maximum number of nodes in the validation set
+    # Check if the validation set is empty
+    max_nodes_val = 0
+    if len(filtered_validation_data) == 0:
+        max_nodes_val = 0
+    else:
+        max_nodes_val = max([data.num_nodes for data in filtered_validation_data])
+    max_nodes = max(max_nodes_train, max_nodes_test, max_nodes_val)
+    print(f"Max nodes: {max_nodes} for {task_type}")
+
+    # Similarly, get the maximum lengths of brts sequences, for padding
+    max_brts_len_train = max([len(data.brts) for data in filtered_training_data])
+    max_brts_len_test = max([len(data.brts) for data in filtered_testing_data])
+
+    # Get the maximum length of brts sequences in the validation set
+    # Check if the validation set is empty
+    max_brts_len_val = 0
+    if len(filtered_validation_data) == 0:
+        max_brts_len_val = 0
+    else:
+        max_brts_len_val = max([len(data.brts) for data in filtered_validation_data])
+    max_brts_len = max(max_brts_len_train, max_brts_len_test, max_brts_len_val)
+    print(f"Max brts length: {max_brts_len} for {task_type}")
 
     class TreeData(InMemoryDataset):
         def __init__(self, root, data_list, transform=None, pre_transform=None):
+            # Calculate the maximum length of brts across all graphs
+            max_length = max_brts_len
+
+            # Pad the brts attribute for each graph
+            for data in data_list:
+                pad_size = max_length - len(data.brts)
+                data.brts = torch.cat([data.brts, data.brts.new_full((pad_size,), fill_value=0)], dim=0)
+
             super(TreeData, self).__init__(root, transform, pre_transform)
             self.data, self.slices = self.collate(data_list)
 
@@ -353,100 +491,189 @@ def main():
         def _process(self):
             pass  # No processing required
 
-    max_nodes_train = max([data.num_nodes for data in filtered_training_data])
-    max_nodes_test = max([data.num_nodes for data in filtered_testing_data])
-    max_nodes = max(max_nodes_train, max_nodes_test)
-
     training_dataset = TreeData(root=None, data_list=filtered_training_data, transform=T.ToDense(max_nodes))
     testing_dataset = TreeData(root=None, data_list=filtered_testing_data, transform=T.ToDense(max_nodes))
 
     class GNN(torch.nn.Module):
         def __init__(self, in_channels, hidden_channels, out_channels,
-                     normalize=False, lin=True):
+                     normalize=False):
             super(GNN, self).__init__()
 
             self.convs = torch.nn.ModuleList()
             self.bns = torch.nn.ModuleList()
 
-            self.convs.append(GCNConv(in_channels, hidden_channels, normalize))
-            self.bns.append(torch.nn.BatchNorm1d(hidden_channels))
+            for i in range(gnn_depth):
+                first_index = 0
+                last_index = gnn_depth - 1
 
-            self.convs.append(GCNConv(hidden_channels, hidden_channels, normalize))
-            self.bns.append(torch.nn.BatchNorm1d(hidden_channels))
-
-            self.convs.append(GCNConv(hidden_channels, out_channels, normalize))
-            self.bns.append(torch.nn.BatchNorm1d(out_channels))
+                if gnn_depth == 1:
+                    self.convs.append(SAGEConv(in_channels, out_channels, normalize))
+                    self.bns.append(torch.nn.BatchNorm1d(out_channels))
+                else:
+                    if i == first_index:
+                        self.convs.append(SAGEConv(in_channels, hidden_channels, normalize))
+                        self.bns.append(torch.nn.BatchNorm1d(hidden_channels))
+                    elif i == last_index:
+                        self.convs.append(SAGEConv(hidden_channels, out_channels, normalize))
+                        self.bns.append(torch.nn.BatchNorm1d(out_channels))
+                    else:
+                        self.convs.append(SAGEConv(hidden_channels, hidden_channels, normalize))
+                        self.bns.append(torch.nn.BatchNorm1d(hidden_channels))
 
         def forward(self, x, adj, mask=None):
+            outputs = []  # Initialize a list to store outputs at each step
             for step in range(len(self.convs)):
-                x = F.relu(self.convs[step](x, adj, mask))
+                x = F.gelu(self.convs[step](x, adj, mask))
                 x = torch.permute(x, (0, 2, 1))
                 x = self.bns[step](x)
                 x = torch.permute(x, (0, 2, 1))
+                outputs.append(x)  # Store the current x
 
-            return x
+            x_concatenated = torch.cat(outputs, dim=-1)
+            return x_concatenated
+
+    class LSTM(torch.nn.Module):
+        def __init__(self, in_channels, hidden_channels, out_channels, lstm_depth=1, dropout_rate=0.5, num_classes=n_classes):
+            super(LSTM, self).__init__()
+
+            self.lstm = torch.nn.LSTM(input_size=in_channels, hidden_size=hidden_channels, num_layers=lstm_depth,
+                                      batch_first=True, dropout=dropout_rate if lstm_depth > 1 else 0)
+            self.dropout = torch.nn.Dropout(dropout_rate)
+
+            # Regression output layers
+            self.lin_reg = torch.nn.Linear(hidden_channels, out_channels)
+            self.readout_reg = torch.nn.Linear(out_channels, n_predicted_values)  # Assuming regression output is a single value
+
+            # Classification output layers
+            self.lin_class = torch.nn.Linear(hidden_channels, out_channels)
+            self.readout_class = torch.nn.Linear(out_channels, num_classes)  # Number of classes for classification
+
+        def forward(self, x):
+            out, (h_n, c_n) = self.lstm(x)
+
+            # Get the final hidden state from the last LSTM layer
+            final_hidden_state = h_n[-1, :, :]
+
+            # Apply activation function to the final hidden state
+            x = F.gelu(final_hidden_state)
+
+            # Regression branch
+            reg_out = self.dropout(x)
+            reg_out = self.lin_reg(reg_out)
+            reg_out = F.gelu(reg_out)
+            reg_out = self.dropout(reg_out)
+            reg_out = self.readout_reg(reg_out)
+
+            # Classification branch
+            class_out = self.dropout(x)
+            class_out = self.lin_class(class_out)
+            class_out = F.gelu(class_out)
+            class_out = self.dropout(class_out)
+            class_out = self.readout_class(class_out)
+            class_out = torch.softmax(class_out, dim=-1)
+
+            return reg_out, class_out
+
 
     class DiffPool(torch.nn.Module):
-        def __init__(self):
+        def __init__(self, verbose=False):
             super(DiffPool, self).__init__()
+            self.verbose = verbose
+            if self.verbose:
+                print("Initializing DiffPool model...")
 
-            num_nodes = ceil(0.25 * max_nodes)
-            self.gnn1_pool = GNN(training_dataset.num_node_features, 64, num_nodes)
-            self.gnn1_embed = GNN(training_dataset.num_node_features, 64, 64)
+            # Read in augmented data
+            self.graph_sizes = torch.tensor([], dtype=torch.long)
 
-            num_nodes = ceil(0.25 * num_nodes)
-            self.gnn2_pool = GNN(64, 64, num_nodes)
-            self.gnn2_embed = GNN(64, 64, 64, lin=False)
+            if self.verbose:
+                print("Graph sizes loaded...")
 
-            self.gnn3_embed = GNN(64, 64, 64, lin=False)
+            # DiffPool Layer 1
+            num_nodes1 = ceil(diffpool_ratio * max_nodes)
+            self.gnn1_pool = GNN(training_dataset.num_node_features, gcn_layer1_hidden_channels, num_nodes1)
+            self.gnn1_embed = GNN(training_dataset.num_node_features, gcn_layer1_hidden_channels,
+                                  gcn_layer2_hidden_channels)
 
-            # Layers for regression
-            self.lin1re = torch.nn.Linear(64, 64)
-            self.lin2re = torch.nn.Linear(64, 4)
+            # DiffPool Layer 2
+            num_nodes2 = ceil(diffpool_ratio * num_nodes1)
+            gnn1_out_channels = gcn_layer1_hidden_channels * (gnn_depth - 1) + gcn_layer2_hidden_channels
+            self.gnn2_pool = GNN(gnn1_out_channels, gcn_layer2_hidden_channels, num_nodes2)
+            self.gnn2_embed = GNN(gnn1_out_channels, gcn_layer2_hidden_channels, gcn_layer3_hidden_channels)
 
-            # Layers for classification
-            self.lin1cl = torch.nn.Linear(64, 64)
-            self.lin2cl = torch.nn.Linear(64, 3)
+            # DiffPool Layer 3
+            gnn2_out_channels = gcn_layer2_hidden_channels * (gnn_depth - 1) + gcn_layer3_hidden_channels
+            self.gnn3_embed = GNN(gnn2_out_channels, gcn_layer3_hidden_channels, lin_layer1_hidden_channels)
+            gnn3_out_channels = gcn_layer3_hidden_channels * (gnn_depth - 1) + lin_layer1_hidden_channels
+
+            # Final Readout Layers
+            self.lin1 = torch.nn.Linear(gnn3_out_channels, lin_layer2_hidden_channels)
+            self.lin2 = torch.nn.Linear(lin_layer2_hidden_channels, n_predicted_values)
+
+            self.lin_class1 = torch.nn.Linear(gnn3_out_channels, lin_layer2_hidden_channels)
+            self.lin_class2 = torch.nn.Linear(lin_layer2_hidden_channels, n_classes)
 
         def forward(self, x, adj, mask=None):
+            # Forward pass through the DiffPool layer 1
             s = self.gnn1_pool(x, adj, mask)
             x = self.gnn1_embed(x, adj, mask)
-
             x, adj, l1, e1 = dense_diff_pool(x, adj, s, mask)
 
+            if self.verbose:
+                print("DiffPool Layer 1 Completed...")
+
+            # Forward pass through the DiffPool layer 2
             s = self.gnn2_pool(x, adj)
             x = self.gnn2_embed(x, adj)
-
             x, adj, l2, e2 = dense_diff_pool(x, adj, s)
 
+            if self.verbose:
+                print("DiffPool Layer 2 Completed...")
+
+            # Forward pass through the DiffPool layer 3
             x = self.gnn3_embed(x, adj)
 
-            x = x.mean(dim=1)
+            if self.verbose:
+                print("DiffPool Layer 3 Completed...")
 
-            xre = F.dropout(x, p=0.5, training=self.training)
-            xre = self.lin1re(xre)
-            xre = F.relu(xre)
-            xre = F.dropout(xre, p=0.5, training=self.training)
-            xre = self.lin2re(xre)
-            xre = F.relu(xre)
+            # Global pooling after the final GNN layer
+            if global_pooling_method == "mean":
+                x = x.mean(dim=1)
+            elif global_pooling_method == "max":
+                x = x.max(dim=1).values
+            elif global_pooling_method == "sum":
+                x = x.sum(dim=1)
+            else:
+                raise ValueError("Invalid global pooling method.")
 
-            xcl = F.dropout(x, p=0.5, training=self.training)
-            xcl = self.lin1cl(xcl)
-            xcl = F.relu(xcl)
-            xcl = F.dropout(xcl, p=0.5, training=self.training)
-            xcl = self.lin2cl(xcl)
+            if self.verbose:
+                print("Global Pooling Completed...")
 
-            return xre, xcl
+            # Regression branch
+            reg_out = F.dropout(x, p=dropout_ratio, training=self.training)
+            reg_out = self.lin1(reg_out)
+            reg_out = F.gelu(reg_out)
+            reg_out = F.dropout(reg_out, p=dropout_ratio, training=self.training)
+            reg_out = self.lin2(reg_out)
 
-    def combined_loss(output_regression, target_regression, output_classification, target_classification):
-        loss_regression = F.mse_loss(output_regression, target_regression)
+            # Classification branch
+            class_out = F.dropout(x, p=dropout_ratio, training=self.training)
+            class_out = self.lin_class1(class_out)
+            class_out = F.gelu(class_out)
+            class_out = F.dropout(class_out, p=dropout_ratio, training=self.training)
+            class_out = self.lin_class2(class_out)
+            class_out = torch.softmax(class_out, dim=-1)
+
+            return reg_out, class_out, l1 + l2, e1 + e2
+
+    def combined_loss(output_regression, target_regression, output_classification, target_classification, link_loss, entropy_loss):
+        loss_regression = criterion(output_regression, target_regression)
         loss_classification = F.cross_entropy(output_classification, target_classification)
-        loss_all = alpha * loss_regression + beta * loss_classification
+        loss_all = alpha * loss_regression + beta * loss_classification + link_loss + entropy_loss
 
         return loss_all, loss_regression, loss_classification
 
-    def train():
-        model.train()
+    def train_gnn():
+        model_gnn.train()
 
         loss_all = 0  # Keep track of the loss
         loss_reg = 0  # Keep track of the regression loss
@@ -455,12 +682,12 @@ def main():
         for data in train_loader:
             data.to(device)
             optimizer.zero_grad()
-            out_re, out_cl = model(data.x, data.adj, data.mask)
-            target_re = data.y_re.view(data.num_nodes.__len__(), 4).to(device)
+            out_re, out_cl, l, e = model_gnn(data.x, data.adj, data.mask)
+            target_re = data.y_re.view(data.num_nodes.__len__(), n_predicted_values).to(device)
             target_cl = data.y_cl.view(-1).to(device)
             assert out_re.device == target_re.device == out_cl.device == target_cl.device, \
                 "Error: Device mismatch between output and target tensors."
-            loss, loss_reg, loss_cls = combined_loss(out_re, target_re, out_cl, target_cl)
+            loss, loss_reg, loss_cls = combined_loss(out_re, target_re, out_cl, target_cl, l, e)
             loss.backward()
             loss_all += loss.item() * data.num_nodes.__len__()
             loss_reg += loss_reg.item() * data.num_nodes.__len__()
@@ -474,41 +701,102 @@ def main():
         return out_loss_all, out_loss_reg, out_loss_cls
 
     @torch.no_grad()
-    def test_diff(loader):
-        model.eval()
+    def test_diff_gnn(loader):
+        model_gnn.eval()
 
         diffs_all = torch.tensor([], dtype=torch.float, device=device)
+        outputs_all = torch.tensor([], dtype=torch.float, device=device)  # To store all outputs
+        y_all = torch.tensor([], dtype=torch.float, device=device)  # To store all y
+        nodes_all = torch.tensor([], dtype=torch.long, device=device)
 
         for data in loader:
             data.to(device)
-            out_re, _ = model(data.x, data.adj, data.mask)
-            diffs = torch.abs(out_re - data.y_re.view(data.num_nodes.__len__(), 4))
+            out_re, _, _, _ = model_gnn(data.x, data.adj, data.mask)
+            diffs = torch.abs(out_re - data.y_re.view(data.num_nodes.__len__(), n_predicted_values))
             diffs_all = torch.cat((diffs_all, diffs), dim=0)
+            outputs_all = torch.cat((outputs_all, out_re), dim=0)
+            y_all = torch.cat((y_all, data.y_re.view(data.num_nodes.__len__(), n_predicted_values)), dim=0)
+            nodes_all = torch.cat((nodes_all, data.num_nodes), dim=0)
 
         print(f"diffs_all length: {len(diffs_all)}; test_loader.dataset length: {len(test_loader.dataset)}; Equal: {len(diffs_all) == len(test_loader.dataset)}")
         mean_diffs = torch.sum(diffs_all, dim=0) / len(test_loader.dataset)
-        return mean_diffs.cpu().detach().numpy(), diffs_all.cpu().detach().numpy()
+        return mean_diffs.cpu().detach().numpy(), diffs_all.cpu().detach().numpy(), outputs_all.cpu().detach().numpy(), y_all.cpu().detach().numpy(), nodes_all.cpu().detach().numpy()
 
     @torch.no_grad()
-    def test_accu(loader):
-        model.eval()
+    def compute_test_loss_gnn():
+        model_gnn.eval()  # Set the model to evaluation mode
+
+        loss_all = 0  # Keep track of the loss
+        loss_reg = 0  # Keep track of the regression loss
+        loss_cls = 0  # Keep track of the classification loss
+
+        for data in test_loader:
+            data.to(device)
+            graph_sizes = data.num_nodes
+            out_re, out_cl, l, e = model_gnn(data.x, data.adj, data.mask)
+            target_re = data.y_re.view(data.num_nodes.__len__(), n_predicted_values).to(device)
+            target_cl = data.y_cl.view(-1).to(device)
+            loss, loss_reg, loss_cls = combined_loss(out_re, target_re, out_cl, target_cl, l, e)
+            loss_all += loss.item() * data.num_nodes.__len__()
+            loss_reg += loss_reg.item() * data.num_nodes.__len__()
+            loss_cls += loss_cls.item() * data.num_nodes.__len__()
+
+        out_loss_all = loss_all / len(train_loader.dataset)
+        out_loss_reg = loss_reg / len(train_loader.dataset)
+        out_loss_cls = loss_cls / len(train_loader.dataset)
+
+        return out_loss_all, out_loss_reg, out_loss_cls
+
+    @torch.no_grad()
+    def test_accu_gnn(loader, num_classes):
+        model_gnn.eval()
         correct = 0
+        total_samples = len(loader.dataset)
+
+        # Initialize counters for per-class correct predictions and total samples per class
+        correct_per_class = torch.zeros(num_classes, dtype=torch.long).to(device)
+        total_per_class = torch.zeros(num_classes, dtype=torch.long).to(device)
+        outputs_all = torch.tensor([], dtype=torch.float, device=device)  # To store all outputs
+        y_all = torch.tensor([], dtype=torch.float, device=device)  # To store all y
 
         for data in loader:
             data = data.to(device)
-            _, out_cl = model(data.x, data.adj, data.mask)
+            _, out_cl, _, _ = model_gnn(data.x, data.adj, data.mask)
+
+            outputs_all = torch.cat((outputs_all, out_cl), dim=0)
+            y_all = torch.cat((y_all, data.y_cl.view(-1)), dim=0)
+
+            # Get the predicted class by taking the class with the max score
             pred = out_cl.max(dim=1)[1]
+
+            # Update the total correct predictions
             correct += pred.eq(data.y_cl.view(-1)).sum().item()
 
-        accuracy = correct / len(loader.dataset)
-        return accuracy
+            # Update the correct count and total count per class
+            for i in range(num_classes):
+                mask = data.y_cl.view(-1) == i  # Find all samples belonging to class i
+                correct_per_class[i] += pred[mask].eq(data.y_cl.view(-1)[mask]).sum().item()
+                total_per_class[i] += mask.sum().item()
+
+        # Calculate overall accuracy
+        overall_accuracy = correct / total_samples
+
+        # Calculate per-class accuracy
+        class_accuracy = correct_per_class.float() / total_per_class.float()
+
+        # Handle cases where a class might not be present in the batch
+        class_accuracy[total_per_class == 0] = float('nan')  # Assign NaN to avoid division by zero
+
+        return overall_accuracy, class_accuracy, outputs_all.cpu().detach().numpy(), y_all.cpu().detach().numpy()
+
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Training using {device}")
 
-    model = DiffPool()
-    model = model.to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.003)
+    model_gnn = DiffPool()
+    model_gnn = model_gnn.to(device)
+    optimizer = torch.optim.AdamW(model_gnn.parameters(), lr=learning_rate)
+    criterion = torch.nn.HuberLoss(delta=huber_delta).to(device)
 
     def shape_check(dataset, max_nodes):
         incorrect_shapes = []  # List to store indices of data elements with incorrect shapes
@@ -516,7 +804,7 @@ def main():
             data = dataset[i]
             # Check the shapes of data.x, data.adj, and data.mask
             if data.x.shape != torch.Size([max_nodes, 3]) or \
-                    data.y_re.shape != torch.Size([4]) or \
+                    data.y_re.shape != torch.Size([n_predicted_values]) or \
                     data.y_cl.shape != torch.Size([1]) or \
                     data.adj.shape != torch.Size([max_nodes, max_nodes]) or \
                     data.mask.shape != torch.Size([max_nodes]):
@@ -534,136 +822,408 @@ def main():
     shape_check(training_dataset, max_nodes)
     shape_check(testing_dataset, max_nodes)
 
-    train_loader = DenseDataLoader(training_dataset, batch_size=64, shuffle=False)
-    test_loader = DenseDataLoader(testing_dataset, batch_size=64, shuffle=False)
+    train_loader = DenseDataLoader(training_dataset, batch_size=train_batch_size_adjusted, shuffle=False)
+    test_loader = DenseDataLoader(testing_dataset, batch_size=test_batch_size_adjusted, shuffle=False)
     print(f"Training dataset length: {len(train_loader.dataset)}")
     print(f"Testing dataset length: {len(test_loader.dataset)}")
     print(train_loader.dataset.transform)
     print(test_loader.dataset.transform)
 
-    print(model)
+    print(model_gnn)
 
     test_mean_diffs_history = []
     train_loss_all_history = []
     train_loss_regression_history = []
     train_loss_classification_history = []
-    test_accuracy_history = []
+    test_loss_all_history = []
+    test_loss_regression_history = []
+    test_loss_classification_history = []
+    test_overall_accuracy_history = []
+    test_per_class_accuracy_history = []
     final_test_diffs = []
+    final_test_predictions = []
+    final_test_y = []
+    final_test_nodes = []
+    final_test_label_pred = []
+    final_test_label_true = []
+    final_overall_accuracy = []
+    final_per_class_accuracy = []
 
-    # Paths for saving embeddings
-    train_dir = os.path.join(name, task_type, "training")
-    test_dir = os.path.join(name, task_type, "testing")
+    # Set up the early stopper
+    # early_stopper = EarlyStopper(patience=3, min_delta=0.05)
+    actual_epoch_gnn = 0
+    # The losses are summed over each data point in the batch, thus we should normalize the losses accordingly
+    train_test_ratio = len(train_loader.dataset) / len(test_loader.dataset)
 
-    # Check and create directories if not exist
-    if not os.path.exists(train_dir):
-        os.makedirs(train_dir)
-    if not os.path.exists(test_dir):
-        os.makedirs(test_dir)
+    print("Now training GNN model...")
 
-    # Training loop
-    for epoch in range(1, epoch_number):
-        train_loss_all, train_loss_reg, train_loss_cls = train()
-        test_mean_diffs, test_diffs_all = test_diff(test_loader)
-        test_accuracy = test_accu(test_loader)
-        test_mean_diffs[2] = test_mean_diffs[2] / beta_n_norm_factor
-        test_mean_diffs[3] = test_mean_diffs[3] / beta_phi_norm_factor
-        print(f'Epoch: {epoch:03d}, Par 1 Mean Diff: {test_mean_diffs[0]:.4f}, Par 2 Mean Diff: {test_mean_diffs[1]:.4f}, Par 3 Mean Diff: {test_mean_diffs[2]:.4f}, Par 4 Mean Diff: {test_mean_diffs[3]:.4f}')
-        print(f'Epoch: {epoch:03d}, Regression Loss: {train_loss_reg:.4f}, Classification Loss: {train_loss_cls:.4f}, Combined Loss: {train_loss_all:.4f}')
-        print(f'Epoch: {epoch:03d}, Classification Accuracy: {test_accuracy:.4f}')
-
+    for epoch in range(1, epoch_number_gnn):
+        actual_epoch_gnn = epoch
+        train_loss_all, train_loss_reg, train_loss_cls = train_gnn()
+        test_loss_all, test_loss_reg, test_loss_cls = compute_test_loss_gnn()
+        test_loss_all = test_loss_all * train_test_ratio
+        test_loss_reg = test_loss_reg * train_test_ratio
+        test_loss_cls = test_loss_cls * train_test_ratio
+        test_mean_diffs, test_diffs_all, test_predictions, test_y, test_nodes_all = test_diff_gnn(test_loader)
+        test_accuracy_all, test_accuracy_class, test_label_pred, test_label_true = test_accu_gnn(test_loader, n_classes)
+        print(f'Epoch: {epoch:03d}, Par 1 Mean Diff: {test_mean_diffs[0]:.4f}, Par 2 Mean Diff: {test_mean_diffs[1]:.4f}, Par 3 Mean Diff: {test_mean_diffs[2]:.4f}, Par 4 Mean Diff: {test_mean_diffs[3]:.4f},Par 5 Mean Diff: {test_mean_diffs[4]:.4f},Par 6 Mean Diff: {test_mean_diffs[5]:.4f}')
+        print(f'Epoch: {epoch:03d}, Train Regression Loss: {train_loss_reg:.4f}, Train Classification Loss: {train_loss_cls:.4f}, Train Combined Loss: {train_loss_all:.4f}')
+        print(f'Epoch: {epoch:03d}, Test Regression Loss: {test_loss_reg:.4f}, Test Classification Loss: {test_loss_cls:.4f}, Test Combined Loss: {test_loss_all:.4f}')
+        print(f'Epoch: {epoch:03d}, Overall Classification Accuracy: {test_accuracy_all:.4f}')
+        # Convert the tensors to arrayss
+        train_loss_reg = train_loss_reg.cpu().detach().numpy()
+        train_loss_cls = train_loss_cls.cpu().detach().numpy()
+        test_loss_reg = test_loss_reg.cpu().detach().numpy()
+        test_loss_cls = test_loss_cls.cpu().detach().numpy()
+        test_accuracy_class = test_accuracy_class.cpu().detach().numpy()
+        print(f'Epoch: {epoch:03d}, Class 0 Accuracy: {test_accuracy_class[0]:.4f}, Class 1 Accuracy: {test_accuracy_class[1]:.4f}, Class 2 Accuracy: {test_accuracy_class[2]:.4f}')
         # Record the values
         test_mean_diffs_history.append(test_mean_diffs)
         train_loss_all_history.append(train_loss_all)
         train_loss_regression_history.append(train_loss_reg)
         train_loss_classification_history.append(train_loss_cls)
-        test_accuracy_history.append(test_accuracy)
+        test_loss_all_history.append(test_loss_all)
+        test_loss_regression_history.append(test_loss_reg)
+        test_loss_classification_history.append(test_loss_cls)
+        test_overall_accuracy_history.append(test_accuracy_all)
+        test_per_class_accuracy_history.append(test_accuracy_class)
         final_test_diffs = test_diffs_all
+        final_test_predictions = test_predictions
+        final_test_y = test_y
+        final_test_nodes = test_nodes_all
+        final_test_label_pred = test_label_pred
+        final_test_label_true = test_label_true
+        final_overall_accuracy = test_accuracy_all
+        final_per_class_accuracy = test_accuracy_class
         print(f"Final test diffs length: {len(final_test_diffs)}")
+        print(f"Final predictions length: {len(final_test_predictions)}")
+        print(f"Final y length: {len(final_test_y)}")
+        print(f"Final nodes length: {len(final_test_nodes)}")
 
-    print("Finished training, saving model...")
-    torch.save(model.state_dict(), os.path.join(name, task_type, f"{task_type}_model_diffpool.pt"))
-    print("Model successfully saved to:")
-    print(f"{task_type}_model_diffpool.pt")
+    # Save the model
+    print("Saving GNN model...")
+    # Create the directory if it doesn't exist
+    if not os.path.exists(os.path.join(name, task_type, "STBO")):
+        os.makedirs(os.path.join(name, task_type, "STBO"))
+    torch.save(model_gnn.state_dict(),
+               os.path.join(name, task_type, "STBO", f"{task_type}_model_diffpool_{gnn_depth}_gnn.pt"))
 
-    print("Saving training and testing performance...")
+
     # After the loop, create a dictionary to hold the data
-    data_dict = {"lambda_diff": [], "mu_diff": [], "beta_n_diff": [], "beta_phi_diff": []}
-
-    printed_vars = set()
-
-    def move_to_cpu(data, var_name="unknown"):
-        if isinstance(data, torch.Tensor) and data.device.type == "cuda":
-            if var_name not in printed_vars:
-                print(f"Moving tensor in {var_name} to CPU from:", data.device)
-                printed_vars.add(var_name)
-            return data.cpu().detach()
-        return data
-
+    data_dict = {"lambda_diff": [], "mu_diff": [], "beta_n_diff": [], "beta_phi_diff": [], "gamma_n_diff": [], "gamma_phi_diff": []}
+    # Iterate through test_mean_diffs_history
     for array in test_mean_diffs_history:
-        # Use the helper function to ensure data is on the CPU
-        array = [move_to_cpu(item, var_name=name) for item, name in zip(array, ["lambda_diff", "mu_diff", "beta_n_diff", "beta_phi_diff"])]
-
         # It's assumed that the order of elements in the array corresponds to the keys in data_dict
         data_dict["lambda_diff"].append(array[0])
         data_dict["mu_diff"].append(array[1])
         data_dict["beta_n_diff"].append(array[2])
         data_dict["beta_phi_diff"].append(array[3])
-
-    # Similarly, ensure that the other lists are on the CPU before assigning to the dictionary
-    data_dict["Epoch"] = list(range(1, epoch_number))
-    data_dict["Train_Loss_All"] = [move_to_cpu(item, var_name="Train_Loss_All") for item in train_loss_all_history]
-    data_dict["Train_Loss_Regression"] = [move_to_cpu(item, var_name="Train_Loss_Regression") for item in train_loss_regression_history]
-    data_dict["Train_Loss_Classification"] = [move_to_cpu(item, var_name="Train_Loss_Classification") for item in train_loss_classification_history]
-    data_dict["Cl_Accuracy"] = [move_to_cpu(item, var_name="Cl_Accuracy") for item in test_accuracy_history]
-
-    def check_col_lengths(data_dict):
-        # Get the lengths of all columns
-        lengths = [len(v) for v in data_dict.values()]
-
-        # Check if all lengths are the same
-        if len(set(lengths)) != 1:
-            inconsistent_cols = [key for key, value in data_dict.items() if len(value) != lengths[0]]
-            return False, inconsistent_cols
-        return True, []
-
-    model_performance = None
-    final_differences = None
+        data_dict["gamma_n_diff"].append(array[4])
+        data_dict["gamma_phi_diff"].append(array[5])
+    data_dict["Epoch"] = list(range(1, actual_epoch_gnn + 1))
+    data_dict["Train_Loss_ALL"] = train_loss_all_history
+    data_dict["Train_Loss_Regression"] = train_loss_regression_history
+    data_dict["Train_Loss_Classification"] = train_loss_classification_history
+    data_dict["Test_Loss_ALL"] = test_loss_all_history
+    data_dict["Test_Loss_Regression"] = test_loss_regression_history
+    data_dict["Test_Loss_Classification"] = test_loss_classification_history
 
     # Convert the dictionary to a pandas DataFrame
-    try:
-        model_performance = pd.DataFrame(data_dict)
-    except Exception as e:
-        consistent, cols = check_col_lengths(data_dict)
-        if not consistent:
-            print("Error due to inconsistent lengths in columns:", ", ".join(cols))
-        else:
-            print("An unknown error occurred:", str(e))
+    model_performance = pd.DataFrame(data_dict)
+    final_differences = pd.DataFrame(final_test_diffs, columns=["lambda_diff", "mu_diff", "beta_n_diff", "beta_phi_diff", "gamma_n_diff", "gamma_phi_diff"])
+    final_predictions = pd.DataFrame(final_test_predictions, columns=["lambda_pred", "mu_pred", "beta_n_pred", "beta_phi_pred", "gamma_n_pred", "gamma_phi_pred"])
+    final_y = pd.DataFrame(final_test_y, columns=["lambda", "mu", "beta_n", "beta_phi", "gamma_n", "gamma_phi"])
+    final_nodes = pd.DataFrame(final_test_nodes, columns=["num_nodes"])
+    final_label_prob = pd.DataFrame(final_test_label_pred, columns=["pd_prob", "ed_prob", "nnd_prob"])
+    final_label_true = pd.DataFrame(final_test_label_true, columns=["true_class"])
 
-    try:
-        final_differences = pd.DataFrame(final_test_diffs, columns=["lambda_diff", "mu_diff", "beta_n_diff", "beta_phi_diff"])
-    except Exception as e:
-        print("Error occurred while creating the final_differences DataFrame:", str(e))
+    # Column-wise combine all final DataFrames
+    final_result = pd.concat([final_differences, final_predictions, final_y, final_nodes, final_label_prob, final_label_true], axis=1)
 
-    # Check if variables exist before saving
-    if 'model_performance' in locals():
-        try:
-            pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_diffpool.rds"), model_performance)
-            print(f"Successfully saved training and testing performance to files:")
-            print(f"{task_type}_diffpool.rds")
-        except Exception as e:
-            print(f"Error occurred while saving model_performance: {str(e)}")
-    else:
-        print("model_performance has not been assigned!")
+    print("Final differences:")
+    print(abs(final_differences[["lambda_diff", "mu_diff", "beta_n_diff", "beta_phi_diff", "gamma_n_diff", "gamma_phi_diff"]]).mean())
+    print("Final overall accuracy:", final_overall_accuracy)
+    print("Final per-class accuracy:", final_per_class_accuracy)
 
-    if 'final_differences' in locals():
-        try:
-            pyreadr.write_rds(os.path.join(name, task_type, f"{task_type}_final_diffs_diffpool.rds"), final_differences)
-            print(f"Successfully saved final mean differences to files:")
-            print(f"{task_type}_final_diffs_diffpool.rds")
-        except Exception as e:
-            print(f"Error occurred while saving final_differences: {str(e)}")
-    else:
-        print("final_differences has not been assigned!")
+    # Workaround to get rid of the dtype incompatible issue
+    model_performance = model_performance.astype(object)
+    final_result = final_result.astype(object)
+
+    # Save the data to a file using pyreadr
+    pyreadr.write_rds(os.path.join(name, task_type, "STBO", f"{task_type}_diffpool_{gnn_depth}_gnn.rds"), model_performance)
+    pyreadr.write_rds(os.path.join(name, task_type, "STBO", f"{task_type}_final_diffpool_{gnn_depth}_gnn.rds"), final_result)
+
+
+    # Now the functions and logics for lstm
+    def combined_loss_lstm(output_regression, target_regression, output_classification, target_classification):
+        loss_regression = criterion(output_regression, target_regression)
+        loss_classification = F.cross_entropy(output_classification, target_classification)
+        loss_all = alpha * loss_regression + beta * loss_classification
+
+        return loss_all, loss_regression, loss_classification
+
+    def train_lstm():
+        model_lstm.train()
+
+        loss_all = 0  # Keep track of the loss
+        loss_reg = 0  # Keep track of the regression loss
+        loss_cls = 0  # Keep track of the classification loss
+
+        for data in train_loader:
+            lengths_brts = torch.sum(data.brts != 0, dim=1).cpu().tolist()
+            brts_cpu = data.brts.cpu()
+            brts_cpu = brts_cpu.unsqueeze(-1)
+            packed_brts = pack_padded_sequence(brts_cpu, lengths_brts, batch_first=True, enforce_sorted=False).to(device)
+            data.to(device)
+            optimizer_lstm.zero_grad()
+            out_re, out_cl = model_lstm(packed_brts)
+            target_re = data.y_re.view(data.num_nodes.__len__(), n_predicted_values).to(device)
+            target_cl = data.y_cl.view(-1).to(device)
+            assert out_re.device == target_re.device == out_cl.device == target_cl.device, \
+                "Error: Device mismatch between output and target tensors."
+            loss, loss_reg, loss_cls = combined_loss_lstm(out_re, target_re, out_cl, target_cl)
+            loss.backward()
+            loss_all += loss.item() * data.num_nodes.__len__()
+            loss_reg += loss_reg.item() * data.num_nodes.__len__()
+            loss_cls += loss_cls.item() * data.num_nodes.__len__()
+            optimizer_lstm.step()
+
+        out_loss_all = loss_all / len(train_loader.dataset)
+        out_loss_reg = loss_reg / len(train_loader.dataset)
+        out_loss_cls = loss_cls / len(train_loader.dataset)
+
+        return out_loss_all, out_loss_reg, out_loss_cls
+
+    @torch.no_grad()
+    def test_diff_lstm(loader):
+        model_lstm.eval()
+
+        diffs_all = torch.tensor([], dtype=torch.float, device=device)
+        outputs_all = torch.tensor([], dtype=torch.float, device=device)  # To store all outputs
+        y_all = torch.tensor([], dtype=torch.float, device=device)  # To store all y
+        nodes_all = torch.tensor([], dtype=torch.long, device=device)
+
+        for data in loader:
+            lengths_brts = torch.sum(data.brts != 0, dim=1).cpu().tolist()
+            brts_cpu = data.brts.cpu()
+            brts_cpu = brts_cpu.unsqueeze(-1)
+            packed_brts = pack_padded_sequence(brts_cpu, lengths_brts, batch_first=True, enforce_sorted=False).to(device)
+            data.to(device)
+            out_re, _ = model_lstm(packed_brts)
+            diffs = torch.abs(out_re - data.y_re.view(data.num_nodes.__len__(), n_predicted_values))
+            diffs_all = torch.cat((diffs_all, diffs), dim=0)
+            outputs_all = torch.cat((outputs_all, out_re), dim=0)
+            y_all = torch.cat((y_all, data.y_re.view(data.num_nodes.__len__(), n_predicted_values)), dim=0)
+            nodes_all = torch.cat((nodes_all, data.num_nodes), dim=0)
+
+        print(f"diffs_all length: {len(diffs_all)}; test_loader.dataset length: {len(test_loader.dataset)}; Equal: {len(diffs_all) == len(test_loader.dataset)}")
+        mean_diffs = torch.sum(diffs_all, dim=0) / len(test_loader.dataset)
+        return mean_diffs.cpu().detach().numpy(), diffs_all.cpu().detach().numpy(), outputs_all.cpu().detach().numpy(), y_all.cpu().detach().numpy(), nodes_all.cpu().detach().numpy()
+
+    @torch.no_grad()
+    def compute_test_loss_lstm():
+        model_lstm.eval()  # Set the model to evaluation mode
+
+        loss_all = 0  # Keep track of the loss
+        loss_reg = 0  # Keep track of the regression loss
+        loss_cls = 0  # Keep track of the classification loss
+
+        for data in test_loader:
+            lengths_brts = torch.sum(data.brts != 0, dim=1).cpu().tolist()
+            brts_cpu = data.brts.cpu()
+            brts_cpu = brts_cpu.unsqueeze(-1)
+            packed_brts = pack_padded_sequence(brts_cpu, lengths_brts, batch_first=True, enforce_sorted=False).to(device)
+            data.to(device)
+            graph_sizes = data.num_nodes
+            out_re, out_cl = model_lstm(packed_brts)
+            target_re = data.y_re.view(data.num_nodes.__len__(), n_predicted_values).to(device)
+            target_cl = data.y_cl.view(-1).to(device)
+            loss, loss_reg, loss_cls = combined_loss_lstm(out_re, target_re, out_cl, target_cl)
+            loss_all += loss.item() * data.num_nodes.__len__()
+            loss_reg += loss_reg.item() * data.num_nodes.__len__()
+            loss_cls += loss_cls.item() * data.num_nodes.__len__()
+
+        out_loss_all = loss_all / len(train_loader.dataset)
+        out_loss_reg = loss_reg / len(train_loader.dataset)
+        out_loss_cls = loss_cls / len(train_loader.dataset)
+
+        return out_loss_all, out_loss_reg, out_loss_cls
+
+    @torch.no_grad()
+    def test_accu_lstm(loader, num_classes):
+        model_lstm.eval()
+        correct = 0
+        total_samples = len(loader.dataset)
+
+        # Initialize counters for per-class correct predictions and total samples per class
+        correct_per_class = torch.zeros(num_classes, dtype=torch.long).to(device)
+        total_per_class = torch.zeros(num_classes, dtype=torch.long).to(device)
+        outputs_all = torch.tensor([], dtype=torch.float, device=device)  # To store all outputs
+        y_all = torch.tensor([], dtype=torch.float, device=device)  # To store all y
+
+        for data in loader:
+            lengths_brts = torch.sum(data.brts != 0, dim=1).cpu().tolist()
+            brts_cpu = data.brts.cpu()
+            brts_cpu = brts_cpu.unsqueeze(-1)
+            packed_brts = pack_padded_sequence(brts_cpu, lengths_brts, batch_first=True, enforce_sorted=False).to(device)
+
+            data = data.to(device)
+            _, out_cl = model_lstm(packed_brts)
+
+            outputs_all = torch.cat((outputs_all, out_cl), dim=0)
+            y_all = torch.cat((y_all, data.y_cl.view(-1)), dim=0)
+
+            # Get the predicted class by taking the class with the max score
+            pred = out_cl.max(dim=1)[1]
+
+            # Update the total correct predictions
+            correct += pred.eq(data.y_cl.view(-1)).sum().item()
+
+            # Update the correct count and total count per class
+            for i in range(num_classes):
+                mask = data.y_cl.view(-1) == i  # Find all samples belonging to class i
+                correct_per_class[i] += pred[mask].eq(data.y_cl.view(-1)[mask]).sum().item()
+                total_per_class[i] += mask.sum().item()
+
+        # Calculate overall accuracy
+        overall_accuracy = correct / total_samples
+
+        # Calculate per-class accuracy
+        class_accuracy = correct_per_class.float() / total_per_class.float()
+
+        # Handle cases where a class might not be present in the batch
+        class_accuracy[total_per_class == 0] = float('nan')  # Assign NaN to avoid division by zero
+
+        return overall_accuracy, class_accuracy, outputs_all.cpu().detach().numpy(), y_all.cpu().detach().numpy()
+
+    model_lstm = LSTM(in_channels=1, hidden_channels=lstm_hidden_channels,
+                      out_channels=lstm_output_channels, lstm_depth=lstm_depth).to(device)
+    optimizer_lstm = torch.optim.AdamW(model_lstm.parameters(), lr=learning_rate)
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print(f"Training using {device}")
+    print(model_lstm)
+
+    test_mean_diffs_history = []
+    train_loss_all_history = []
+    train_loss_regression_history = []
+    train_loss_classification_history = []
+    test_loss_all_history = []
+    test_loss_regression_history = []
+    test_loss_classification_history = []
+    test_overall_accuracy_history = []
+    test_per_class_accuracy_history = []
+    final_test_diffs = []
+    final_test_predictions = []
+    final_test_y = []
+    final_test_nodes = []
+    final_test_label_pred = []
+    final_test_label_true = []
+    final_overall_accuracy = []
+    final_per_class_accuracy = []
+
+    # Set up the early stopper
+    # early_stopper = EarlyStopper(patience=3, min_delta=0.05)
+    actual_epoch_lstm = 0
+    # The losses are summed over each data point in the batch, thus we should normalize the losses accordingly
+    train_test_ratio = len(train_loader.dataset) / len(test_loader.dataset)
+
+    print("Now training LSTM model...")
+
+    for epoch in range(1, epoch_number_lstm):
+        actual_epoch_lstm = epoch
+        train_loss_all, train_loss_reg, train_loss_cls = train_lstm()
+        test_loss_all, test_loss_reg, test_loss_cls = compute_test_loss_lstm()
+        test_loss_all = test_loss_all * train_test_ratio
+        test_loss_reg = test_loss_reg * train_test_ratio
+        test_loss_cls = test_loss_cls * train_test_ratio
+        test_mean_diffs, test_diffs_all, test_predictions, test_y, test_nodes_all = test_diff_lstm(test_loader)
+        test_accuracy_all, test_accuracy_class, test_label_pred, test_label_true = test_accu_lstm(test_loader, n_classes)
+        print(f'Epoch: {epoch:03d}, Par 1 Mean Diff: {test_mean_diffs[0]:.4f}, Par 2 Mean Diff: {test_mean_diffs[1]:.4f}, Par 3 Mean Diff: {test_mean_diffs[2]:.4f}, Par 4 Mean Diff: {test_mean_diffs[3]:.4f},Par 5 Mean Diff: {test_mean_diffs[4]:.4f},Par 6 Mean Diff: {test_mean_diffs[5]:.4f}')
+        print(f'Epoch: {epoch:03d}, Train Regression Loss: {train_loss_reg:.4f}, Train Classification Loss: {train_loss_cls:.4f}, Train Combined Loss: {train_loss_all:.4f}')
+        print(f'Epoch: {epoch:03d}, Test Regression Loss: {test_loss_reg:.4f}, Test Classification Loss: {test_loss_cls:.4f}, Test Combined Loss: {test_loss_all:.4f}')
+        print(f'Epoch: {epoch:03d}, Overall Classification Accuracy: {test_accuracy_all:.4f}')
+        # Convert the tensors to arrayss
+        train_loss_reg = train_loss_reg.cpu().detach().numpy()
+        train_loss_cls = train_loss_cls.cpu().detach().numpy()
+        test_loss_reg = test_loss_reg.cpu().detach().numpy()
+        test_loss_cls = test_loss_cls.cpu().detach().numpy()
+        test_accuracy_class = test_accuracy_class.cpu().detach().numpy()
+        print(f'Epoch: {epoch:03d}, Class 0 Accuracy: {test_accuracy_class[0]:.4f}, Class 1 Accuracy: {test_accuracy_class[1]:.4f}, Class 2 Accuracy: {test_accuracy_class[2]:.4f}')
+        # Record the values
+        test_mean_diffs_history.append(test_mean_diffs)
+        train_loss_all_history.append(train_loss_all)
+        train_loss_regression_history.append(train_loss_reg)
+        train_loss_classification_history.append(train_loss_cls)
+        test_loss_all_history.append(test_loss_all)
+        test_loss_regression_history.append(test_loss_reg)
+        test_loss_classification_history.append(test_loss_cls)
+        test_overall_accuracy_history.append(test_accuracy_all)
+        test_per_class_accuracy_history.append(test_accuracy_class)
+        final_test_diffs = test_diffs_all
+        final_test_predictions = test_predictions
+        final_test_y = test_y
+        final_test_nodes = test_nodes_all
+        final_test_label_pred = test_label_pred
+        final_test_label_true = test_label_true
+        final_overall_accuracy = test_accuracy_all
+        final_per_class_accuracy = test_accuracy_class
+        print(f"Final test diffs length: {len(final_test_diffs)}")
+        print(f"Final predictions length: {len(final_test_predictions)}")
+        print(f"Final y length: {len(final_test_y)}")
+        print(f"Final nodes length: {len(final_test_nodes)}")
+
+    # Save the model
+    print("Saving LSTM model...")
+    # Create the directory if it doesn't exist
+    if not os.path.exists(os.path.join(name, task_type, "STBO")):
+        os.makedirs(os.path.join(name, task_type, "STBO"))
+    torch.save(model_lstm.state_dict(),
+               os.path.join(name, task_type, "STBO", f"{task_type}_model_diffpool_{gnn_depth}_lstm.pt"))
+
+
+    # After the loop, create a dictionary to hold the data
+    data_dict = {"lambda_diff": [], "mu_diff": [], "beta_n_diff": [], "beta_phi_diff": [], "gamma_n_diff": [], "gamma_phi_diff": []}
+    # Iterate through test_mean_diffs_history
+    for array in test_mean_diffs_history:
+        # It's assumed that the order of elements in the array corresponds to the keys in data_dict
+        data_dict["lambda_diff"].append(array[0])
+        data_dict["mu_diff"].append(array[1])
+        data_dict["beta_n_diff"].append(array[2])
+        data_dict["beta_phi_diff"].append(array[3])
+        data_dict["gamma_n_diff"].append(array[4])
+        data_dict["gamma_phi_diff"].append(array[5])
+    data_dict["Epoch"] = list(range(1, actual_epoch_lstm + 1))
+    data_dict["Train_Loss_ALL"] = train_loss_all_history
+    data_dict["Train_Loss_Regression"] = train_loss_regression_history
+    data_dict["Train_Loss_Classification"] = train_loss_classification_history
+    data_dict["Test_Loss_ALL"] = test_loss_all_history
+    data_dict["Test_Loss_Regression"] = test_loss_regression_history
+    data_dict["Test_Loss_Classification"] = test_loss_classification_history
+
+    # Convert the dictionary to a pandas DataFrame
+    model_performance = pd.DataFrame(data_dict)
+    final_differences = pd.DataFrame(final_test_diffs, columns=["lambda_diff", "mu_diff", "beta_n_diff", "beta_phi_diff", "gamma_n_diff", "gamma_phi_diff"])
+    final_predictions = pd.DataFrame(final_test_predictions, columns=["lambda_pred", "mu_pred", "beta_n_pred", "beta_phi_pred", "gamma_n_pred", "gamma_phi_pred"])
+    final_y = pd.DataFrame(final_test_y, columns=["lambda", "mu", "beta_n", "beta_phi", "gamma_n", "gamma_phi"])
+    final_nodes = pd.DataFrame(final_test_nodes, columns=["num_nodes"])
+    final_label_prob = pd.DataFrame(final_test_label_pred, columns=["pd_prob", "ed_prob", "nnd_prob"])
+    final_label_true = pd.DataFrame(final_test_label_true, columns=["true_class"])
+
+    # Column-wise combine all final DataFrames
+    final_result = pd.concat([final_differences, final_predictions, final_y, final_nodes, final_label_prob, final_label_true], axis=1)
+
+    print("Final differences:")
+    print(abs(final_differences[["lambda_diff", "mu_diff", "beta_n_diff", "beta_phi_diff", "gamma_n_diff", "gamma_phi_diff"]]).mean())
+    print("Final overall accuracy:", final_overall_accuracy)
+    print("Final per-class accuracy:", final_per_class_accuracy)
+
+    # Workaround to get rid of the dtype incompatible issue
+    model_performance = model_performance.astype(object)
+    final_result = final_result.astype(object)
+
+    # Save the data to a file using pyreadr
+    pyreadr.write_rds(os.path.join(name, task_type, "STBO", f"{task_type}_diffpool_{gnn_depth}_lstm.rds"), model_performance)
+    pyreadr.write_rds(os.path.join(name, task_type, "STBO", f"{task_type}_final_diffpool_{gnn_depth}_lstm.rds"), final_result)
 
 
 if __name__ == '__main__':
