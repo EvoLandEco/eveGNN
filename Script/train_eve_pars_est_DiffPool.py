@@ -318,7 +318,7 @@ def read_rds_to_pytorch(path, count, normalize=False):
 
         params_current_tensor = torch.tensor(params_current[0:(n_predicted_values)], dtype=torch.float)
 
-        class_current_tensor = torch.tensor(params_current[7], dtype=torch.long)
+        class_current_tensor = torch.tensor(params_current[n_predicted_values + 1], dtype=torch.long)
 
         brts_tensor = torch.tensor(brts_list[i].values, dtype=torch.float)
 
@@ -829,129 +829,165 @@ def main():
     print(train_loader.dataset.transform)
     print(test_loader.dataset.transform)
 
-    # print(model_gnn)
-    #
-    # test_mean_diffs_history = []
-    # train_loss_all_history = []
-    # train_loss_regression_history = []
-    # train_loss_classification_history = []
-    # test_loss_all_history = []
-    # test_loss_regression_history = []
-    # test_loss_classification_history = []
-    # test_overall_accuracy_history = []
-    # test_per_class_accuracy_history = []
-    # final_test_diffs = []
-    # final_test_predictions = []
-    # final_test_y = []
-    # final_test_nodes = []
-    # final_test_label_pred = []
-    # final_test_label_true = []
-    # final_overall_accuracy = []
-    # final_per_class_accuracy = []
-    #
-    # # Set up the early stopper
-    # # early_stopper = EarlyStopper(patience=3, min_delta=0.05)
-    # actual_epoch_gnn = 0
-    # # The losses are summed over each data point in the batch, thus we should normalize the losses accordingly
-    # train_test_ratio = len(train_loader.dataset) / len(test_loader.dataset)
-    #
-    # print("Now training GNN model...")
-    #
-    # for epoch in range(1, epoch_number_gnn):
-    #     actual_epoch_gnn = epoch
-    #     train_loss_all, train_loss_reg, train_loss_cls = train_gnn()
-    #     test_loss_all, test_loss_reg, test_loss_cls = compute_test_loss_gnn()
-    #     test_loss_all = test_loss_all * train_test_ratio
-    #     test_loss_reg = test_loss_reg * train_test_ratio
-    #     test_loss_cls = test_loss_cls * train_test_ratio
-    #     test_mean_diffs, test_diffs_all, test_predictions, test_y, test_nodes_all = test_diff_gnn(test_loader)
-    #     test_accuracy_all, test_accuracy_class, test_label_pred, test_label_true = test_accu_gnn(test_loader, n_classes)
-    #     print(f'Epoch: {epoch:03d}, Par 1 Mean Diff: {test_mean_diffs[0]:.4f}, Par 2 Mean Diff: {test_mean_diffs[1]:.4f}, Par 3 Mean Diff: {test_mean_diffs[2]:.4f}, Par 4 Mean Diff: {test_mean_diffs[3]:.4f},Par 5 Mean Diff: {test_mean_diffs[4]:.4f},Par 6 Mean Diff: {test_mean_diffs[5]:.4f}')
-    #     print(f'Epoch: {epoch:03d}, Train Regression Loss: {train_loss_reg:.4f}, Train Classification Loss: {train_loss_cls:.4f}, Train Combined Loss: {train_loss_all:.4f}')
-    #     print(f'Epoch: {epoch:03d}, Test Regression Loss: {test_loss_reg:.4f}, Test Classification Loss: {test_loss_cls:.4f}, Test Combined Loss: {test_loss_all:.4f}')
-    #     print(f'Epoch: {epoch:03d}, Overall Classification Accuracy: {test_accuracy_all:.4f}')
-    #     # Convert the tensors to arrayss
-    #     train_loss_reg = train_loss_reg.cpu().detach().numpy()
-    #     train_loss_cls = train_loss_cls.cpu().detach().numpy()
-    #     test_loss_reg = test_loss_reg.cpu().detach().numpy()
-    #     test_loss_cls = test_loss_cls.cpu().detach().numpy()
-    #     test_accuracy_class = test_accuracy_class.cpu().detach().numpy()
-    #     print(f'Epoch: {epoch:03d}, Class 0 Accuracy: {test_accuracy_class[0]:.4f}, Class 1 Accuracy: {test_accuracy_class[1]:.4f}, Class 2 Accuracy: {test_accuracy_class[2]:.4f}')
-    #     # Record the values
-    #     test_mean_diffs_history.append(test_mean_diffs)
-    #     train_loss_all_history.append(train_loss_all)
-    #     train_loss_regression_history.append(train_loss_reg)
-    #     train_loss_classification_history.append(train_loss_cls)
-    #     test_loss_all_history.append(test_loss_all)
-    #     test_loss_regression_history.append(test_loss_reg)
-    #     test_loss_classification_history.append(test_loss_cls)
-    #     test_overall_accuracy_history.append(test_accuracy_all)
-    #     test_per_class_accuracy_history.append(test_accuracy_class)
-    #     final_test_diffs = test_diffs_all
-    #     final_test_predictions = test_predictions
-    #     final_test_y = test_y
-    #     final_test_nodes = test_nodes_all
-    #     final_test_label_pred = test_label_pred
-    #     final_test_label_true = test_label_true
-    #     final_overall_accuracy = test_accuracy_all
-    #     final_per_class_accuracy = test_accuracy_class
-    #     print(f"Final test diffs length: {len(final_test_diffs)}")
-    #     print(f"Final predictions length: {len(final_test_predictions)}")
-    #     print(f"Final y length: {len(final_test_y)}")
-    #     print(f"Final nodes length: {len(final_test_nodes)}")
-    #
-    # # Save the model
-    # print("Saving GNN model...")
-    # # Create the directory if it doesn't exist
-    # if not os.path.exists(os.path.join(name, task_type, "STBO")):
-    #     os.makedirs(os.path.join(name, task_type, "STBO"))
-    # torch.save(model_gnn.state_dict(),
-    #            os.path.join(name, task_type, "STBO", f"{task_type}_model_diffpool_{gnn_depth}_gnn.pt"))
-    #
-    #
-    # # After the loop, create a dictionary to hold the data
-    # data_dict = {"lambda_diff": [], "mu_diff": [], "beta_n_diff": [], "beta_phi_diff": [], "gamma_n_diff": [], "gamma_phi_diff": []}
-    # # Iterate through test_mean_diffs_history
-    # for array in test_mean_diffs_history:
-    #     # It's assumed that the order of elements in the array corresponds to the keys in data_dict
-    #     data_dict["lambda_diff"].append(array[0])
-    #     data_dict["mu_diff"].append(array[1])
-    #     data_dict["beta_n_diff"].append(array[2])
-    #     data_dict["beta_phi_diff"].append(array[3])
-    #     data_dict["gamma_n_diff"].append(array[4])
-    #     data_dict["gamma_phi_diff"].append(array[5])
-    # data_dict["Epoch"] = list(range(1, actual_epoch_gnn + 1))
-    # data_dict["Train_Loss_ALL"] = train_loss_all_history
-    # data_dict["Train_Loss_Regression"] = train_loss_regression_history
-    # data_dict["Train_Loss_Classification"] = train_loss_classification_history
-    # data_dict["Test_Loss_ALL"] = test_loss_all_history
-    # data_dict["Test_Loss_Regression"] = test_loss_regression_history
-    # data_dict["Test_Loss_Classification"] = test_loss_classification_history
-    #
-    # # Convert the dictionary to a pandas DataFrame
-    # model_performance = pd.DataFrame(data_dict)
-    # final_differences = pd.DataFrame(final_test_diffs, columns=["lambda_diff", "mu_diff", "beta_n_diff", "beta_phi_diff", "gamma_n_diff", "gamma_phi_diff"])
-    # final_predictions = pd.DataFrame(final_test_predictions, columns=["lambda_pred", "mu_pred", "beta_n_pred", "beta_phi_pred", "gamma_n_pred", "gamma_phi_pred"])
-    # final_y = pd.DataFrame(final_test_y, columns=["lambda", "mu", "beta_n", "beta_phi", "gamma_n", "gamma_phi"])
-    # final_nodes = pd.DataFrame(final_test_nodes, columns=["num_nodes"])
-    # final_label_prob = pd.DataFrame(final_test_label_pred, columns=["pd_prob", "ed_prob", "nnd_prob"])
-    # final_label_true = pd.DataFrame(final_test_label_true, columns=["true_class"])
-    #
-    # # Column-wise combine all final DataFrames
-    # final_result = pd.concat([final_differences, final_predictions, final_y, final_nodes, final_label_prob, final_label_true], axis=1)
-    #
-    # print("Final differences:")
-    # print(abs(final_differences[["lambda_diff", "mu_diff", "beta_n_diff", "beta_phi_diff", "gamma_n_diff", "gamma_phi_diff"]]).mean())
-    # print("Final overall accuracy:", final_overall_accuracy)
-    # print("Final per-class accuracy:", final_per_class_accuracy)
-    # 
-    # # Workaround to get rid of the dtype incompatible issue
-    # model_performance = model_performance.astype(object)
-    # final_result = final_result.astype(object)
-    #
-    # # Save the data to a file using pyreadr
-    # pyreadr.write_rds(os.path.join(name, task_type, "STBO", f"{task_type}_diffpool_{gnn_depth}_gnn.rds"), model_performance)
-    # pyreadr.write_rds(os.path.join(name, task_type, "STBO", f"{task_type}_final_diffpool_{gnn_depth}_gnn.rds"), final_result)
+    print(model_gnn)
+
+    test_mean_diffs_history = []
+    train_loss_all_history = []
+    train_loss_regression_history = []
+    train_loss_classification_history = []
+    test_loss_all_history = []
+    test_loss_regression_history = []
+    test_loss_classification_history = []
+    test_overall_accuracy_history = []
+    test_per_class_accuracy_history = []
+    final_test_diffs = []
+    final_test_predictions = []
+    final_test_y = []
+    final_test_nodes = []
+    final_test_label_pred = []
+    final_test_label_true = []
+    final_overall_accuracy = []
+    final_per_class_accuracy = []
+
+    # Set up the early stopper
+    # early_stopper = EarlyStopper(patience=3, min_delta=0.05)
+    actual_epoch_gnn = 0
+    # The losses are summed over each data point in the batch, thus we should normalize the losses accordingly
+    train_test_ratio = len(train_loader.dataset) / len(test_loader.dataset)
+
+    print("Now training GNN model...")
+
+    for epoch in range(1, epoch_number_gnn):
+        actual_epoch_gnn = epoch
+        train_loss_all, train_loss_reg, train_loss_cls = train_gnn()
+        test_loss_all, test_loss_reg, test_loss_cls = compute_test_loss_gnn()
+        test_loss_all = test_loss_all * train_test_ratio
+        test_loss_reg = test_loss_reg * train_test_ratio
+        test_loss_cls = test_loss_cls * train_test_ratio
+        test_mean_diffs, test_diffs_all, test_predictions, test_y, test_nodes_all = test_diff_gnn(test_loader)
+        test_accuracy_all, test_accuracy_class, test_label_pred, test_label_true = test_accu_gnn(test_loader, n_classes)
+        print(f'Epoch: {epoch:03d}, Train Regression Loss: {train_loss_reg:.4f}, Train Classification Loss: {train_loss_cls:.4f}, Train Combined Loss: {train_loss_all:.4f}')
+        print(f'Epoch: {epoch:03d}, Test Regression Loss: {test_loss_reg:.4f}, Test Classification Loss: {test_loss_cls:.4f}, Test Combined Loss: {test_loss_all:.4f}')
+        print(f'Epoch: {epoch:03d}, Overall Classification Accuracy: {test_accuracy_all:.4f}')
+        # Convert the tensors to arrayss
+        train_loss_reg = train_loss_reg.cpu().detach().numpy()
+        train_loss_cls = train_loss_cls.cpu().detach().numpy()
+        test_loss_reg = test_loss_reg.cpu().detach().numpy()
+        test_loss_cls = test_loss_cls.cpu().detach().numpy()
+        test_accuracy_class = test_accuracy_class.cpu().detach().numpy()
+        print(f'Epoch: {epoch:03d}, Class 0 Accuracy: {test_accuracy_class[0]:.4f}, Class 1 Accuracy: {test_accuracy_class[1]:.4f}, Class 2 Accuracy: {test_accuracy_class[2]:.4f}')
+        # Record the values
+        test_mean_diffs_history.append(test_mean_diffs)
+        train_loss_all_history.append(train_loss_all)
+        train_loss_regression_history.append(train_loss_reg)
+        train_loss_classification_history.append(train_loss_cls)
+        test_loss_all_history.append(test_loss_all)
+        test_loss_regression_history.append(test_loss_reg)
+        test_loss_classification_history.append(test_loss_cls)
+        test_overall_accuracy_history.append(test_accuracy_all)
+        test_per_class_accuracy_history.append(test_accuracy_class)
+        final_test_diffs = test_diffs_all
+        final_test_predictions = test_predictions
+        final_test_y = test_y
+        final_test_nodes = test_nodes_all
+        final_test_label_pred = test_label_pred
+        final_test_label_true = test_label_true
+        final_overall_accuracy = test_accuracy_all
+        final_per_class_accuracy = test_accuracy_class
+        print(f"Final test diffs length: {len(final_test_diffs)}")
+        print(f"Final predictions length: {len(final_test_predictions)}")
+        print(f"Final y length: {len(final_test_y)}")
+        print(f"Final nodes length: {len(final_test_nodes)}")
+
+    # Save the model
+    print("Saving GNN model...")
+    # Create the directory if it doesn't exist
+    if not os.path.exists(os.path.join(name, task_type, "STBO")):
+        os.makedirs(os.path.join(name, task_type, "STBO"))
+    torch.save(model_gnn.state_dict(),
+               os.path.join(name, task_type, "STBO", f"{task_type}_model_diffpool_{gnn_depth}_gnn.pt"))
+
+    # Safe append in case of missing values
+    def safe_append(array, index, default_value=0):
+        try:
+            return array[index]
+        except IndexError:
+            return default_value
+
+    # After the loop, create a dictionary to hold the data
+    data_dict = {"lambda_diff": [], "mu_diff": [], "beta_n_diff": [], "beta_phi_diff": [], "gamma_n_diff": [], "gamma_phi_diff": []}
+
+    # Iterate through test_mean_diffs_history
+    for array in test_mean_diffs_history:
+        # Safely append each value, filling with 0 if missing
+        data_dict["lambda_diff"].append(safe_append(array, 0))
+        data_dict["mu_diff"].append(safe_append(array, 1))
+        data_dict["beta_n_diff"].append(safe_append(array, 2))
+        data_dict["beta_phi_diff"].append(safe_append(array, 3))
+        data_dict["gamma_n_diff"].append(safe_append(array, 4))
+        data_dict["gamma_phi_diff"].append(safe_append(array, 5))
+
+    # Ensure the length of other lists matches actual_epoch_gnn, filling missing values with 0
+    actual_epoch_gnn = len(train_loss_all_history)  # Ensure epoch count matches available data
+
+    data_dict["Epoch"] = list(range(1, actual_epoch_gnn + 1))
+    data_dict["Train_Loss_ALL"] = train_loss_all_history[:actual_epoch_gnn] + [0] * (actual_epoch_gnn - len(train_loss_all_history))
+    data_dict["Train_Loss_Regression"] = train_loss_regression_history[:actual_epoch_gnn] + [0] * (actual_epoch_gnn - len(train_loss_regression_history))
+    data_dict["Train_Loss_Classification"] = train_loss_classification_history[:actual_epoch_gnn] + [0] * (actual_epoch_gnn - len(train_loss_classification_history))
+    data_dict["Test_Loss_ALL"] = test_loss_all_history[:actual_epoch_gnn] + [0] * (actual_epoch_gnn - len(test_loss_all_history))
+    data_dict["Test_Loss_Regression"] = test_loss_regression_history[:actual_epoch_gnn] + [0] * (actual_epoch_gnn - len(test_loss_regression_history))
+    data_dict["Test_Loss_Classification"] = test_loss_classification_history[:actual_epoch_gnn] + [0] * (actual_epoch_gnn - len(test_loss_classification_history))
+
+    # Convert the dictionary to a pandas DataFrame
+    model_performance = pd.DataFrame(data_dict)
+
+    # For final_test_diffs, final_test_predictions, final_test_y, final_test_nodes, final_test_label_pred, and final_test_label_true
+    # Use fillna to ensure missing values are replaced with 0 in DataFrames
+
+    # Define a function to safely create DataFrames, checking for missing columns and filling with zeros
+    def safe_create_dataframe(data, columns):
+        # Convert data to a DataFrame, handling case where data might have fewer columns than expected
+        df = pd.DataFrame(data)
+
+        # If there are fewer columns in the data than expected, fill missing columns with zeros
+        if df.shape[1] < len(columns):
+            # Add missing columns with zeros
+            for col in range(len(columns) - df.shape[1]):
+                df[f"missing_col_{col}"] = 0
+
+        # Now set the correct column names, making sure the DataFrame has the correct structure
+        df.columns = columns[:df.shape[1]]
+
+        # Check for any missing expected columns (by name) and fill them with zeros
+        for col in columns:
+            if col not in df.columns:
+                df[col] = 0  # Add the missing column and fill with zeros
+
+        return df
+
+    # Using the safe_create_dataframe function for each DataFrame
+    final_differences = safe_create_dataframe(final_test_diffs, ["lambda_diff", "mu_diff", "beta_n_diff", "beta_phi_diff", "gamma_n_diff", "gamma_phi_diff"])
+    final_predictions = safe_create_dataframe(final_test_predictions, ["lambda_pred", "mu_pred", "beta_n_pred", "beta_phi_pred", "gamma_n_pred", "gamma_phi_pred"])
+    final_y = safe_create_dataframe(final_test_y, ["lambda", "mu", "beta_n", "beta_phi", "gamma_n", "gamma_phi"])
+    final_nodes = safe_create_dataframe(final_test_nodes, ["num_nodes"])
+    final_label_prob = safe_create_dataframe(final_test_label_pred, ["pd_prob", "ed_prob", "nnd_prob"])
+    final_label_true = safe_create_dataframe(final_test_label_true, ["true_class"])
+
+    # Column-wise combine all final DataFrames
+    final_result = pd.concat([final_differences, final_predictions, final_y, final_nodes, final_label_prob, final_label_true], axis=1)
+
+    print("Final differences:")
+    print(abs(final_differences[["lambda_diff", "mu_diff", "beta_n_diff", "beta_phi_diff", "gamma_n_diff", "gamma_phi_diff"]]).mean())
+    print("Final overall accuracy:", final_overall_accuracy)
+    print("Final per-class accuracy:", final_per_class_accuracy)
+
+    # Workaround to get rid of the dtype incompatible issue
+    model_performance = model_performance.astype(object)
+    final_result = final_result.astype(object)
+
+    # Save the data to a file using pyreadr
+    pyreadr.write_rds(os.path.join(name, task_type, "STBO", f"{task_type}_diffpool_{gnn_depth}_gnn.rds"), model_performance)
+    pyreadr.write_rds(os.path.join(name, task_type, "STBO", f"{task_type}_final_diffpool_{gnn_depth}_gnn.rds"), final_result)
 
 
     # Now the functions and logics for lstm
@@ -1138,7 +1174,6 @@ def main():
         test_loss_cls = test_loss_cls * train_test_ratio
         test_mean_diffs, test_diffs_all, test_predictions, test_y, test_nodes_all = test_diff_lstm(test_loader)
         test_accuracy_all, test_accuracy_class, test_label_pred, test_label_true = test_accu_lstm(test_loader, n_classes)
-        print(f'Epoch: {epoch:03d}, Par 1 Mean Diff: {test_mean_diffs[0]:.4f}, Par 2 Mean Diff: {test_mean_diffs[1]:.4f}, Par 3 Mean Diff: {test_mean_diffs[2]:.4f}, Par 4 Mean Diff: {test_mean_diffs[3]:.4f},Par 5 Mean Diff: {test_mean_diffs[4]:.4f},Par 6 Mean Diff: {test_mean_diffs[5]:.4f}')
         print(f'Epoch: {epoch:03d}, Train Regression Loss: {train_loss_reg:.4f}, Train Classification Loss: {train_loss_cls:.4f}, Train Combined Loss: {train_loss_all:.4f}')
         print(f'Epoch: {epoch:03d}, Test Regression Loss: {test_loss_reg:.4f}, Test Classification Loss: {test_loss_cls:.4f}, Test Combined Loss: {test_loss_all:.4f}')
         print(f'Epoch: {epoch:03d}, Overall Classification Accuracy: {test_accuracy_all:.4f}')
@@ -1183,31 +1218,38 @@ def main():
 
     # After the loop, create a dictionary to hold the data
     data_dict = {"lambda_diff": [], "mu_diff": [], "beta_n_diff": [], "beta_phi_diff": [], "gamma_n_diff": [], "gamma_phi_diff": []}
+
     # Iterate through test_mean_diffs_history
     for array in test_mean_diffs_history:
-        # It's assumed that the order of elements in the array corresponds to the keys in data_dict
-        data_dict["lambda_diff"].append(array[0])
-        data_dict["mu_diff"].append(array[1])
-        data_dict["beta_n_diff"].append(array[2])
-        data_dict["beta_phi_diff"].append(array[3])
-        data_dict["gamma_n_diff"].append(array[4])
-        data_dict["gamma_phi_diff"].append(array[5])
+        # Safely append each value, filling with 0 if missing
+        data_dict["lambda_diff"].append(safe_append(array, 0))
+        data_dict["mu_diff"].append(safe_append(array, 1))
+        data_dict["beta_n_diff"].append(safe_append(array, 2))
+        data_dict["beta_phi_diff"].append(safe_append(array, 3))
+        data_dict["gamma_n_diff"].append(safe_append(array, 4))
+        data_dict["gamma_phi_diff"].append(safe_append(array, 5))
+
+    # Ensure the length of other lists matches actual_epoch_lstm, filling missing values with 0
+    actual_epoch_lstm = len(train_loss_all_history)  # Ensure epoch count matches available data
+
     data_dict["Epoch"] = list(range(1, actual_epoch_lstm + 1))
-    data_dict["Train_Loss_ALL"] = train_loss_all_history
-    data_dict["Train_Loss_Regression"] = train_loss_regression_history
-    data_dict["Train_Loss_Classification"] = train_loss_classification_history
-    data_dict["Test_Loss_ALL"] = test_loss_all_history
-    data_dict["Test_Loss_Regression"] = test_loss_regression_history
-    data_dict["Test_Loss_Classification"] = test_loss_classification_history
+    data_dict["Train_Loss_ALL"] = train_loss_all_history[:actual_epoch_lstm] + [0] * (actual_epoch_lstm - len(train_loss_all_history))
+    data_dict["Train_Loss_Regression"] = train_loss_regression_history[:actual_epoch_lstm] + [0] * (actual_epoch_lstm - len(train_loss_regression_history))
+    data_dict["Train_Loss_Classification"] = train_loss_classification_history[:actual_epoch_lstm] + [0] * (actual_epoch_lstm - len(train_loss_classification_history))
+    data_dict["Test_Loss_ALL"] = test_loss_all_history[:actual_epoch_lstm] + [0] * (actual_epoch_lstm - len(test_loss_all_history))
+    data_dict["Test_Loss_Regression"] = test_loss_regression_history[:actual_epoch_lstm] + [0] * (actual_epoch_lstm - len(test_loss_regression_history))
+    data_dict["Test_Loss_Classification"] = test_loss_classification_history[:actual_epoch_lstm] + [0] * (actual_epoch_lstm - len(test_loss_classification_history))
 
     # Convert the dictionary to a pandas DataFrame
     model_performance = pd.DataFrame(data_dict)
-    final_differences = pd.DataFrame(final_test_diffs, columns=["lambda_diff", "mu_diff", "beta_n_diff", "beta_phi_diff", "gamma_n_diff", "gamma_phi_diff"])
-    final_predictions = pd.DataFrame(final_test_predictions, columns=["lambda_pred", "mu_pred", "beta_n_pred", "beta_phi_pred", "gamma_n_pred", "gamma_phi_pred"])
-    final_y = pd.DataFrame(final_test_y, columns=["lambda", "mu", "beta_n", "beta_phi", "gamma_n", "gamma_phi"])
-    final_nodes = pd.DataFrame(final_test_nodes, columns=["num_nodes"])
-    final_label_prob = pd.DataFrame(final_test_label_pred, columns=["pd_prob", "ed_prob", "nnd_prob"])
-    final_label_true = pd.DataFrame(final_test_label_true, columns=["true_class"])
+
+    # Using the safe_create_dataframe function for each DataFrame
+    final_differences = safe_create_dataframe(final_test_diffs, ["lambda_diff", "mu_diff", "beta_n_diff", "beta_phi_diff", "gamma_n_diff", "gamma_phi_diff"])
+    final_predictions = safe_create_dataframe(final_test_predictions, ["lambda_pred", "mu_pred", "beta_n_pred", "beta_phi_pred", "gamma_n_pred", "gamma_phi_pred"])
+    final_y = safe_create_dataframe(final_test_y, ["lambda", "mu", "beta_n", "beta_phi", "gamma_n", "gamma_phi"])
+    final_nodes = safe_create_dataframe(final_test_nodes, ["num_nodes"])
+    final_label_prob = safe_create_dataframe(final_test_label_pred, ["pd_prob", "ed_prob", "nnd_prob"])
+    final_label_true = safe_create_dataframe(final_test_label_true, ["true_class"])
 
     # Column-wise combine all final DataFrames
     final_result = pd.concat([final_differences, final_predictions, final_y, final_nodes, final_label_prob, final_label_true], axis=1)
