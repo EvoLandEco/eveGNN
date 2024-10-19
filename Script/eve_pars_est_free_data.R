@@ -13,6 +13,21 @@ setwd(name)
 dists_pd <- params$dists_pd
 dists_ed <- params$dists_ed
 dists_nnd <- params$dists_nnd
+
+# Manually set gammas to zero, for 4-Pars simulation
+dists_pd[[4]]$max <- 0
+dists_pd[[4]]$min <- 0
+dists_ed[[4]]$max <- 0
+dists_ed[[4]]$min <- 0
+dists_nnd[[4]]$max <- 0
+dists_nnd[[4]]$min <- 0
+dists_pd[[5]]$max <- 0
+dists_pd[[5]]$min <- 0
+dists_ed[[5]]$max <- 0
+dists_ed[[5]]$min <- 0
+dists_nnd[[5]]$max <- 0
+dists_nnd[[5]]$min <- 0
+
 # within_ranges_pd <- params$within_ranges_pd
 # within_ranges_ed <- params$within_ranges_ed
 # within_ranges_nnd <- params$within_ranges_nnd
