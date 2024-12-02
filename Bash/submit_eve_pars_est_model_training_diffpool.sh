@@ -22,7 +22,7 @@ name=$1
 task_type=$2
 gnn_depth=$3
 
-# Call the Python script with the arguments
-python ../Script/train_eve_pars_est_DiffPool.py "$name" "$task_type" "$gnn_depth"
+# Call the regression model training Python script with the arguments
+python ../Script/train_eve_pars_est_DiffPool_reg.py "$name" "$task_type" "$gnn_depth"
 
 deactivate
