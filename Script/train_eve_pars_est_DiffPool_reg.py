@@ -275,9 +275,7 @@ def read_rds_to_pytorch(path, count, normalize=False):
     params_list = []
 
     for filename in files_tree:
-        print(filename)
         params = get_params(filename)
-        print(params)
         params_list.append(params)
 
     # # Normalize beta_n and beta_phi
@@ -308,9 +306,6 @@ def read_rds_to_pytorch(path, count, normalize=False):
             edge_length_tensor = torch.tensor(length_list[i].values, dtype=torch.float)
 
         params_current = params_list[i]
-
-        print(params_current[0:(n_predicted_values)])
-        print(params_current[7])
 
         params_current_tensor = torch.tensor(params_current[0:(n_predicted_values)], dtype=torch.float)
 
