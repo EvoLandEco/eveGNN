@@ -359,13 +359,17 @@ def shuffle_data(data_list):
 
 
 def main():
-    if len(sys.argv) != 4:
+    if len(sys.argv) != 5:
         print(f"Python Command Line Error. Usage: {sys.argv[0]} <name> <task_type> <gnn_depth>")
         sys.exit(1)
 
     name = sys.argv[1]
     task_type = sys.argv[2]
     gnn_depth = int(sys.argv[3])
+    scenario_param = sys.argv[4]
+
+    # Make sure the scenario parameter is valid before proceeding
+    assert(scenario_param in ["all", "pd", "ed", "nnd"]), "Invalid scenario parameter. Choose from 'all', 'pd', 'ed', 'nnd'."
 
     print(f'Name: {name}, Task Type: {task_type}', f'GNN Depth: {gnn_depth}')
     print("Now on branch Multimodal-Stacking-Boosting")
@@ -1039,14 +1043,20 @@ def main():
         # Ensure the length of other lists matches actual_epoch_lstm, filling missing values with 0
         actual_epoch_lstm = len(train_loss_all_history)  # Ensure epoch count matches available data
 
-        data_dict["Epoch"] = list(range(1, actual_epoch_lstm + 1))
-        data_dict["Train_Loss_ALL"] = train_loss_all_history[:actual_epoch_lstm] + [0] * (
+        # Create a dictionary to hold the data of LSTM training performance
+        data_dict_lstm_performance = {"Epoch":[], "Train_Loss_ALL": [], "Test_Loss_ALL": []}
+
+        # Fill the dictionary with the data
+        data_dict_lstm_performance["Epoch"] = list(range(1, actual_epoch_lstm + 1))
+        data_dict_lstm_performance["Train_Loss_ALL"] = train_loss_all_history[:actual_epoch_lstm] + [0] * (
                 actual_epoch_lstm - len(train_loss_all_history))
-        data_dict["Test_Loss_ALL"] = test_loss_all_history[:actual_epoch_lstm] + [0] * (
+        data_dict_lstm_performance["Test_Loss_ALL"] = test_loss_all_history[:actual_epoch_lstm] + [0] * (
                 actual_epoch_lstm - len(test_loss_all_history))
 
+        print(data_dict_lstm_performance)
+
         # Convert the dictionary to a pandas DataFrame
-        model_performance = pd.DataFrame(data_dict)
+        model_performance = pd.DataFrame(data_dict_lstm_performance)
 
         # Workaround to get rid of the dtype incompatible issue
         model_performance = model_performance.astype(object)
@@ -1182,10 +1192,7 @@ def main():
         print(f"Training and testing completed for scenario: {scenario}")
 
     # Execute the Boost BT function for each scenario
-    boost_bt("all")
-    boost_bt("pd")
-    boost_bt("ed")
-    boost_bt("nnd")
+    boost_bt(scenario_param)
 
 
 if __name__ == '__main__':

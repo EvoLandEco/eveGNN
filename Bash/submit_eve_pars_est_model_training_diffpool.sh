@@ -12,8 +12,8 @@ ml Python/3.8.16-GCCcore-11.2.0
 source $HOME/venvs/eve/bin/activate
 
 # Check if the correct number of arguments is provided
-if [ "$#" -ne 3 ]; then
-    echo "Bash Command Line Error. Usage: $0 <name> <task_type> <gnn_depth>"
+if [ "$#" -ne 4 ]; then
+    echo "Bash Command Line Error. Usage: $0 <name> <task_type> <gnn_depth> <scenario>"
     exit 1
 fi
 
@@ -21,8 +21,9 @@ fi
 name=$1
 task_type=$2
 gnn_depth=$3
+scenario=$4
 
 # Call the regression model training Python script with the arguments
-python ../Script/train_eve_pars_est_DiffPool_reg.py "$name" "$task_type" "$gnn_depth"
+python ../Script/train_eve_pars_est_DiffPool_reg.py "$name" "$task_type" "$gnn_depth" "$scenario"
 
 deactivate
