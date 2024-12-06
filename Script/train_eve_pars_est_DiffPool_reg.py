@@ -1053,8 +1053,6 @@ def main():
         data_dict_lstm_performance["Test_Loss_ALL"] = test_loss_all_history[:actual_epoch_lstm] + [0] * (
                 actual_epoch_lstm - len(test_loss_all_history))
 
-        print(data_dict_lstm_performance)
-
         # Convert the dictionary to a pandas DataFrame
         model_performance = pd.DataFrame(data_dict_lstm_performance)
 
