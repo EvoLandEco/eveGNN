@@ -359,14 +359,15 @@ def shuffle_data(data_list):
 
 
 def main():
-    if len(sys.argv) != 5:
-        print(f"Python Command Line Error. Usage: {sys.argv[0]} <name> <task_type> <gnn_depth> <scenario>")
+    if len(sys.argv) != 6:
+        print(f"Python Command Line Error. Usage: {sys.argv[0]} <name> <task_type> <gnn_depth> <scenario> <partite>")
         sys.exit(1)
 
     name = sys.argv[1]
     task_type = sys.argv[2]
     gnn_depth = int(sys.argv[3])
     scenario_param = sys.argv[4]
+    partite_param = sys.argv[5]
 
     # Make sure the scenario parameter is valid before proceeding
     assert(scenario_param in ["all", "pd", "ed", "nnd"]), "Invalid scenario parameter. Choose from 'all', 'pd', 'ed', 'nnd'."
@@ -438,6 +439,22 @@ def main():
     filtered_training_data = [data for data in filtered_training_data if data.num_nodes <= max_nodes_limit]
     filtered_testing_data = [data for data in filtered_testing_data if data.num_nodes <= max_nodes_limit]
     filtered_validation_data = [data for data in filtered_validation_data if data.num_nodes <= max_nodes_limit]
+
+    # Keep only part of data according to partite_param parameter, by tree size
+    if partite_param == "full":
+        pass
+    elif partite_param == "small":
+        filtered_training_data = [data for data in filtered_training_data if data.num_nodes <= 200]
+        filtered_testing_data = [data for data in filtered_testing_data if data.num_nodes <= 200]
+        filtered_validation_data = [data for data in filtered_validation_data if data.num_nodes <= 200]
+    elif partite_param == "medium":
+        filtered_training_data = [data for data in filtered_training_data if 200 < data.num_nodes <= 500]
+        filtered_testing_data = [data for data in filtered_testing_data if 200 < data.num_nodes <= 500]
+        filtered_validation_data = [data for data in filtered_validation_data if 200 < data.num_nodes <= 500]
+    elif partite_param == "large":
+        filtered_training_data = [data for data in filtered_training_data if 500 < data.num_nodes]
+        filtered_testing_data = [data for data in filtered_testing_data if 500 < data.num_nodes]
+        filtered_validation_data = [data for data in filtered_validation_data if 500 < data.num_nodes]
 
     # Get the maximum number of nodes, for padding the matrices of the graphs
     max_nodes_train = max([data.num_nodes for data in filtered_training_data])
@@ -639,8 +656,9 @@ def main():
             return reg_out, l1 + l2, e1 + e2
 
     # Define the major loop for training and testing of Boost BT
-    def boost_bt(scenario):
+    def boost_bt(scenario, partite):
         print(f"Training and testing for scenario: {scenario}")
+        print(f"Partite: {partite}")
 
         def train_gnn():
             model_gnn.train()
@@ -752,25 +770,25 @@ def main():
             training_dataset_filtered_data = [data for data in filtered_training_data if data.y_cl == 0]
             testing_dataset_filtered_data = [data for data in filtered_testing_data if data.y_cl == 0]
             training_dataset_filtered = TreeData(root=None, data_list=training_dataset_filtered_data,
-                                                    transform=T.ToDense(max_nodes))
+                                                 transform=T.ToDense(max_nodes))
             testing_dataset_filtered = TreeData(root=None, data_list=testing_dataset_filtered_data,
-                                                   transform=T.ToDense(max_nodes))
+                                                transform=T.ToDense(max_nodes))
         elif scenario == "ed":
             # Filter the datasets to keep only the ED data
             training_dataset_filtered_data = [data for data in filtered_training_data if data.y_cl == 1]
             testing_dataset_filtered_data = [data for data in filtered_testing_data if data.y_cl == 1]
             training_dataset_filtered = TreeData(root=None, data_list=training_dataset_filtered_data,
-                                                    transform=T.ToDense(max_nodes))
+                                                 transform=T.ToDense(max_nodes))
             testing_dataset_filtered = TreeData(root=None, data_list=testing_dataset_filtered_data,
-                                                    transform=T.ToDense(max_nodes))
+                                                transform=T.ToDense(max_nodes))
         elif scenario == "nnd":
             # Filter the datasets to keep only the NND data
             training_dataset_filtered_data = [data for data in filtered_training_data if data.y_cl == 2]
             testing_dataset_filtered_data = [data for data in filtered_testing_data if data.y_cl == 2]
             training_dataset_filtered = TreeData(root=None, data_list=training_dataset_filtered_data,
-                                                    transform=T.ToDense(max_nodes))
+                                                 transform=T.ToDense(max_nodes))
             testing_dataset_filtered = TreeData(root=None, data_list=testing_dataset_filtered_data,
-                                                    transform=T.ToDense(max_nodes))
+                                                transform=T.ToDense(max_nodes))
 
         train_loader = DenseDataLoader(training_dataset_filtered, batch_size=train_batch_size_adjusted, shuffle=False)
         test_loader = DenseDataLoader(testing_dataset_filtered, batch_size=test_batch_size_adjusted, shuffle=False)
@@ -831,7 +849,7 @@ def main():
         if not os.path.exists(os.path.join(name, task_type, "STBO")):
             os.makedirs(os.path.join(name, task_type, "STBO"))
         torch.save(model_gnn.state_dict(),
-                   os.path.join(name, task_type, "STBO", f"{task_type}_model_diffpool_{gnn_depth}_gnn_{scenario}.pt"))
+                   os.path.join(name, task_type, "STBO", f"{task_type}_model_diffpool_{gnn_depth}_gnn_{scenario}_{partite}.pt"))
 
         # Safe append in case of missing values
         def safe_append(array, index, default_value=0):
@@ -913,9 +931,9 @@ def main():
         final_result = final_result.astype(object)
 
         # Save the data to a file using pyreadr
-        pyreadr.write_rds(os.path.join(name, task_type, "STBO", f"{task_type}_diffpool_{gnn_depth}_gnn_{scenario}.rds"),
+        pyreadr.write_rds(os.path.join(name, task_type, "STBO", f"{task_type}_diffpool_{gnn_depth}_gnn_{scenario}_{partite}.rds"),
                           model_performance)
-        pyreadr.write_rds(os.path.join(name, task_type, "STBO", f"{task_type}_final_diffpool_{gnn_depth}_gnn_{scenario}.rds"),
+        pyreadr.write_rds(os.path.join(name, task_type, "STBO", f"{task_type}_final_diffpool_{gnn_depth}_gnn_{scenario}_{partite}.rds"),
                           final_result)
 
         # Now the functions and logics for training the LSTM model on the residuals from GNN
@@ -1038,7 +1056,7 @@ def main():
         if not os.path.exists(os.path.join(name, task_type, "STBO")):
             os.makedirs(os.path.join(name, task_type, "STBO"))
         torch.save(model_lstm.state_dict(),
-                   os.path.join(name, task_type, "STBO", f"{task_type}_model_diffpool_{gnn_depth}_lstm_{scenario}.pt"))
+                   os.path.join(name, task_type, "STBO", f"{task_type}_model_diffpool_{gnn_depth}_lstm_{scenario}_{partite}.pt"))
 
         # Ensure the length of other lists matches actual_epoch_lstm, filling missing values with 0
         actual_epoch_lstm = len(train_loss_all_history)  # Ensure epoch count matches available data
@@ -1060,7 +1078,7 @@ def main():
         model_performance = model_performance.astype(object)
 
         # Save the data to a file using pyreadr
-        pyreadr.write_rds(os.path.join(name, task_type, "STBO", f"{task_type}_diffpool_{gnn_depth}_lstm_{scenario}.rds"),
+        pyreadr.write_rds(os.path.join(name, task_type, "STBO", f"{task_type}_diffpool_{gnn_depth}_lstm_{scenario}_{partite}.rds"),
                           model_performance)
 
         # Use the trained LSTM model to compensate the GNN model, and test the compensated model
@@ -1112,17 +1130,17 @@ def main():
 
         # Create a dictionary to hold the data
         lstm_compensation_data_dict = {"res_lambda_before": [], "res_mu_before": [], "res_beta_n_before": [],
-                                        "res_beta_phi_before": [], "res_gamma_n_before": [], "res_gamma_phi_before": [],
-                                        "res_lambda_after": [], "res_mu_after": [], "res_beta_n_after": [],
-                                        "res_beta_phi_after": [], "res_gamma_n_after": [], "res_gamma_phi_after": [],
-                                        "pred_res_lambda": [], "pred_res_mu": [], "pred_res_beta_n": [],
-                                        "pred_res_beta_phi": [], "pred_res_gamma_n": [], "pred_res_gamma_phi": [],
-                                        "pred_lambda_before": [], "pred_mu_before": [], "pred_beta_n_before": [],
-                                        "pred_beta_phi_before": [], "pred_gamma_n_before": [], "pred_gamma_phi_before": [],
-                                        "pred_lambda_after": [], "pred_mu_after": [], "pred_beta_n_after": [],
-                                        "pred_beta_phi_after": [], "pred_gamma_n_after": [], "pred_gamma_phi_after": [],
-                                        "lambda": [], "mu": [], "beta_n": [], "beta_phi": [], "gamma_n": [], "gamma_phi": [],
-                                        "num_nodes": [], "label": []}
+                                       "res_beta_phi_before": [], "res_gamma_n_before": [], "res_gamma_phi_before": [],
+                                       "res_lambda_after": [], "res_mu_after": [], "res_beta_n_after": [],
+                                       "res_beta_phi_after": [], "res_gamma_n_after": [], "res_gamma_phi_after": [],
+                                       "pred_res_lambda": [], "pred_res_mu": [], "pred_res_beta_n": [],
+                                       "pred_res_beta_phi": [], "pred_res_gamma_n": [], "pred_res_gamma_phi": [],
+                                       "pred_lambda_before": [], "pred_mu_before": [], "pred_beta_n_before": [],
+                                       "pred_beta_phi_before": [], "pred_gamma_n_before": [], "pred_gamma_phi_before": [],
+                                       "pred_lambda_after": [], "pred_mu_after": [], "pred_beta_n_after": [],
+                                       "pred_beta_phi_after": [], "pred_gamma_n_after": [], "pred_gamma_phi_after": [],
+                                       "lambda": [], "mu": [], "beta_n": [], "beta_phi": [], "gamma_n": [], "gamma_phi": [],
+                                       "num_nodes": [], "label": []}
 
         # Fill the dictionary with the data
         for array in residuals_before_lstm:
@@ -1184,10 +1202,10 @@ def main():
         # Workaround to get rid of the dtype incompatible issue
         lstm_compensation_data_df = lstm_compensation_data_df.astype(object)
 
-        pyreadr.write_rds(os.path.join(name, task_type, "STBO", f"{task_type}_gnn_{gnn_depth}_lstm_compensation_{scenario}.rds"),
+        pyreadr.write_rds(os.path.join(name, task_type, "STBO", f"{task_type}_gnn_{gnn_depth}_lstm_compensation_{scenario}_{partite}.rds"),
                           lstm_compensation_data_df)
 
-        print(f"Training and testing completed for scenario: {scenario}")
+        print(f"Training and testing completed for scenario: {scenario} {partite}")
 
     # Execute the Boost BT function for each scenario
     boost_bt(scenario_param)
