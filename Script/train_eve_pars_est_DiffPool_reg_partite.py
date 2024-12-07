@@ -1208,7 +1208,7 @@ def main():
         print(f"Training and testing completed for scenario: {scenario} {partite}")
 
     # Execute the Boost BT function for each scenario
-    boost_bt(scenario_param)
+    boost_bt(scenario_param, partite_param)
 
 
 if __name__ == '__main__':
