@@ -1,10 +1,10 @@
 #!/bin/bash
-#SBATCH --time=41:59:00
+#SBATCH --time=11:59:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --gpus-per-node=1
-#SBATCH --job-name=gnn_eve_pars_est_diffpool_partite
-#SBATCH --output=logs/gnn_eve_pars_est_diffpool-partite-%j.log
+#SBATCH --job-name=gnn_eve_pars_est_diffpool_misspec
+#SBATCH --output=logs/gnn_eve_pars_est_diffpool-misspec-%j.log
 #SBATCH --mem=64GB
 #SBATCH --partition=gpu
 
@@ -25,6 +25,6 @@ scenario=$4
 partite=$5
 
 # Call the regression model training Python script with the arguments
-python ../Script/train_eve_pars_est_DiffPool_reg_partite.py "$name" "$task_type" "$gnn_depth" "$scenario" "$partite"
+python ../Script/train_eve_pars_est_DiffPool_reg_misspec.py "$name" "$task_type" "$gnn_depth" "$scenario" "$partite"
 
 deactivate
