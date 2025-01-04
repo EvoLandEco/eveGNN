@@ -14,19 +14,22 @@ dists_pd <- params$dists_pd
 dists_ed <- params$dists_ed
 dists_nnd <- params$dists_nnd
 
-# Manually set betas and gammas to zero, for 2-Pars simulation
-dists_pd[[2]]$max <- 0
-dists_pd[[2]]$min <- 0
-dists_ed[[2]]$max <- 0
-dists_ed[[2]]$min <- 0
-dists_nnd[[2]]$max <- 0
-dists_nnd[[2]]$min <- 0
-dists_pd[[3]]$max <- 0
-dists_pd[[3]]$min <- 0
-dists_ed[[3]]$max <- 0
-dists_ed[[3]]$min <- 0
-dists_nnd[[3]]$max <- 0
-dists_nnd[[3]]$min <- 0
+# Manually set betas and gammas to zero, for 2-Pars or 4-pars simulation
+# These lines set betas to zero
+# dists_pd[[2]]$max <- 0
+# dists_pd[[2]]$min <- 0
+# dists_ed[[2]]$max <- 0
+# dists_ed[[2]]$min <- 0
+# dists_nnd[[2]]$max <- 0
+# dists_nnd[[2]]$min <- 0
+# dists_pd[[3]]$max <- 0
+# dists_pd[[3]]$min <- 0
+# dists_ed[[3]]$max <- 0
+# dists_ed[[3]]$min <- 0
+# dists_nnd[[3]]$max <- 0
+# dists_nnd[[3]]$min <- 0
+
+# These lines set gammas to zero
 dists_pd[[4]]$max <- 0
 dists_pd[[4]]$min <- 0
 dists_ed[[4]]$max <- 0
