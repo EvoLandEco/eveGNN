@@ -30,18 +30,18 @@ dists_nnd <- params$dists_nnd
 # dists_nnd[[3]]$min <- 0
 
 # These lines set gammas to zero
-dists_pd[[4]]$max <- 0
-dists_pd[[4]]$min <- 0
-dists_ed[[4]]$max <- 0
-dists_ed[[4]]$min <- 0
-dists_nnd[[4]]$max <- 0
-dists_nnd[[4]]$min <- 0
-dists_pd[[5]]$max <- 0
-dists_pd[[5]]$min <- 0
-dists_ed[[5]]$max <- 0
-dists_ed[[5]]$min <- 0
-dists_nnd[[5]]$max <- 0
-dists_nnd[[5]]$min <- 0
+# dists_pd[[4]]$max <- 0
+# dists_pd[[4]]$min <- 0
+# dists_ed[[4]]$max <- 0
+# dists_ed[[4]]$min <- 0
+# dists_nnd[[4]]$max <- 0
+# dists_nnd[[4]]$min <- 0
+# dists_pd[[5]]$max <- 0
+# dists_pd[[5]]$min <- 0
+# dists_ed[[5]]$max <- 0
+# dists_ed[[5]]$min <- 0
+# dists_nnd[[5]]$max <- 0
+# dists_nnd[[5]]$min <- 0
 
 # within_ranges_pd <- params$within_ranges_pd
 # within_ranges_ed <- params$within_ranges_ed
