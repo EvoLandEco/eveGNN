@@ -566,13 +566,13 @@ main_menu() {
                                                 echo "Submitting jobs for TES with GNN depth $i"
                                                 for scenario in "all" "pd" "ed" "nnd"; do
                                                     echo "Submitting job for $scenario"
-                                                    sbatch --dependency=afterok:14470338 submit_eve_pars_est_model_training_diffpool.sh "$name" "EVE_FREE_TES" "$i" "$scenario"
+                                                    sbatch --dependency=afterok:14490413 submit_eve_pars_est_model_training_diffpool.sh "$name" "EVE_FREE_TES" "$i" "$scenario"
                                                 done
                                                 for partite in "full" "small" "medium" "large"; do
                                                     echo "Submitting job for $partite"
-                                                    sbatch --dependency=afterok:14470338 submit_eve_pars_est_model_training_diffpool_partite.sh "$name" "EVE_FREE_TES" "$i" "all" "$partite"
+                                                    sbatch --dependency=afterok:14490413 submit_eve_pars_est_model_training_diffpool_partite.sh "$name" "EVE_FREE_TES" "$i" "all" "$partite"
                                                 done
-                                                sbatch --dependency=afterok:14470338 submit_eve_pars_est_model_training_diffpool_misspec.sh "$name" "EVE_FREE_TES" "$i" "all" "full"
+                                                sbatch --dependency=afterok:14490413 submit_eve_pars_est_model_training_diffpool_misspec.sh "$name" "EVE_FREE_TES" "$i" "all" "full"
                                             else
                                                 echo
                                                 echo -e "${Red}ERROR: ${NC}Missing configuration file for Evolutionary-Relatedness-Dependent DiffPool model."
