@@ -563,16 +563,17 @@ main_menu() {
 #                                                    sbatch submit_eve_pars_est_model_training_diffpool.sh "$name" "EVE_FREE_TES" "$i"
 #                                                done
                                                 i=$max_gnn_depth
-                                                echo "Submitting jobs for TES with GNN depth $i"
-                                                for scenario in "all" "pd" "ed" "nnd"; do
-                                                    echo "Submitting job for $scenario"
-                                                    sbatch submit_eve_pars_est_model_training_diffpool.sh "$name" "EVE_FREE_TES" "$i" "$scenario"
-                                                done
-                                                for partite in "full" "small" "medium" "large"; do
-                                                    echo "Submitting job for $partite"
-                                                    sbatch submit_eve_pars_est_model_training_diffpool_partite.sh "$name" "EVE_FREE_TES" "$i" "all" "$partite"
-                                                done
-                                                sbatch submit_eve_pars_est_model_training_diffpool_misspec.sh "$name" "EVE_FREE_TES" "$i" "all" "full"
+                                                sbatch submit_eve_pars_est_model_training_diffpool_cls.sh "$name" "EVE_FREE_TES" "$i"
+#                                                echo "Submitting jobs for TES with GNN depth $i"
+#                                                for scenario in "all" "pd" "ed" "nnd"; do
+#                                                    echo "Submitting job for $scenario"
+#                                                    sbatch submit_eve_pars_est_model_training_diffpool.sh "$name" "EVE_FREE_TES" "$i" "$scenario"
+#                                                done
+#                                                for partite in "full" "small" "medium" "large"; do
+#                                                    echo "Submitting job for $partite"
+#                                                    sbatch submit_eve_pars_est_model_training_diffpool_partite.sh "$name" "EVE_FREE_TES" "$i" "all" "$partite"
+#                                                done
+#                                                sbatch submit_eve_pars_est_model_training_diffpool_misspec.sh "$name" "EVE_FREE_TES" "$i" "all" "full"
                                             else
                                                 echo
                                                 echo -e "${Red}ERROR: ${NC}Missing configuration file for Evolutionary-Relatedness-Dependent DiffPool model."
