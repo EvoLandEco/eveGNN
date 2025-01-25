@@ -23,7 +23,7 @@ lstm_output_channels: 32
 max_gnn_depth: 3
 max_nodes_limit: 2500
 n_classes: 3
-n_predicted_values: 6
+n_predicted_values: 4
 normalize_edge_length: False
 normalize_graph_representation: False
 test_batch_size: 64
