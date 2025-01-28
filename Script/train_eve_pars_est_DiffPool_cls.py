@@ -308,7 +308,7 @@ def read_rds_to_pytorch(path, count, normalize=False):
 
         params_current_tensor = torch.tensor(params_current[0:(n_predicted_values)], dtype=torch.float)
 
-        class_current_tensor = torch.tensor(params_current[n_predicted_values + 1], dtype=torch.long)
+        class_current_tensor = torch.tensor(params_current[6 + 1], dtype=torch.long)
 
         brts_tensor = torch.tensor(brts_list[i].values, dtype=torch.float)
 
