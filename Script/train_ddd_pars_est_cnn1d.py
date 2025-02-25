@@ -13,8 +13,6 @@ import yaml
 from torch_geometric.data import InMemoryDataset, Data
 from torch_geometric.loader import DenseDataLoader
 from math import ceil
-from torch.utils.data import TensorDataset, DataLoader
-from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence, pad_sequence, pack_sequence
 
 # Load the global parameters from the config file
 global_params = None
@@ -339,16 +337,15 @@ def export_to_rds(embeddings, epoch, name, task_type, which_set):
 
 
 def main():
-    if len(sys.argv) != 4:
-        print(f"Usage: {sys.argv[0]} <name> <task_type> <gnn_depth>")
+    if len(sys.argv) != 3:
+        print(f"Usage: {sys.argv[0]} <name> <task_type>")
         sys.exit(1)
 
     name = sys.argv[1]
     task_type = sys.argv[2]
-    gnn_depth = int(sys.argv[3])
 
     # Now you can use the variables name and set_i in your code
-    print(f'Name: {name}, Task Type: {task_type}', f'GNN Depth: {gnn_depth}')
+    print(f'Name: {name}, Task Type: {task_type}')
     print("Now on branch Multimodal-Stacking-Boosting")
 
     training_dataset_list = []
@@ -487,31 +484,35 @@ def main():
             self.conv4 = torch.nn.Conv1d(in_channels=32, out_channels=64, kernel_size=10, stride=1)
             # Pooling 4 (average): kernel_size=2, stride=2 -> 64 x 116
 
+            # Use an AdaptiveAvgPool1d to get a fixed time length:
+            self.adaptive_pool = torch.nn.AdaptiveAvgPool1d(116)
+
             # Fully Connected 1: input = 64*116 = 7424, output = 100
-            self.fc1 = torch.nn.Linear(64 * 116, 100)
+            self.fc1 = torch.nn.Linear(64 * 116 , 100)
             # Dropout with p=0.01
             self.dropout = torch.nn.Dropout(p=0.01)
             # Fully Connected 2: input = 100, output = 2
             self.fc2 = torch.nn.Linear(100, n_predicted_values)
 
-    def forward(self, x):
-        x = F.relu(self.conv1(x))
-        x = F.avg_pool1d(x, kernel_size=2, stride=2)
+        def forward(self, x):
+            x = F.relu(self.conv1(x))
+            x = F.avg_pool1d(x, kernel_size=2, stride=2)
 
-        x = F.relu(self.conv2(x))
-        x = F.avg_pool1d(x, kernel_size=2, stride=2)
+            x = F.relu(self.conv2(x))
+            x = F.avg_pool1d(x, kernel_size=2, stride=2)
 
-        x = F.relu(self.conv3(x))
-        x = F.avg_pool1d(x, kernel_size=2, stride=2)
+            x = F.relu(self.conv3(x))
+            x = F.avg_pool1d(x, kernel_size=2, stride=2)
 
-        x = F.relu(self.conv4(x))
-        x = F.avg_pool1d(x, kernel_size=2, stride=2)
+            x = F.relu(self.conv4(x))
+            # Adaptive pooling to get a fixed time length
+            x = self.adaptive_pool(x)
 
-        x = x.view(x.size(0), -1)  # Flatten
-        x = F.relu(self.fc1(x))
-        x = self.dropout(x)
-        x = self.fc2(x)
-        return x
+            x = x.view(x.size(0), -1)  # Flatten
+            x = F.relu(self.fc1(x))
+            x = self.dropout(x)
+            x = self.fc2(x)
+            return x
 
     class EarlyStopper:
         def __init__(self, patience=3, min_delta=0.1):
@@ -538,7 +539,7 @@ def main():
         for data in train_loader:
             data.to(device)
             optimizer.zero_grad()
-            out = model_cnn1d(data.brts)
+            out = model_cnn1d(data.brts.unsqueeze(1))
             loss = criterion(out, data.y.view(data.num_nodes.__len__(), n_predicted_values))
             loss.backward()
             loss_all += loss.item() * data.num_nodes.__len__()
@@ -557,7 +558,7 @@ def main():
 
         for data in loader:
             data.to(device)
-            out = model_cnn1d(data.brts)
+            out = model_cnn1d(data.brts.unsqueeze(1))
             diffs = torch.abs(out - data.y.view(data.num_nodes.__len__(), n_predicted_values))
             diffs_all = torch.cat((diffs_all, diffs), dim=0)
             outputs_all = torch.cat((outputs_all, out), dim=0)
@@ -575,7 +576,7 @@ def main():
         loss_all = 0
         for data in test_loader:
             data.to(device)
-            out = model_cnn1d(data.brts)
+            out = model_cnn1d(data.brts.unsqueeze(1))
             loss = criterion(out, data.y.view(data.num_nodes.__len__(), n_predicted_values))
             loss_all += loss.item() * data.num_nodes.__len__()
 
@@ -670,7 +671,7 @@ def main():
     if not os.path.exists(os.path.join(name, task_type, "STBO")):
         os.makedirs(os.path.join(name, task_type, "STBO"))
     torch.save(model_cnn1d.state_dict(),
-               os.path.join(name, task_type, "STBO", f"{task_type}_model_diffpool_{gnn_depth}_gnn.pt"))
+               os.path.join(name, task_type, "STBO", f"{task_type}_model_cnn1d.pt"))
 
     # After the loop, create a dictionary to hold the data
     data_dict = {"lambda_diff": [], "mu_diff": [], "cap_diff": []}
@@ -701,12 +702,12 @@ def main():
     final_y = final_y.astype(object)
 
     # Save the data to a file using pyreadr
-    pyreadr.write_rds(os.path.join(name, task_type, "STBO", f"{task_type}_diffpool_{gnn_depth}.rds"), model_performance)
-    pyreadr.write_rds(os.path.join(name, task_type, "STBO", f"{task_type}_final_diffs_diffpool_{gnn_depth}.rds"),
+    pyreadr.write_rds(os.path.join(name, task_type, "STBO", f"{task_type}_cnn1d.rds"), model_performance)
+    pyreadr.write_rds(os.path.join(name, task_type, "STBO", f"{task_type}_final_diffs_cnn1d.rds"),
                       final_differences)
-    pyreadr.write_rds(os.path.join(name, task_type, "STBO", f"{task_type}_final_predictions_diffpool_{gnn_depth}.rds"),
+    pyreadr.write_rds(os.path.join(name, task_type, "STBO", f"{task_type}_final_predictions_cnn1d.rds"),
                       final_predictions)
-    pyreadr.write_rds(os.path.join(name, task_type, "STBO", f"{task_type}_final_y_diffpool_{gnn_depth}.rds"), final_y)
+    pyreadr.write_rds(os.path.join(name, task_type, "STBO", f"{task_type}_final_y_cnn1d.rds"), final_y)
 
 
 if __name__ == '__main__':
