@@ -1,0 +1,7 @@
+batch_size_reduce_factor: 0.25
+cap_norm_factor: 1000
+epoch_number_cnn1d: 100
+max_nodes_limit: 2500
+n_predicted_values: 3
+test_batch_size: 64
+train_batch_size: 64
