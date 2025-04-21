@@ -96,11 +96,11 @@ bd_free_tes_list <- future.apply::future_replicate(nrep, eveGNN::randomized_bd_f
 # Split list into training/testing data and validation (out-of-sample) data
 bd_list_all <- eveGNN::extract_by_range(tree_list = bd_free_tes_list, ranges = within_ranges)
 
-if (!dir.exists("BD_FREE_TES")) {
-  dir.create("BD_FREE_TES")
+if (!dir.exists("DDD_FREE_TES")) {
+  dir.create("DDD_FREE_TES")
 }
 
-setwd("BD_FREE_TES")
+setwd("DDD_FREE_TES")
 
 print("Exporting Training/Testing TES Data to GNN")
 
