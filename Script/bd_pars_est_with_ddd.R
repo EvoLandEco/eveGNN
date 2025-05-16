@@ -69,18 +69,18 @@
 #   }
 # }
 #
-# args <- commandArgs(TRUE)
-#
-# name <- as.character(args[1])
-#
-# params <- yaml::read_yaml("../Config/bd_sim.yaml")
-#
-# if (!dir.exists(name)) {
-#   dir.create(name)
-# }
-#
-# setwd(name)
-#
+args <- commandArgs(TRUE)
+
+name <- as.character(args[1])
+
+params <- yaml::read_yaml("../Config/bd_sim.yaml")
+
+if (!dir.exists(name)) {
+  dir.create(name)
+}
+
+setwd(name)
+
 # dists <- params$dists
 # within_ranges <- params$within_ranges
 # nrep <- params$nrep
