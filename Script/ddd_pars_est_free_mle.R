@@ -8,6 +8,11 @@ data <- readRDS(file.path(name, "DDD_MLE_TES/MLE_DATA/ddd_mle.rds"))
 setwd(name)
 setwd("DDD_MLE_TES")
 
+# If data i has only two parameters, set the third to Inf
+if (length(data$pars[[i]]) == 2) {
+  data$pars[[i]][3] <- Inf
+}
+
 # Maximize the ML, let the MLE run in the best way possible
 tryCatch(
   R.utils::withTimeout({
