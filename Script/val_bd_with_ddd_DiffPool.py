@@ -395,6 +395,9 @@ def main():
             # Calculate the maximum length of brts across all graphs
             max_length = max_brts_len
 
+            # Filter out graphs with brts longer than max_length
+            data_list = [data for data in data_list if len(data.brts) <= max_length]
+
             # Pad the brts attribute for each graph
             for data in data_list:
                 pad_size = max_length - len(data.brts)
