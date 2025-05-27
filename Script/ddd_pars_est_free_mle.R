@@ -24,7 +24,9 @@ tryCatch(
       soc = 2,
       cond = 1,
       ddmodel = 1,
-      num_cycles = Inf
+      num_cycles = Inf,
+      optimmethod = "simplex",
+      methode = "odeint::runge_kutta_cash_karp54"
     )
     # If an error occurred, ml will be NA and we return NA right away.
     if (length(ml) == 1 && is.na(ml)) {
@@ -58,12 +60,15 @@ tryCatch(
   R.utils::withTimeout({
     ml <- DDD::dd_ML(
       brts = data$brts[[i]],
-      initparsopt = c(runif(1, 0.1, 4), runif(1, 0, 1.5), runif(1, 10, 1000)),
+      initparsopt = c(runif(1, 0.1, 0.8), runif(1, 0, 0.64), 10000),
       idparsopt = c(1, 2, 3),
       btorph = 0,
       soc = 2,
       cond = 1,
-      ddmodel = 1
+      ddmodel = 1,
+      num_cycles = Inf,
+      optimmethod = "simplex",
+      methode = "odeint::runge_kutta_cash_karp54"
     )
     # If an error occurred, ml will be NA and we return NA right away.
     if (length(ml) == 1 && is.na(ml)) {
