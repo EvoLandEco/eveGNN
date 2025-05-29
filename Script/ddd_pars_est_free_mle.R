@@ -36,6 +36,7 @@ tryCatch(
     names(ml) <- NULL
     differences <- eveGNN::all_differences(as.numeric(ml[1:3]), data$pars[[i]])
     differences$nnode <- data$tes[[i]]$Nnode
+    differences$loglik <- ml[4]
 
     filename <- paste0("differences_", i, ".rds")
 
@@ -78,6 +79,7 @@ tryCatch(
     names(ml) <- NULL
     differences <- eveGNN::all_differences(as.numeric(ml[1:3]), data$pars[[i]])
     differences$nnode <- data$tes[[i]]$Nnode
+    differences$loglik <- ml[4]
 
     filename <- paste0("differences_", i, ".rds")
     saveRDS(differences, file = filename)
