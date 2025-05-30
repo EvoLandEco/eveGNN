@@ -51,7 +51,7 @@ for (k in seq_along(opt_methods)) {
   )
 }
 
-best_lls <- sapply(best_reps, function(x) if (is.numeric(x)) x[4] else NA_real_)
+best_lls <- sapply(best_reps, function(x) as.numeric(x[4]))
 
 if (all(is.na(best_lls))) {
   best_out <- NA
@@ -89,7 +89,7 @@ for (k in seq_along(opt_methods)) {
   )
 }
 
-typical_lls <- sapply(typical_reps, function(x) if (is.numeric(x)) x[4] else NA_real_)
+typical_lls <- sapply(typical_reps, function(x) as.numeric(x[4]))
 
 if (all(is.na(typical_lls))) {
   typical_out <- NA

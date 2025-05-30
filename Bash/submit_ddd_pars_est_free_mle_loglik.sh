@@ -12,4 +12,4 @@ index=${1}
 name=${2}
 
 ml R
-Rscript ../Script/ddd_pars_est_free_mle_fail.R ${index} ${name}
+Rscript ../Script/ddd_pars_est_free_mle_loglik.R ${index} ${name}
