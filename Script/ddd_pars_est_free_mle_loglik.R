@@ -1,20 +1,16 @@
 args <- commandArgs(TRUE)
-
 i    <- as.numeric(args[1])
 name <- as.character(args[2])
 
 data <- readRDS(file.path(name, "DDD_MLE_TES/MLE_DATA/ddd_mle.rds"))
 
-setwd(name)
-setwd("DDD_MLE_TES")
-
-# If data i has only two parameters, set the third to Inf
+setwd(file.path(name, "DDD_MLE_TES"))
 if (length(data$pars[[i]]) == 2) data$pars[[i]][3] <- Inf
 
-# --------------------------------------------------------------
-# Helper: run one dd_ML call safely, returning the raw ml vector
-# --------------------------------------------------------------
-safe_ddml <- function(brts, initpars, opt_method, t_limit) {
+## ----------------------------------------------------------------
+## Safe wrapper
+## ----------------------------------------------------------------
+safe_ddml <- function(brts, initpars, opt_method, int_method, t_limit) {
   err_dir <- "safe_ddml_errors"
   if (!dir.exists(err_dir)) dir.create(err_dir, recursive = TRUE)
 
@@ -30,113 +26,115 @@ safe_ddml <- function(brts, initpars, opt_method, t_limit) {
         ddmodel     = 1,
         num_cycles  = Inf,
         optimmethod = opt_method,
-        methode     = "odeint::runge_kutta_cash_karp54"
+        methode     = int_method
       )
       if (length(ml) == 1 && is.na(ml)) NA else ml
     }, timeout = t_limit),
 
     TimeoutException = function(ex) {
       info <- list(
-        type       = "timeout",
-        brts       = brts,
-        initpars   = initpars,
-        opt_method = opt_method,
-        t_limit    = t_limit,
-        error_msg  = ex$message
+        type        = "timeout",
+        brts        = brts,
+        initpars    = initpars,
+        opt_method  = opt_method,
+        int_method  = int_method,
+        t_limit     = t_limit,
+        error_msg   = ex$message
       )
-      fname <- tempfile(
-        pattern = paste0(opt_method, "_timeout_"),
-        tmpdir  = err_dir,
-        fileext = ".rds"
-      )
-      saveRDS(info, fname)
+      saveRDS(info,
+              tempfile(
+                pattern = sprintf("%s_%s_timeout_", opt_method, basename(int_method)),
+                tmpdir  = err_dir,
+                fileext = ".rds"))
       NA
     },
 
     error = function(ex) {
       info <- list(
-        type       = "error",
-        brts       = brts,
-        initpars   = initpars,
-        opt_method = opt_method,
-        t_limit    = t_limit,
-        error_msg  = ex$message,
-        call       = deparse(ex$call)
+        type        = "error",
+        brts        = brts,
+        initpars    = initpars,
+        opt_method  = opt_method,
+        int_method  = int_method,
+        t_limit     = t_limit,
+        error_msg   = ex$message,
+        call        = deparse(ex$call)
       )
-      fname <- tempfile(
-        pattern = paste0(opt_method, "_error_"),
-        tmpdir  = err_dir,
-        fileext = ".rds"
-      )
-      saveRDS(info, fname)
+      saveRDS(info,
+              tempfile(
+                pattern = sprintf("%s_%s_error_", opt_method, basename(int_method)),
+                tmpdir  = err_dir,
+                fileext = ".rds"))
       NA
     }
   )
 }
 
-opt_methods <- c("simplex", "subplex", "DEoptim")
+opt_methods  <- c("simplex", "subplex", "DEoptim")
+int_methods  <- c("odeint::runge_kutta_cash_karp54", "analytical")
+combos       <- expand.grid(opt = opt_methods, int = int_methods, stringsAsFactors = FALSE)
 
-# --------------------------------------------------------------
-# 1. Best-case block  (three different optimisation methods)
-# --------------------------------------------------------------
-best_reps <- vector("list", length(opt_methods))
-for (k in seq_along(opt_methods)) {
-  best_reps[[k]] <- safe_ddml(
-    brts       = data$brts[[i]],
-    initpars   = data$pars[[i]],
-    opt_method = opt_methods[k],
-    t_limit    = 30000
-  )
+## ----------------------------------------------------------------
+## Helper to run *one* block (best or typical) and save everything
+## ----------------------------------------------------------------
+run_block <- function(block_dir, brts, initpars, t_limit) {
+  if (!dir.exists(block_dir)) dir.create(block_dir, recursive = TRUE)
+
+  results <- vector("list", nrow(combos))
+
+  for (row in seq_len(nrow(combos))) {
+    om <- combos$opt[row]
+    im <- combos$int[row]
+    ml <- safe_ddml(brts, initpars, om, im, t_limit)
+
+    if (length(ml) == 1 && is.na(ml)) {
+      results[[row]] <- list(
+        opt_method = om,
+        methode    = im,
+        loglik     = NA_real_,
+        mle        = NA,
+        differences = NA,
+        nnode      = data$tes[[i]]$Nnode
+      )
+    } else {
+      diffs <- eveGNN::all_differences(as.numeric(ml[1:3]), data$pars[[i]])
+      results[[row]] <- list(
+        opt_method  = om,
+        methode     = im,
+        loglik      = as.numeric(ml[4]),
+        mle         = ml[1:3],
+        differences = diffs,
+        nnode       = data$tes[[i]]$Nnode
+      )
+    }
+  }
+
+  saveRDS(results, file.path(block_dir, sprintf("differences_%d.rds", i)))
 }
 
-best_lls <- sapply(best_reps, function(x) as.numeric(x[4]))
+## ----------------------------------------------------------------
+## 1.  BEST-CASE  (true parameters as starting point)
+## ----------------------------------------------------------------
+run_block(
+  block_dir = ".",
+  brts      = data$brts[[i]],
+  initpars  = data$pars[[i]],
+  t_limit   = 30000
+)
 
-if (all(is.na(best_lls))) {
-  best_out <- NA
-} else {
-  j         <- which.max(best_lls)
-  ml        <- best_reps[[j]]
-  names(ml) <- NULL
-  best_out  <- eveGNN::all_differences(as.numeric(ml[1:3]), data$pars[[i]])
-  best_out$nnode  <- data$tes[[i]]$Nnode
-}
-
-saveRDS(best_out, file = paste0("differences_", i, ".rds"))
-
-
-# --------------------------------------------------------------
-# 2. Typical-case block (NO_INIT, three different methods)
-# --------------------------------------------------------------
+## ----------------------------------------------------------------
+## 2.  TYPICAL-CASE  (random starting point)
+## ----------------------------------------------------------------
 if (!dir.exists("NO_INIT")) dir.create("NO_INIT")
 setwd("NO_INIT")
 
-# One random initial vector, reused for all three methods
-init_typical <- c(
-  runif(1, 0.1, 4.0),
-  runif(1, 0.0, 1.5),
-  runif(1, 10.0, 1000.0)
+init_typical <- c(runif(1, 0.1, 4.0),
+                  runif(1, 0.0, 1.5),
+                  runif(1, 10.0, 1000.0))
+
+run_block(
+  block_dir = ".",
+  brts      = data$brts[[i]],
+  initpars  = init_typical,
+  t_limit   = 30000
 )
-
-typical_reps <- vector("list", length(opt_methods))
-for (k in seq_along(opt_methods)) {
-  typical_reps[[k]] <- safe_ddml(
-    brts       = data$brts[[i]],
-    initpars   = init_typical,
-    opt_method = opt_methods[k],
-    t_limit    = 30000
-  )
-}
-
-typical_lls <- sapply(typical_reps, function(x) as.numeric(x[4]))
-
-if (all(is.na(typical_lls))) {
-  typical_out <- NA
-} else {
-  j          <- which.max(typical_lls)
-  ml         <- typical_reps[[j]]
-  names(ml)  <- NULL
-  typical_out <- eveGNN::all_differences(as.numeric(ml[1:3]), data$pars[[i]])
-  typical_out$nnode  <- data$tes[[i]]$Nnode
-}
-
-saveRDS(typical_out, file = paste0("differences_", i, ".rds"))
