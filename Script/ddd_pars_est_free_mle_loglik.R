@@ -15,6 +15,9 @@ if (length(data$pars[[i]]) == 2) data$pars[[i]][3] <- Inf
 # Helper: run one dd_ML call safely, returning the raw ml vector
 # --------------------------------------------------------------
 safe_ddml <- function(brts, initpars, opt_method, t_limit) {
+  err_dir <- "safe_ddml_errors"
+  if (!dir.exists(err_dir)) dir.create(err_dir, recursive = TRUE)
+
   tryCatch(
     R.utils::withTimeout({
       ml <- DDD::dd_ML(
@@ -31,8 +34,43 @@ safe_ddml <- function(brts, initpars, opt_method, t_limit) {
       )
       if (length(ml) == 1 && is.na(ml)) NA else ml
     }, timeout = t_limit),
-    TimeoutException = function(ex) NA,
-    error            = function(ex) NA
+
+    TimeoutException = function(ex) {
+      info <- list(
+        type       = "timeout",
+        brts       = brts,
+        initpars   = initpars,
+        opt_method = opt_method,
+        t_limit    = t_limit,
+        error_msg  = ex$message
+      )
+      fname <- tempfile(
+        pattern = paste0(opt_method, "_timeout_"),
+        tmpdir  = err_dir,
+        fileext = ".rds"
+      )
+      saveRDS(info, fname)
+      NA
+    },
+
+    error = function(ex) {
+      info <- list(
+        type       = "error",
+        brts       = brts,
+        initpars   = initpars,
+        opt_method = opt_method,
+        t_limit    = t_limit,
+        error_msg  = ex$message,
+        call       = deparse(ex$call)
+      )
+      fname <- tempfile(
+        pattern = paste0(opt_method, "_error_"),
+        tmpdir  = err_dir,
+        fileext = ".rds"
+      )
+      saveRDS(info, fname)
+      NA
+    }
   )
 }
 
