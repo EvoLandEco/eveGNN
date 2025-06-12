@@ -70,8 +70,8 @@ safe_ddml <- function(brts, initpars, opt_method, int_method, t_limit) {
   )
 }
 
-opt_methods  <- c("simplex", "subplex", "DEoptim")
-int_methods  <- c("odeint::runge_kutta_cash_karp54", "analytical")
+opt_methods  <- c("simplex")
+int_methods  <- c("odeint::runge_kutta_cash_karp54")
 combos       <- expand.grid(opt = opt_methods, int = int_methods, stringsAsFactors = FALSE)
 
 ## ----------------------------------------------------------------
@@ -119,7 +119,7 @@ run_block(
   block_dir = ".",
   brts      = data$brts[[i]],
   initpars  = data$pars[[i]],
-  t_limit   = 30000
+  t_limit   = 43200
 )
 
 ## ----------------------------------------------------------------
@@ -136,5 +136,5 @@ run_block(
   block_dir = ".",
   brts      = data$brts[[i]],
   initpars  = init_typical,
-  t_limit   = 30000
+  t_limit   = 43200
 )
