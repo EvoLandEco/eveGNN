@@ -71,7 +71,7 @@ safe_ddml <- function(brts, initpars, opt_method, int_method, t_limit) {
 }
 
 opt_methods  <- c("simplex")
-int_methods  <- c("odeint::runge_kutta_cash_karp54")
+int_methods  <- c("analytical")
 combos       <- expand.grid(opt = opt_methods, int = int_methods, stringsAsFactors = FALSE)
 
 ## ----------------------------------------------------------------
