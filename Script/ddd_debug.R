@@ -1,5 +1,5 @@
 args <- commandArgs(TRUE)
-name    <- as.numeric(args[1])
+name    <- as.character(args[1])
 
 data <- readRDS(file.path(name, "DDD_MLE_TES/differences_1187.rds"))
 
