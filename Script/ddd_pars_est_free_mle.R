@@ -43,7 +43,7 @@ tryCatch(
     saveRDS(differences, file = filename)
 
     return(differences)
-  }, timeout = 60000),  # in seconds
+  }, timeout = 43200),  # in seconds
   TimeoutException = function(ex) {
     return(NA)  # Return NA or some other indication of timeout
   }
@@ -85,7 +85,7 @@ tryCatch(
     saveRDS(differences, file = filename)
 
     return(differences)
-  }, timeout = 22800),  # in seconds
+  }, timeout = 43200),  # in seconds
   TimeoutException = function(ex) {
     return(NA)  # Return NA or some other indication of timeout
   }
