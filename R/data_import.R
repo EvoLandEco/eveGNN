@@ -577,9 +577,233 @@ load_full_mle_result <- function(path, task_type, model_type, no_init = FALSE) {
 #' @export load_separated_mle_result
 load_separated_mle_result <- function(path, task_type, model_type, no_init = FALSE) {
   mle_results <- list()
+
+  if (!no_init) {
+    mle_list <- list.files(
+      file.path(path, paste0(task_type, "_MLE_TES")),
+      pattern = "^differences_[0-9]+\\.rds$",
+      full.names = TRUE
+    )
+  } else {
+    mle_list <- list.files(
+      file.path(path, paste0(task_type, "_MLE_TES"), "NO_INIT"),
+      pattern = "^differences_[0-9]+\\.rds$",
+      full.names = TRUE
+    )
+  }
+
+  total_count <- length(mle_list)
+  na_count <- 0
+
+  for (i in seq_along(mle_list)) {
+    res <- readRDS(mle_list[i])
+    if (length(res) == 1 && is.na(res)) {
+      na_count <- na_count + 1
+      mle_results[[i]] <- NA
+    } else {
+      mle_results[[i]] <- res
+    }
+  }
+
+  out_list <- list()
+  idx <- 1
+
+  if (task_type == "DDD") {
+    for (i in seq_along(mle_results)) {
+      if (length(mle_results[[i]]) == 1 && is.na(mle_results[[i]])) next
+      true_vals <- mle_results[[i]]$true
+      mle_vals  <- mle_results[[i]]$mle
+      r_diffs <- (true_vals - mle_vals) / true_vals * 100
+      a_diffs <- true_vals - mle_vals
+      out_list[[idx]] <- list(
+        lambda = true_vals[1],
+        mu     = true_vals[2],
+        cap    = true_vals[3],
+        lambda_r_diff = r_diffs[1],
+        mu_r_diff     = r_diffs[2],
+        cap_r_diff    = r_diffs[3],
+        lambda_a_diff = a_diffs[1],
+        mu_a_diff     = a_diffs[2],
+        cap_a_diff    = a_diffs[3],
+        num_nodes     = mle_results[[i]]$nnode
+      )
+      idx <- idx + 1
+    }
+  } else if (task_type == "PBD") {
+    for (i in seq_along(mle_results)) {
+      if (length(mle_results[[i]]) == 1 && is.na(mle_results[[i]])) next
+      true_vals <- mle_results[[i]]$true
+      mle_vals  <- mle_results[[i]]$mle
+      r_diffs <- (true_vals - mle_vals) / true_vals * 100
+      a_diffs <- true_vals - mle_vals
+      out_list[[idx]] <- list(
+        lambda1     = true_vals[1],
+        lambda2     = true_vals[2],
+        lambda3     = true_vals[3],
+        mu1         = true_vals[4],
+        mu2         = true_vals[5],
+        lambda1_pred = mle_vals[1],
+        lambda2_pred = mle_vals[2],
+        lambda3_pred = mle_vals[3],
+        mu1_pred     = mle_vals[4],
+        mu2_pred     = mle_vals[5],
+        lambda1_r_diff = r_diffs[1],
+        lambda2_r_diff = r_diffs[2],
+        lambda3_r_diff = r_diffs[3],
+        mu1_r_diff     = r_diffs[4],
+        mu2_r_diff     = r_diffs[5],
+        lambda1_a_diff = a_diffs[1],
+        lambda2_a_diff = a_diffs[2],
+        lambda3_a_diff = a_diffs[3],
+        mu1_a_diff     = a_diffs[4],
+        mu2_a_diff     = a_diffs[5],
+        num_nodes      = mle_results[[i]]$nnode
+      )
+      idx <- idx + 1
+    }
+  } else if (task_type == "EVE") {
+    stop("Not implemented yet.")
+  } else {
+    stop("Unknown task type: ", task_type)
+  }
+
+  if (total_count > 0) {
+    prop_na <- na_count / total_count
+    message(sprintf(
+      "Ignored %d of %d results (%.1f%%) due to NA.",
+      na_count, total_count, 100 * prop_na
+    ))
+  }
+
+  if (length(out_list) == 0) {
+    out <- dplyr::bind_rows(list())
+  } else {
+    out <- dplyr::bind_rows(out_list)
+  }
+  out$Model <- model_type
+  out$Task  <- paste0(task_type, "_MLE_TES")
+  out <- as.data.frame(out)
+
+  return(out)
+}
+
+
+#’ @export load_separated_mle_result2
+#’ @export
+#’ @export
+load_separated_mle_result2 <- function(path,
+                                      task_type,
+                                      model_type,
+                                      no_init = FALSE,
+                                      rel_tol = 0.10) {
+  # locate RDS files
+  subdir <- if (!no_init) {
+    file.path(path, paste0(task_type, "_MLE_TES"))
+  } else {
+    file.path(path, paste0(task_type, "_MLE_TES"), "NO_INIT")
+  }
+  files <- list.files(subdir,
+                      pattern   = "^differences_[0-9]+\\.rds$",
+                      full.names = TRUE)
+
+  results_list <- vector("list", length(files))
+  keep_idx     <- logical(length(files))
+
+  for (j in seq_along(files)) {
+    obj <- readRDS(files[j])
+    res_list <- obj$results
+    ints     <- vapply(res_list, `[[`, character(1), "integrator")
+
+    ode_idx <- which(ints == "odeint::runge_kutta_cash_karp54")
+    ana_idx <- which(ints == "analytical")
+    if (length(ode_idx) != 1 || length(ana_idx) != 1) next
+
+    ode_res <- res_list[[ode_idx]]
+    ana_res <- res_list[[ana_idx]]
+
+    ode_est <- ode_res$est
+    ana_est <- ana_res$est
+
+    # determine which parameters are valid for relative check
+    valid_idx <- which(
+      is.finite(ode_est) & is.finite(ana_est) &
+        ode_est != -1 & ana_est != -1
+    )
+    if (length(valid_idx) > 0) {
+      rel_diff <- abs(ode_est[valid_idx] - ana_est[valid_idx]) /
+        abs(ana_est[valid_idx])
+      if (any(rel_diff > rel_tol)) next
+    }
+
+    # mark for inclusion
+    keep_idx[j] <- TRUE
+
+    true_p <- obj$input$truepars
+    mle_p  <- ode_est
+    r_diffs <- (true_p - mle_p) / true_p * 100
+    a_diffs <-  true_p - mle_p
+
+    # recompute nnode from branching times
+    brts   <- obj$input$brts
+    nnode  <- length(brts) + 1
+
+    if (task_type == "DDD") {
+      results_list[[j]] <- list(
+        lambda        = true_p[1],
+        mu            = true_p[2],
+        cap           = true_p[3],
+        lambda_r_diff = r_diffs[1],
+        mu_r_diff     = r_diffs[2],
+        cap_r_diff    = r_diffs[3],
+        lambda_a_diff = a_diffs[1],
+        mu_a_diff     = a_diffs[2],
+        cap_a_diff    = a_diffs[3],
+        num_nodes     = nnode
+      )
+    } else if (task_type == "PBD") {
+      results_list[[j]] <- list(
+        lambda1        = true_p[1],
+        lambda2        = true_p[2],
+        lambda3        = true_p[3],
+        mu1            = true_p[4],
+        mu2            = true_p[5],
+        lambda1_pred   = mle_p[1],
+        lambda2_pred   = mle_p[2],
+        lambda3_pred   = mle_p[3],
+        mu1_pred       = mle_p[4],
+        mu2_pred       = mle_p[5],
+        lambda1_r_diff = r_diffs[1],
+        lambda2_r_diff = r_diffs[2],
+        lambda3_r_diff = r_diffs[3],
+        mu1_r_diff     = r_diffs[4],
+        mu2_r_diff     = r_diffs[5],
+        lambda1_a_diff = a_diffs[1],
+        lambda2_a_diff = a_diffs[2],
+        lambda3_a_diff = a_diffs[3],
+        mu1_a_diff     = a_diffs[4],
+        mu2_a_diff     = a_diffs[5],
+        num_nodes      = nnode
+      )
+    } else {
+      stop("Unknown task type: ", task_type)
+    }
+  }
+
+  # bind retained entries and add metadata
+  df <- dplyr::bind_rows(results_list[keep_idx])
+  df$Model <- model_type
+  df$Task  <- paste0(task_type, "_MLE_TES")
+  as.data.frame(df)
+}
+
+
+
+#' @export load_separated_mle_misspec
+load_separated_mle_misspec <- function(path, task_type, model_type, no_init = FALSE) {
+  mle_results <- list()
   mle_list <- list()
 
-    # construct filenames
+  # construct filenames
   if (!no_init) {
     mle_list <- list.files(file.path(path, paste0(task_type, "_MLE_TES")), pattern = "^differences_[0-9]+\\.rds$", full.names = TRUE)
   } else {
@@ -592,18 +816,13 @@ load_separated_mle_result <- function(path, task_type, model_type, no_init = FAL
   }
   if (task_type == "DDD") {
     for (i in seq_len(length(mle_results))) {
-      r_diffs <- (mle_results[[i]]$true - mle_results[[i]]$mle) / mle_results[[i]]$true * 100
-      a_diffs <- mle_results[[i]]$true - mle_results[[i]]$mle
       out[[i]] <- list(
         lambda = mle_results[[i]]$true[1],
         mu = mle_results[[i]]$true[2],
         cap = mle_results[[i]]$true[3],
-        lambda_r_diff = r_diffs[1],
-        mu_r_diff = r_diffs[2],
-        cap_r_diff = r_diffs[3],
-        lambda_a_diff = a_diffs[1],
-        mu_a_diff = a_diffs[2],
-        cap_a_diff = a_diffs[3],
+        lambda_pred = mle_results[[i]]$mle[1],
+        mu_pred = mle_results[[i]]$mle[2],
+        cap_pred = mle_results[[i]]$mle[3],
         num_nodes = mle_results[[i]]$nnode
       )
     }
@@ -648,6 +867,7 @@ load_separated_mle_result <- function(path, task_type, model_type, no_init = FAL
 
   return(out)
 }
+
 
 
 #' @export load_empirical_mle_result
