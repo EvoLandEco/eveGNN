@@ -1,27 +1,11 @@
 # eveGNN
-eveGNN contains functions and scripts to apply Graph Neural Network approaches on phylogenetic trees, for evolutionary analyses like tree classification, node classification and tree parameter estimation.
+eveGNN contains all the functions and scripts used throughout the formation of the paper "Parameter Estimation from Phylogenetic Trees Using Neural Networks and Ensemble Learning", Systematic Biology (2025), DOI: 10.1093/sysbio/syaf060
 
-## Dependency
-- Optuna >= 3.4.0
+It serves as an archive of our entire exploratory codebase during the past years. For a simple illustrative project of combining R and PyTorch models to estimate phylogenetic parameters, go to https://github.com/evolandeco/evonn
+
+Several branches and many different versions of scripts exist in the repo, we therefore recommend to look at branch `@multimodal-stacking-boosting` and a particular script https://github.com/EvoLandEco/eveGNN/blob/multimodal-stacking-boosting/Script/train_ddd_pars_est_DiffPool.py for the proposed best performing ensemble learning architecture as descripbed in the paper.
+
+## Environment
 - R >= 4.2.1
-- Python = 3.8.16
-- PyTorch Geometric = 2.4.0
-- eveGNN (in R, run `devtools::install_github("EvoLandEco/eveGNN")`)
-
-## How to use
-ADAM (Automated DAta Manager) is a simple shell program to help manage simulation data, train GNN model and more. The program and the scripts it calls are designed for a cluster computer in the SLURM environment.
-
-- First, clone the repo:
-```bash
-git clone https://github.com/EvoLandEco/eveGNN
-```
-- Second, locate to bash, create a folder for new project:
-```bash
-cd Bash
-mkdir myproject
-```
-- Finally, run ADAM:
-```bash
-bash ADAM.sh myproject
-```
-![624461](https://github.com/EvoLandEco/eveGNN/assets/57348932/f4bc8341-68d6-4c7b-86e4-36ee44391c09)
+- Python >= 3.8.16
+- PyTorch Geometric >= 2.4.0
