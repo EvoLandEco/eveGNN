@@ -40,8 +40,8 @@ randomized_eve_fixed_age <- function(dists, age, metric, offset) {
 fill_size_quota <- function(dists, age, metric, offset,
                             sizes = 10:1000,         # or 10:1009 if need 100,000
                             per_size = 100,          # target per distinct size
-                            batch_nrep = 5000,       # sims per batch (parallelized)
-                            max_batches = 500,       # safety cap
+                            batch_nrep = 20000,       # sims per batch (parallelized)
+                            max_batches = 5000,       # safety cap
                             nworkers_sim = parallel::detectCores() - 1) {
 
   target_total <- length(sizes) * per_size
@@ -139,15 +139,15 @@ age        <- params$age
 # Build three balanced datasets
 eve_pd_list_all  <- fill_size_quota(dists_pd,  age, metric = "pd",  offset = "simtime",
                                     sizes = sizes, per_size = per_size,
-                                    batch_nrep = 5000, max_batches = 500, nworkers_sim = nworkers_sim)
+                                    batch_nrep = 20000, max_batches = 5000, nworkers_sim = nworkers_sim)
 
 eve_ed_list_all  <- fill_size_quota(dists_ed,  age, metric = "ed",  offset = "none",
                                     sizes = sizes, per_size = per_size,
-                                    batch_nrep = 5000, max_batches = 500, nworkers_sim = nworkers_sim)
+                                    batch_nrep = 20000, max_batches = 5000, nworkers_sim = nworkers_sim)
 
 eve_nnd_list_all <- fill_size_quota(dists_nnd, age, metric = "nnd", offset = "none",
                                     sizes = sizes, per_size = per_size,
-                                    batch_nrep = 5000, max_batches = 500, nworkers_sim = nworkers_sim)
+                                    batch_nrep = 20000, max_batches = 5000, nworkers_sim = nworkers_sim)
 
 # Export
 dir.create("EVE_FREE_TES", showWarnings = FALSE)
