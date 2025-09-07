@@ -18,14 +18,14 @@ randomized_eve_fixed_age <- function(dists, age, metric, offset) {
   raw_result <- evesim::edd_sim(pars = pars_list, age = age, metric = metric,
                                 offset = offset, size_limit = 2000)
 
-  if (is.null(raw_result$sim)) {
+  if (is.null(raw_result$tes)) {
     result[["tes"]] <- NULL
     result[["n_nodes"]] <- NA_integer_
   } else {
-    phy <- raw_result$sim
+    phy <- raw_result$tes
     ## total nodes = tips + internal nodes (ape 'phylo' convention)
-    n_nodes <- length(phy$tip.label) + phy$Nnode   # ← add
-    result[["n_nodes"]] <- n_nodes                 # ← add
+    n_nodes <- length(phy$tip.label) + phy$Nnode
+    result[["n_nodes"]] <- n_nodes
     result[["tes"]] <- evesim::SimTable.phylo(phy, drop_extinct = TRUE)
   }
 
