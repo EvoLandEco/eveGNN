@@ -7,7 +7,7 @@ params <- yaml::read_yaml("../Config/eve_sim.yaml")
 # Utilities
 randomized_eve_fixed_age <- function(dists, age, metric, offset) {
   result <- list()
-  params <- generate_params(dists)
+  params <- eveGNN::generate_params(dists)
   lambda <- params[[1]]
   mu <- runif(1, min = 0, max = 0.8 * lambda)
   beta_n <- params[[2]]; beta_phi <- params[[3]]
@@ -133,7 +133,7 @@ age <- params$age
 nworkers_sim <- params$nworkers_sim
 
 sizes      <- 10:1009
-per_size   <- 100
+per_size   <- 50
 age        <- params$age
 
 # Build three balanced datasets
