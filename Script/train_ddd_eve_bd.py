@@ -231,7 +231,6 @@ def main():
     set_i = sys.argv[2]
     task_type = sys.argv[3]
 
-    # Now you can use the variables name and set_i in your code
     print(f'Name: {name}, Set: {set_i}, Task Type: {task_type}')
 
     bd_tree_path = os.path.join(name, "BD_TES/set_1")

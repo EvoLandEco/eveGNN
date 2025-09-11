@@ -18,6 +18,163 @@ from torch_geometric.nn import DenseGCNConv as GCNConv, dense_diff_pool
 from torch_geometric.nn import DenseSAGEConv as SAGEConv
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence, pad_sequence, pack_sequence
 
+# Spectra settings
+import math
+import json
+from typing import Dict, List, Tuple, Optional
+import numpy.linalg as npla
+
+SPEC_BINS = 64                          # histogram bins on [0, 2]
+SPEC_TAUS = [0.05, 0.1, 0.3, 1.0]       # NetLSD heat-trace scales
+SPEC_BAND_SPLITS = (0.2, 1.2)           # low/mid/high bands in [0,2]
+MAX_EIG_NODES = 600                     # exact eig only if n_nodes <= this
+SPEC_SAVE_DENSITY = True                # also persist densities for later
+
+# Spectra helpers
+# ================== Spectral helpers ==================
+def _normalized_laplacian_from_dense_adj(A: np.ndarray) -> np.ndarray:
+    # A: (n,n) symmetric, nonnegative
+    d = A.sum(axis=1)
+    invsqrt = np.zeros_like(d, dtype=float)
+    nz = d > 0
+    invsqrt[nz] = 1.0 / np.sqrt(d[nz])
+    Dinv = np.multiply.outer(invsqrt, invsqrt)
+    # L = I - D^{-1/2} A D^{-1/2}
+    n = A.shape[0]
+    return np.eye(n, dtype=float) - Dinv * A
+
+def _eig_or_density(L: np.ndarray, bins: np.ndarray) -> Tuple[Optional[np.ndarray], np.ndarray]:
+    """Return (evals_if_small_or_None, density_on_bins)."""
+    n = L.shape[0]
+    if n <= MAX_EIG_NODES:
+        evals = npla.eigvalsh(L)
+        # clip to [0,2] in case of tiny numeric negatives
+        evals = np.clip(evals, 0.0, 2.0)
+        hist, _ = np.histogram(evals, bins=bins)
+        dens = hist / (hist.sum() + 1e-30)
+        return evals, dens
+    else:
+        # SLQ fallback (dense matvec; cheap at these sizes)
+        def _l_mv(x): return L @ x
+        dens = _slq_density_matvec(_l_mv, n, bins, probes=64, lanczos_steps=150, complex_mode=False)
+        return None, dens
+
+def _slq_density_matvec(mv, n: int, bins: np.ndarray, probes=64, lanczos_steps=150, complex_mode=False):
+    rng = np.random.default_rng(1234)
+    H = np.zeros(len(bins) - 1, dtype=float)
+    for _ in range(probes):
+        v0 = rng.standard_normal(n) if not complex_mode else rng.standard_normal(n) + 1j * rng.standard_normal(n)
+        al, be = _lanczos_tridiag_matvec(mv, n, lanczos_steps, v0)
+        m = len(al)
+        T = np.diag(al)
+        if m > 1:
+            off = be[:m-1]
+            T[np.arange(m-1), np.arange(1, m)] = off
+            T[np.arange(1, m), np.arange(m-1)] = off
+        evals, evecs = npla.eigh(T)
+        w = (evecs[0] ** 2).real
+        h, _ = np.histogram(evals, bins=bins, weights=w)
+        H += h
+    return H / (H.sum() + 1e-30)
+
+def _lanczos_tridiag_matvec(mv, n, m, v0, tol=1e-12):
+    q_prev = np.zeros(n, dtype=v0.dtype)
+    norm_v0 = npla.norm(v0)
+    q = (v0 if norm_v0 > 0 else np.ones(n)) / (norm_v0 if norm_v0 > 0 else np.sqrt(n))
+    al, be, beta = [], [], 0.0
+    for _ in range(m):
+        z = mv(q)
+        a = np.vdot(q, z).real
+        z = z - a * q - beta * q_prev
+        beta = float(npla.norm(z))
+        al.append(a)
+        if len(al) < m:
+            be.append(beta)
+        if beta < tol:
+            break
+        q_prev, q = q, z / beta
+    return np.array(al, float), np.array(be, float)
+
+def _heat_trace_from_density(bin_centers: np.ndarray, density: np.ndarray, taus: List[float]) -> np.ndarray:
+    p = density / (density.sum() + 1e-30)
+    lam = bin_centers.reshape(1, -1)
+    T = np.array(taus, float).reshape(-1, 1)
+    return (np.exp(-T * lam) @ p.reshape(-1, 1)).ravel()
+
+def _band_masses(density: np.ndarray, bins: np.ndarray, splits: Tuple[float,float]) -> Tuple[float,float,float]:
+    s1, s2 = splits
+    edges = bins
+    i1 = np.searchsorted(edges, s1, side="right") - 1
+    i2 = np.searchsorted(edges, s2, side="right") - 1
+    low  = float(density[:max(0, i1)].sum())
+    mid  = float(density[max(0, i1):max(i1, i2)].sum())
+    high = float(density[max(i2, 0):].sum())
+    return low, mid, high
+
+def compute_spectral_stats_from_dense(adj: np.ndarray, mask: Optional[np.ndarray],
+                                      bins: np.ndarray,
+                                      taus: List[float],
+                                      band_splits: Tuple[float,float]) -> Dict[str, object]:
+    """adj: (max_n, max_n), mask: (max_n,) booleans; returns a flat dict of scalar stats; density included."""
+    if mask is None:
+        n = adj.shape[0]
+        A = adj
+    else:
+        idx = np.where(mask.astype(bool))[0]
+        n = int(idx.size)
+        A = adj[np.ix_(idx, idx)]
+    if n == 0:
+        return dict(spec_n_nodes=0)
+
+    # degrees/edges
+    d = A.sum(axis=1)
+    n_edges = int((A > 0).sum() // 2)
+
+    # normalized Laplacian and its spectrum/density
+    L = _normalized_laplacian_from_dense_adj(A)
+    evals, density = _eig_or_density(L, bins)
+    centers = 0.5 * (bins[:-1] + bins[1:])
+    low, mid, high = _band_masses(density, bins, band_splits)
+    h = _heat_trace_from_density(centers, density, taus)
+
+    out = dict(
+        spec_n_nodes=int(n),
+        spec_n_edges=int(n_edges),
+        spec_deg_min=float(d.min() if d.size else 0.0),
+        spec_deg_med=float(np.median(d) if d.size else 0.0),
+        spec_deg_max=float(d.max() if d.size else 0.0),
+        spec_band_low=float(low),
+        spec_band_mid=float(mid),
+        spec_band_high=float(high),
+    )
+    # scalar eigen info if available
+    if evals is not None and evals.size > 0:
+        out["spec_lambda2"] = float(evals[1]) if evals.size >= 2 else float("nan")
+        out["spec_lmax"] = float(evals[-1])
+        out["spec_eig_small5"] = json.dumps(evals[:min(5, evals.size)].tolist())
+        out["spec_eig_large5"] = json.dumps(evals[max(0, evals.size-5):].tolist())
+        # simple multiplicity summary (within 1e-6)
+        mult = 0
+        if evals.size >= 2:
+            diffs = np.diff(np.round(evals, 6))
+            mult = int((diffs == 0).sum())
+        out["spec_mult_geq2"] = int(mult)
+    else:
+        out["spec_lambda2"] = float("nan")
+        out["spec_lmax"] = float("nan")
+        out["spec_eig_small5"] = json.dumps([])
+        out["spec_eig_large5"] = json.dumps([])
+        out["spec_mult_geq2"] = 0
+
+    # heat-trace scalars
+    for i, tau in enumerate(taus):
+        out[f"spec_heat_tau_{tau}"] = float(h[i])
+
+    # include density (list) to reconstruct later
+    out["spec_density"] = json.dumps(density.tolist())
+    return out
+
+
 # Load the global parameters from the config file
 global_params = None
 
@@ -53,8 +210,6 @@ normalize_graph_representation = global_params["normalize_graph_representation"]
 huber_delta = global_params["huber_delta"]
 global_pooling_method = global_params["global_pooling_method"]
 
-alpha= global_params["alpha"]
-beta = global_params["beta"]
 metric_to_category = {'pd': 0, 'ed': 1, 'nnd': 2}
 
 # Check if metric_to_category is a dictionary with string keys and integer values
@@ -62,14 +217,6 @@ assert isinstance(metric_to_category, dict), "metric_to_category should be a dic
 for key, value in metric_to_category.items():
     assert isinstance(key, str), "All keys in metric_to_category should be strings"
     assert isinstance(value, int), "All values in metric_to_category should be integers"
-
-# Check if alpha and beta are positive floats
-assert isinstance(alpha, float) and alpha > 0, "alpha should be a positive float"
-assert isinstance(beta, float) and beta > 0, "beta should be a positive float"
-
-# Check if alpha + beta = 1
-assert alpha + beta == 1, "alpha + beta should equal 1"
-
 
 def read_table(path):
     return pd.read_csv(path, sep="\s+", header=0)  # assuming the tables are tab-delimited
@@ -318,7 +465,7 @@ def read_rds_to_pytorch(path, count, normalize=False):
 
         params_current_tensor = torch.tensor(params_current[0:(n_predicted_values)], dtype=torch.float)
 
-        class_current_tensor = torch.tensor(params_current[n_predicted_values + 1], dtype=torch.long)
+        class_current_tensor = torch.tensor(params_current[6 + 1], dtype=torch.long)
 
         brts_tensor = torch.tensor(brts_list[i].values, dtype=torch.float)
 
@@ -539,10 +686,6 @@ def main():
                                       batch_first=True, dropout=dropout_rate if lstm_depth > 1 else 0)
             self.dropout = torch.nn.Dropout(dropout_rate)
 
-            # Regression output layers
-            self.lin_reg = torch.nn.Linear(hidden_channels, out_channels)
-            self.readout_reg = torch.nn.Linear(out_channels, n_predicted_values)  # Assuming regression output is a single value
-
             # Classification output layers
             self.lin_class = torch.nn.Linear(hidden_channels, out_channels)
             self.readout_class = torch.nn.Linear(out_channels, num_classes)  # Number of classes for classification
@@ -556,13 +699,6 @@ def main():
             # Apply activation function to the final hidden state
             x = F.gelu(final_hidden_state)
 
-            # Regression branch
-            reg_out = self.dropout(x)
-            reg_out = self.lin_reg(reg_out)
-            reg_out = F.gelu(reg_out)
-            reg_out = self.dropout(reg_out)
-            reg_out = self.readout_reg(reg_out)
-
             # Classification branch
             class_out = self.dropout(x)
             class_out = self.lin_class(class_out)
@@ -571,7 +707,7 @@ def main():
             class_out = self.readout_class(class_out)
             class_out = torch.softmax(class_out, dim=-1)
 
-            return reg_out, class_out
+            return class_out
 
 
     class DiffPool(torch.nn.Module):
@@ -647,13 +783,6 @@ def main():
             if self.verbose:
                 print("Global Pooling Completed...")
 
-            # Regression branch
-            reg_out = F.dropout(x, p=dropout_ratio, training=self.training)
-            reg_out = self.lin1(reg_out)
-            reg_out = F.gelu(reg_out)
-            reg_out = F.dropout(reg_out, p=dropout_ratio, training=self.training)
-            reg_out = self.lin2(reg_out)
-
             # Classification branch
             class_out = F.dropout(x, p=dropout_ratio, training=self.training)
             class_out = self.lin_class1(class_out)
@@ -662,108 +791,88 @@ def main():
             class_out = self.lin_class2(class_out)
             class_out = torch.softmax(class_out, dim=-1)
 
-            return reg_out, class_out, l1 + l2, e1 + e2
-
-    def combined_loss(output_regression, target_regression, output_classification, target_classification, link_loss, entropy_loss):
-        loss_regression = criterion(output_regression, target_regression)
-        loss_classification = F.cross_entropy(output_classification, target_classification)
-        loss_all = alpha * loss_regression + beta * loss_classification + link_loss + entropy_loss
-
-        return loss_all, loss_regression, loss_classification
+            return class_out, l1 + l2, e1 + e2
 
     def train_gnn():
         model_gnn.train()
 
         loss_all = 0  # Keep track of the loss
-        loss_reg = 0  # Keep track of the regression loss
-        loss_cls = 0  # Keep track of the classification loss
 
         for data in train_loader:
             data.to(device)
             optimizer.zero_grad()
-            out_re, out_cl, l, e = model_gnn(data.x, data.adj, data.mask)
-            target_re = data.y_re.view(data.num_nodes.__len__(), n_predicted_values).to(device)
+            out_cl, l, e = model_gnn(data.x, data.adj, data.mask)
             target_cl = data.y_cl.view(-1).to(device)
-            assert out_re.device == target_re.device == out_cl.device == target_cl.device, \
+            assert out_cl.device == target_cl.device, \
                 "Error: Device mismatch between output and target tensors."
-            loss, loss_reg, loss_cls = combined_loss(out_re, target_re, out_cl, target_cl, l, e)
+            loss = F.cross_entropy(out_cl, target_cl)
             loss.backward()
             loss_all += loss.item() * data.num_nodes.__len__()
-            loss_reg += loss_reg.item() * data.num_nodes.__len__()
-            loss_cls += loss_cls.item() * data.num_nodes.__len__()
             optimizer.step()
 
         out_loss_all = loss_all / len(train_loader.dataset)
-        out_loss_reg = loss_reg / len(train_loader.dataset)
-        out_loss_cls = loss_cls / len(train_loader.dataset)
 
-        return out_loss_all, out_loss_reg, out_loss_cls
-
-    @torch.no_grad()
-    def test_diff_gnn(loader):
-        model_gnn.eval()
-
-        diffs_all = torch.tensor([], dtype=torch.float, device=device)
-        outputs_all = torch.tensor([], dtype=torch.float, device=device)  # To store all outputs
-        y_all = torch.tensor([], dtype=torch.float, device=device)  # To store all y
-        nodes_all = torch.tensor([], dtype=torch.long, device=device)
-
-        for data in loader:
-            data.to(device)
-            out_re, _, _, _ = model_gnn(data.x, data.adj, data.mask)
-            diffs = torch.abs(out_re - data.y_re.view(data.num_nodes.__len__(), n_predicted_values))
-            diffs_all = torch.cat((diffs_all, diffs), dim=0)
-            outputs_all = torch.cat((outputs_all, out_re), dim=0)
-            y_all = torch.cat((y_all, data.y_re.view(data.num_nodes.__len__(), n_predicted_values)), dim=0)
-            nodes_all = torch.cat((nodes_all, data.num_nodes), dim=0)
-
-        print(f"diffs_all length: {len(diffs_all)}; test_loader.dataset length: {len(test_loader.dataset)}; Equal: {len(diffs_all) == len(test_loader.dataset)}")
-        mean_diffs = torch.sum(diffs_all, dim=0) / len(test_loader.dataset)
-        return mean_diffs.cpu().detach().numpy(), diffs_all.cpu().detach().numpy(), outputs_all.cpu().detach().numpy(), y_all.cpu().detach().numpy(), nodes_all.cpu().detach().numpy()
+        return out_loss_all
 
     @torch.no_grad()
     def compute_test_loss_gnn():
         model_gnn.eval()  # Set the model to evaluation mode
 
-        loss_all = 0  # Keep track of the loss
-        loss_reg = 0  # Keep track of the regression loss
-        loss_cls = 0  # Keep track of the classification loss
+        loss_all = 0  # Keep track of the classification loss
 
         for data in test_loader:
             data.to(device)
-            graph_sizes = data.num_nodes
-            out_re, out_cl, l, e = model_gnn(data.x, data.adj, data.mask)
-            target_re = data.y_re.view(data.num_nodes.__len__(), n_predicted_values).to(device)
+            out_cl, l, e = model_gnn(data.x, data.adj, data.mask)
             target_cl = data.y_cl.view(-1).to(device)
-            loss, loss_reg, loss_cls = combined_loss(out_re, target_re, out_cl, target_cl, l, e)
-            loss_all += loss.item() * data.num_nodes.__len__()
-            loss_reg += loss_reg.item() * data.num_nodes.__len__()
-            loss_cls += loss_cls.item() * data.num_nodes.__len__()
+            loss_cls = F.cross_entropy(out_cl, target_cl)
+            loss_all += loss_cls.item() * data.num_nodes.__len__()
 
-        out_loss_all = loss_all / len(train_loader.dataset)
-        out_loss_reg = loss_reg / len(train_loader.dataset)
-        out_loss_cls = loss_cls / len(train_loader.dataset)
+        out_loss_all = loss_all / len(test_loader.dataset)
 
-        return out_loss_all, out_loss_reg, out_loss_cls
+        return out_loss_all
 
     @torch.no_grad()
-    def test_accu_gnn(loader, num_classes):
+    def test_accu_gnn(loader, num_classes, spec_store=None):
         model_gnn.eval()
         correct = 0
         total_samples = len(loader.dataset)
+
+        bins = np.linspace(0.0, 2.0, SPEC_BINS + 1)  # normalized Laplacian support
 
         # Initialize counters for per-class correct predictions and total samples per class
         correct_per_class = torch.zeros(num_classes, dtype=torch.long).to(device)
         total_per_class = torch.zeros(num_classes, dtype=torch.long).to(device)
         outputs_all = torch.tensor([], dtype=torch.float, device=device)  # To store all outputs
-        y_all = torch.tensor([], dtype=torch.float, device=device)  # To store all y
+        pars_all = torch.tensor([], dtype=torch.float, device=device)  # To store all y_re
+        y_all = torch.tensor([], dtype=torch.float, device=device)  # To store all y_cl
+        nodes_all = torch.tensor([], dtype=torch.long, device=device)
 
         for data in loader:
             data = data.to(device)
-            _, out_cl, _, _ = model_gnn(data.x, data.adj, data.mask)
+            out_cl, _, _ = model_gnn(data.x, data.adj, data.mask)
+
+            if spec_store is not None:
+                adj_batch = data.adj.detach().cpu().numpy()
+                mask_batch = data.mask.detach().cpu().numpy()
+                # DenseDataLoader -> batched; handle both [B,...] and singletons
+                if adj_batch.ndim == 3:
+                    B = adj_batch.shape[0]
+                    for b in range(B):
+                        spec = compute_spectral_stats_from_dense(
+                            adj_batch[b], mask_batch[b], bins,
+                            SPEC_TAUS, SPEC_BAND_SPLITS
+                        )
+                        spec_store.append(spec)
+                else:
+                    spec = compute_spectral_stats_from_dense(
+                        adj_batch, mask_batch, bins, SPEC_TAUS, SPEC_BAND_SPLITS
+                    )
+                    spec_store.append(spec)
 
             outputs_all = torch.cat((outputs_all, out_cl), dim=0)
+            pars_all = torch.cat((pars_all, data.y_re.view(data.num_nodes.__len__(), n_predicted_values)), dim=0)
             y_all = torch.cat((y_all, data.y_cl.view(-1)), dim=0)
+            nodes_all = torch.cat((nodes_all, data.num_nodes), dim=0)
 
             # Get the predicted class by taking the class with the max score
             pred = out_cl.max(dim=1)[1]
@@ -786,7 +895,7 @@ def main():
         # Handle cases where a class might not be present in the batch
         class_accuracy[total_per_class == 0] = float('nan')  # Assign NaN to avoid division by zero
 
-        return overall_accuracy, class_accuracy, outputs_all.cpu().detach().numpy(), y_all.cpu().detach().numpy()
+        return overall_accuracy, class_accuracy, outputs_all.cpu().detach().numpy(), y_all.cpu().detach().numpy(), nodes_all.cpu().detach().numpy(), pars_all.cpu().detach().numpy()
 
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -795,7 +904,6 @@ def main():
     model_gnn = DiffPool()
     model_gnn = model_gnn.to(device)
     optimizer = torch.optim.AdamW(model_gnn.parameters(), lr=learning_rate)
-    criterion = torch.nn.HuberLoss(delta=huber_delta).to(device)
 
     def shape_check(dataset, max_nodes):
         incorrect_shapes = []  # List to store indices of data elements with incorrect shapes
@@ -830,23 +938,17 @@ def main():
 
     print(model_gnn)
 
-    test_mean_diffs_history = []
-    train_loss_all_history = []
-    train_loss_regression_history = []
     train_loss_classification_history = []
-    test_loss_all_history = []
-    test_loss_regression_history = []
     test_loss_classification_history = []
     test_overall_accuracy_history = []
     test_per_class_accuracy_history = []
-    final_test_diffs = []
-    final_test_predictions = []
     final_test_y = []
     final_test_nodes = []
     final_test_label_pred = []
     final_test_label_true = []
     final_overall_accuracy = []
     final_per_class_accuracy = []
+    spec_rows_gnn = []
 
     # Set up the early stopper
     # early_stopper = EarlyStopper(patience=3, min_delta=0.05)
@@ -858,45 +960,29 @@ def main():
 
     for epoch in range(1, epoch_number_gnn):
         actual_epoch_gnn = epoch
-        train_loss_all, train_loss_reg, train_loss_cls = train_gnn()
-        test_loss_all, test_loss_reg, test_loss_cls = compute_test_loss_gnn()
-        test_loss_all = test_loss_all * train_test_ratio
-        test_loss_reg = test_loss_reg * train_test_ratio
+        train_loss_cls = train_gnn()
+        test_loss_cls = compute_test_loss_gnn()
         test_loss_cls = test_loss_cls * train_test_ratio
-        test_mean_diffs, test_diffs_all, test_predictions, test_y, test_nodes_all = test_diff_gnn(test_loader)
-        test_accuracy_all, test_accuracy_class, test_label_pred, test_label_true = test_accu_gnn(test_loader, n_classes)
-        print(f'Epoch: {epoch:03d}, Train Regression Loss: {train_loss_reg:.4f}, Train Classification Loss: {train_loss_cls:.4f}, Train Combined Loss: {train_loss_all:.4f}')
-        print(f'Epoch: {epoch:03d}, Test Regression Loss: {test_loss_reg:.4f}, Test Classification Loss: {test_loss_cls:.4f}, Test Combined Loss: {test_loss_all:.4f}')
+        test_accuracy_all, test_accuracy_class, test_label_pred, test_label_true, test_nodes_all, test_y = test_accu_gnn(test_loader, n_classes, spec_store=spec_rows_gnn)
+        print(f'Epoch: {epoch:03d}, Train Classification Loss: {train_loss_cls:.4f}')
+        print(f'Epoch: {epoch:03d}, Test Classification Loss: {test_loss_cls:.4f}')
         print(f'Epoch: {epoch:03d}, Overall Classification Accuracy: {test_accuracy_all:.4f}')
-        # Convert the tensors to arrayss
-        train_loss_reg = train_loss_reg.cpu().detach().numpy()
-        train_loss_cls = train_loss_cls.cpu().detach().numpy()
-        test_loss_reg = test_loss_reg.cpu().detach().numpy()
-        test_loss_cls = test_loss_cls.cpu().detach().numpy()
+        # Convert the tensors to arrays
+        # train_loss_cls = train_loss_cls.cpu().detach().numpy()
+        # test_loss_cls = test_loss_cls.cpu().detach().numpy()
         test_accuracy_class = test_accuracy_class.cpu().detach().numpy()
         print(f'Epoch: {epoch:03d}, Class 0 Accuracy: {test_accuracy_class[0]:.4f}, Class 1 Accuracy: {test_accuracy_class[1]:.4f}, Class 2 Accuracy: {test_accuracy_class[2]:.4f}')
         # Record the values
-        test_mean_diffs_history.append(test_mean_diffs)
-        train_loss_all_history.append(train_loss_all)
-        train_loss_regression_history.append(train_loss_reg)
         train_loss_classification_history.append(train_loss_cls)
-        test_loss_all_history.append(test_loss_all)
-        test_loss_regression_history.append(test_loss_reg)
         test_loss_classification_history.append(test_loss_cls)
         test_overall_accuracy_history.append(test_accuracy_all)
         test_per_class_accuracy_history.append(test_accuracy_class)
-        final_test_diffs = test_diffs_all
-        final_test_predictions = test_predictions
         final_test_y = test_y
         final_test_nodes = test_nodes_all
         final_test_label_pred = test_label_pred
         final_test_label_true = test_label_true
         final_overall_accuracy = test_accuracy_all
         final_per_class_accuracy = test_accuracy_class
-        print(f"Final test diffs length: {len(final_test_diffs)}")
-        print(f"Final predictions length: {len(final_test_predictions)}")
-        print(f"Final y length: {len(final_test_y)}")
-        print(f"Final nodes length: {len(final_test_nodes)}")
 
     # Save the model
     print("Saving GNN model...")
@@ -914,27 +1000,13 @@ def main():
             return default_value
 
     # After the loop, create a dictionary to hold the data
-    data_dict = {"lambda_diff": [], "mu_diff": [], "beta_n_diff": [], "beta_phi_diff": [], "gamma_n_diff": [], "gamma_phi_diff": []}
-
-    # Iterate through test_mean_diffs_history
-    for array in test_mean_diffs_history:
-        # Safely append each value, filling with 0 if missing
-        data_dict["lambda_diff"].append(safe_append(array, 0))
-        data_dict["mu_diff"].append(safe_append(array, 1))
-        data_dict["beta_n_diff"].append(safe_append(array, 2))
-        data_dict["beta_phi_diff"].append(safe_append(array, 3))
-        data_dict["gamma_n_diff"].append(safe_append(array, 4))
-        data_dict["gamma_phi_diff"].append(safe_append(array, 5))
+    data_dict = {}
 
     # Ensure the length of other lists matches actual_epoch_gnn, filling missing values with 0
-    actual_epoch_gnn = len(train_loss_all_history)  # Ensure epoch count matches available data
+    actual_epoch_gnn = len(train_loss_classification_history)  # Ensure epoch count matches available data
 
     data_dict["Epoch"] = list(range(1, actual_epoch_gnn + 1))
-    data_dict["Train_Loss_ALL"] = train_loss_all_history[:actual_epoch_gnn] + [0] * (actual_epoch_gnn - len(train_loss_all_history))
-    data_dict["Train_Loss_Regression"] = train_loss_regression_history[:actual_epoch_gnn] + [0] * (actual_epoch_gnn - len(train_loss_regression_history))
     data_dict["Train_Loss_Classification"] = train_loss_classification_history[:actual_epoch_gnn] + [0] * (actual_epoch_gnn - len(train_loss_classification_history))
-    data_dict["Test_Loss_ALL"] = test_loss_all_history[:actual_epoch_gnn] + [0] * (actual_epoch_gnn - len(test_loss_all_history))
-    data_dict["Test_Loss_Regression"] = test_loss_regression_history[:actual_epoch_gnn] + [0] * (actual_epoch_gnn - len(test_loss_regression_history))
     data_dict["Test_Loss_Classification"] = test_loss_classification_history[:actual_epoch_gnn] + [0] * (actual_epoch_gnn - len(test_loss_classification_history))
 
     # Convert the dictionary to a pandas DataFrame
@@ -965,18 +1037,26 @@ def main():
         return df
 
     # Using the safe_create_dataframe function for each DataFrame
-    final_differences = safe_create_dataframe(final_test_diffs, ["lambda_diff", "mu_diff", "beta_n_diff", "beta_phi_diff", "gamma_n_diff", "gamma_phi_diff"])
-    final_predictions = safe_create_dataframe(final_test_predictions, ["lambda_pred", "mu_pred", "beta_n_pred", "beta_phi_pred", "gamma_n_pred", "gamma_phi_pred"])
     final_y = safe_create_dataframe(final_test_y, ["lambda", "mu", "beta_n", "beta_phi", "gamma_n", "gamma_phi"])
     final_nodes = safe_create_dataframe(final_test_nodes, ["num_nodes"])
     final_label_prob = safe_create_dataframe(final_test_label_pred, ["pd_prob", "ed_prob", "nnd_prob"])
     final_label_true = safe_create_dataframe(final_test_label_true, ["true_class"])
 
-    # Column-wise combine all final DataFrames
-    final_result = pd.concat([final_differences, final_predictions, final_y, final_nodes, final_label_prob, final_label_true], axis=1)
+    # Convert list[dict] -> DataFrame and ensure column order is stable
+    spec_df = pd.DataFrame(spec_rows_gnn)
+    # dens/centers as a sidecar NPZ for later analysis
+    if SPEC_SAVE_DENSITY:
+        dens_mat = np.vstack([np.array(json.loads(s)) if isinstance(s, str) else s
+                              for s in spec_df["spec_density"].tolist()])
+        bin_centers = 0.5 * (np.linspace(0, 2, SPEC_BINS + 1)[:-1] + np.linspace(0, 2, SPEC_BINS + 1)[1:])
+        np.savez(os.path.join(name, task_type, "STBO",
+                              f"{task_type}_spectral_densities_gnn_{SPEC_BINS}bins.npz"),
+                 density=dens_mat, bin_centers=bin_centers, taus=np.array(SPEC_TAUS))
 
-    print("Final differences:")
-    print(abs(final_differences[["lambda_diff", "mu_diff", "beta_n_diff", "beta_phi_diff", "gamma_n_diff", "gamma_phi_diff"]]).mean())
+    # Combine with per-tree outputs
+    final_result = pd.concat(
+        [final_y, final_nodes, final_label_prob, final_label_true, spec_df.drop(columns=["spec_density"])], axis=1)
+
     print("Final overall accuracy:", final_overall_accuracy)
     print("Final per-class accuracy:", final_per_class_accuracy)
 
@@ -990,19 +1070,10 @@ def main():
 
 
     # Now the functions and logics for lstm
-    def combined_loss_lstm(output_regression, target_regression, output_classification, target_classification):
-        loss_regression = criterion(output_regression, target_regression)
-        loss_classification = F.cross_entropy(output_classification, target_classification)
-        loss_all = alpha * loss_regression + beta * loss_classification
-
-        return loss_all, loss_regression, loss_classification
-
     def train_lstm():
         model_lstm.train()
 
         loss_all = 0  # Keep track of the loss
-        loss_reg = 0  # Keep track of the regression loss
-        loss_cls = 0  # Keep track of the classification loss
 
         for data in train_loader:
             lengths_brts = torch.sum(data.brts != 0, dim=1).cpu().tolist()
@@ -1011,57 +1082,24 @@ def main():
             packed_brts = pack_padded_sequence(brts_cpu, lengths_brts, batch_first=True, enforce_sorted=False).to(device)
             data.to(device)
             optimizer_lstm.zero_grad()
-            out_re, out_cl = model_lstm(packed_brts)
-            target_re = data.y_re.view(data.num_nodes.__len__(), n_predicted_values).to(device)
+            out_cl = model_lstm(packed_brts)
             target_cl = data.y_cl.view(-1).to(device)
-            assert out_re.device == target_re.device == out_cl.device == target_cl.device, \
+            assert out_cl.device == target_cl.device, \
                 "Error: Device mismatch between output and target tensors."
-            loss, loss_reg, loss_cls = combined_loss_lstm(out_re, target_re, out_cl, target_cl)
+            loss = F.cross_entropy(out_cl, target_cl)
             loss.backward()
             loss_all += loss.item() * data.num_nodes.__len__()
-            loss_reg += loss_reg.item() * data.num_nodes.__len__()
-            loss_cls += loss_cls.item() * data.num_nodes.__len__()
             optimizer_lstm.step()
 
         out_loss_all = loss_all / len(train_loader.dataset)
-        out_loss_reg = loss_reg / len(train_loader.dataset)
-        out_loss_cls = loss_cls / len(train_loader.dataset)
 
-        return out_loss_all, out_loss_reg, out_loss_cls
-
-    @torch.no_grad()
-    def test_diff_lstm(loader):
-        model_lstm.eval()
-
-        diffs_all = torch.tensor([], dtype=torch.float, device=device)
-        outputs_all = torch.tensor([], dtype=torch.float, device=device)  # To store all outputs
-        y_all = torch.tensor([], dtype=torch.float, device=device)  # To store all y
-        nodes_all = torch.tensor([], dtype=torch.long, device=device)
-
-        for data in loader:
-            lengths_brts = torch.sum(data.brts != 0, dim=1).cpu().tolist()
-            brts_cpu = data.brts.cpu()
-            brts_cpu = brts_cpu.unsqueeze(-1)
-            packed_brts = pack_padded_sequence(brts_cpu, lengths_brts, batch_first=True, enforce_sorted=False).to(device)
-            data.to(device)
-            out_re, _ = model_lstm(packed_brts)
-            diffs = torch.abs(out_re - data.y_re.view(data.num_nodes.__len__(), n_predicted_values))
-            diffs_all = torch.cat((diffs_all, diffs), dim=0)
-            outputs_all = torch.cat((outputs_all, out_re), dim=0)
-            y_all = torch.cat((y_all, data.y_re.view(data.num_nodes.__len__(), n_predicted_values)), dim=0)
-            nodes_all = torch.cat((nodes_all, data.num_nodes), dim=0)
-
-        print(f"diffs_all length: {len(diffs_all)}; test_loader.dataset length: {len(test_loader.dataset)}; Equal: {len(diffs_all) == len(test_loader.dataset)}")
-        mean_diffs = torch.sum(diffs_all, dim=0) / len(test_loader.dataset)
-        return mean_diffs.cpu().detach().numpy(), diffs_all.cpu().detach().numpy(), outputs_all.cpu().detach().numpy(), y_all.cpu().detach().numpy(), nodes_all.cpu().detach().numpy()
+        return out_loss_all
 
     @torch.no_grad()
     def compute_test_loss_lstm():
         model_lstm.eval()  # Set the model to evaluation mode
 
-        loss_all = 0  # Keep track of the loss
-        loss_reg = 0  # Keep track of the regression loss
-        loss_cls = 0  # Keep track of the classification loss
+        loss_all = 0  # Keep track of the classification loss
 
         for data in test_loader:
             lengths_brts = torch.sum(data.brts != 0, dim=1).cpu().tolist()
@@ -1069,20 +1107,14 @@ def main():
             brts_cpu = brts_cpu.unsqueeze(-1)
             packed_brts = pack_padded_sequence(brts_cpu, lengths_brts, batch_first=True, enforce_sorted=False).to(device)
             data.to(device)
-            graph_sizes = data.num_nodes
-            out_re, out_cl = model_lstm(packed_brts)
-            target_re = data.y_re.view(data.num_nodes.__len__(), n_predicted_values).to(device)
+            out_cl = model_lstm(packed_brts)
             target_cl = data.y_cl.view(-1).to(device)
-            loss, loss_reg, loss_cls = combined_loss_lstm(out_re, target_re, out_cl, target_cl)
-            loss_all += loss.item() * data.num_nodes.__len__()
-            loss_reg += loss_reg.item() * data.num_nodes.__len__()
-            loss_cls += loss_cls.item() * data.num_nodes.__len__()
+            loss_cls = F.cross_entropy(out_cl, target_cl)
+            loss_all += loss_cls.item() * data.num_nodes.__len__()
 
-        out_loss_all = loss_all / len(train_loader.dataset)
-        out_loss_reg = loss_reg / len(train_loader.dataset)
-        out_loss_cls = loss_cls / len(train_loader.dataset)
+        out_loss_all = loss_all / len(test_loader.dataset)
 
-        return out_loss_all, out_loss_reg, out_loss_cls
+        return out_loss_all
 
     @torch.no_grad()
     def test_accu_lstm(loader, num_classes):
@@ -1094,7 +1126,9 @@ def main():
         correct_per_class = torch.zeros(num_classes, dtype=torch.long).to(device)
         total_per_class = torch.zeros(num_classes, dtype=torch.long).to(device)
         outputs_all = torch.tensor([], dtype=torch.float, device=device)  # To store all outputs
-        y_all = torch.tensor([], dtype=torch.float, device=device)  # To store all y
+        nodes_all = torch.tensor([], dtype=torch.long, device=device) # To store all nodes
+        pars_all = torch.tensor([], dtype=torch.float, device=device)  # To store all y_re
+        y_all = torch.tensor([], dtype=torch.float, device=device)  # To store all y_cl
 
         for data in loader:
             lengths_brts = torch.sum(data.brts != 0, dim=1).cpu().tolist()
@@ -1103,9 +1137,11 @@ def main():
             packed_brts = pack_padded_sequence(brts_cpu, lengths_brts, batch_first=True, enforce_sorted=False).to(device)
 
             data = data.to(device)
-            _, out_cl = model_lstm(packed_brts)
+            out_cl = model_lstm(packed_brts)
 
             outputs_all = torch.cat((outputs_all, out_cl), dim=0)
+            nodes_all = torch.cat((nodes_all, data.num_nodes), dim=0)
+            pars_all = torch.cat((pars_all, data.y_re.view(data.num_nodes.__len__(), n_predicted_values)), dim=0)
             y_all = torch.cat((y_all, data.y_cl.view(-1)), dim=0)
 
             # Get the predicted class by taking the class with the max score
@@ -1129,7 +1165,7 @@ def main():
         # Handle cases where a class might not be present in the batch
         class_accuracy[total_per_class == 0] = float('nan')  # Assign NaN to avoid division by zero
 
-        return overall_accuracy, class_accuracy, outputs_all.cpu().detach().numpy(), y_all.cpu().detach().numpy()
+        return overall_accuracy, class_accuracy, outputs_all.cpu().detach().numpy(), y_all.cpu().detach().numpy(), nodes_all.cpu().detach().numpy(), pars_all.cpu().detach().numpy()
 
     model_lstm = LSTM(in_channels=1, hidden_channels=lstm_hidden_channels,
                       out_channels=lstm_output_channels, lstm_depth=lstm_depth).to(device)
@@ -1138,17 +1174,10 @@ def main():
     print(f"Training using {device}")
     print(model_lstm)
 
-    test_mean_diffs_history = []
-    train_loss_all_history = []
-    train_loss_regression_history = []
     train_loss_classification_history = []
-    test_loss_all_history = []
-    test_loss_regression_history = []
     test_loss_classification_history = []
     test_overall_accuracy_history = []
     test_per_class_accuracy_history = []
-    final_test_diffs = []
-    final_test_predictions = []
     final_test_y = []
     final_test_nodes = []
     final_test_label_pred = []
@@ -1166,45 +1195,29 @@ def main():
 
     for epoch in range(1, epoch_number_lstm):
         actual_epoch_lstm = epoch
-        train_loss_all, train_loss_reg, train_loss_cls = train_lstm()
-        test_loss_all, test_loss_reg, test_loss_cls = compute_test_loss_lstm()
-        test_loss_all = test_loss_all * train_test_ratio
-        test_loss_reg = test_loss_reg * train_test_ratio
+        train_loss_cls = train_lstm()
+        test_loss_cls = compute_test_loss_lstm()
         test_loss_cls = test_loss_cls * train_test_ratio
-        test_mean_diffs, test_diffs_all, test_predictions, test_y, test_nodes_all = test_diff_lstm(test_loader)
-        test_accuracy_all, test_accuracy_class, test_label_pred, test_label_true = test_accu_lstm(test_loader, n_classes)
-        print(f'Epoch: {epoch:03d}, Train Regression Loss: {train_loss_reg:.4f}, Train Classification Loss: {train_loss_cls:.4f}, Train Combined Loss: {train_loss_all:.4f}')
-        print(f'Epoch: {epoch:03d}, Test Regression Loss: {test_loss_reg:.4f}, Test Classification Loss: {test_loss_cls:.4f}, Test Combined Loss: {test_loss_all:.4f}')
+        test_accuracy_all, test_accuracy_class, test_label_pred, test_label_true, test_nodes_all, test_y = test_accu_lstm(test_loader, n_classes)
+        print(f'Epoch: {epoch:03d}, Train Classification Loss: {train_loss_cls:.4f}')
+        print(f'Epoch: {epoch:03d}, Test Classification Loss: {test_loss_cls:.4f}')
         print(f'Epoch: {epoch:03d}, Overall Classification Accuracy: {test_accuracy_all:.4f}')
         # Convert the tensors to arrayss
-        train_loss_reg = train_loss_reg.cpu().detach().numpy()
-        train_loss_cls = train_loss_cls.cpu().detach().numpy()
-        test_loss_reg = test_loss_reg.cpu().detach().numpy()
-        test_loss_cls = test_loss_cls.cpu().detach().numpy()
+        # train_loss_cls = train_loss_cls.cpu().detach().numpy()
+        # test_loss_cls = test_loss_cls.cpu().detach().numpy()
         test_accuracy_class = test_accuracy_class.cpu().detach().numpy()
         print(f'Epoch: {epoch:03d}, Class 0 Accuracy: {test_accuracy_class[0]:.4f}, Class 1 Accuracy: {test_accuracy_class[1]:.4f}, Class 2 Accuracy: {test_accuracy_class[2]:.4f}')
         # Record the values
-        test_mean_diffs_history.append(test_mean_diffs)
-        train_loss_all_history.append(train_loss_all)
-        train_loss_regression_history.append(train_loss_reg)
         train_loss_classification_history.append(train_loss_cls)
-        test_loss_all_history.append(test_loss_all)
-        test_loss_regression_history.append(test_loss_reg)
         test_loss_classification_history.append(test_loss_cls)
         test_overall_accuracy_history.append(test_accuracy_all)
         test_per_class_accuracy_history.append(test_accuracy_class)
-        final_test_diffs = test_diffs_all
-        final_test_predictions = test_predictions
         final_test_y = test_y
         final_test_nodes = test_nodes_all
         final_test_label_pred = test_label_pred
         final_test_label_true = test_label_true
         final_overall_accuracy = test_accuracy_all
         final_per_class_accuracy = test_accuracy_class
-        print(f"Final test diffs length: {len(final_test_diffs)}")
-        print(f"Final predictions length: {len(final_test_predictions)}")
-        print(f"Final y length: {len(final_test_y)}")
-        print(f"Final nodes length: {len(final_test_nodes)}")
 
     # Save the model
     print("Saving LSTM model...")
@@ -1216,45 +1229,27 @@ def main():
 
 
     # After the loop, create a dictionary to hold the data
-    data_dict = {"lambda_diff": [], "mu_diff": [], "beta_n_diff": [], "beta_phi_diff": [], "gamma_n_diff": [], "gamma_phi_diff": []}
-
-    # Iterate through test_mean_diffs_history
-    for array in test_mean_diffs_history:
-        # Safely append each value, filling with 0 if missing
-        data_dict["lambda_diff"].append(safe_append(array, 0))
-        data_dict["mu_diff"].append(safe_append(array, 1))
-        data_dict["beta_n_diff"].append(safe_append(array, 2))
-        data_dict["beta_phi_diff"].append(safe_append(array, 3))
-        data_dict["gamma_n_diff"].append(safe_append(array, 4))
-        data_dict["gamma_phi_diff"].append(safe_append(array, 5))
+    data_dict = {}
 
     # Ensure the length of other lists matches actual_epoch_lstm, filling missing values with 0
-    actual_epoch_lstm = len(train_loss_all_history)  # Ensure epoch count matches available data
+    actual_epoch_lstm = len(train_loss_classification_history)  # Ensure epoch count matches available data
 
     data_dict["Epoch"] = list(range(1, actual_epoch_lstm + 1))
-    data_dict["Train_Loss_ALL"] = train_loss_all_history[:actual_epoch_lstm] + [0] * (actual_epoch_lstm - len(train_loss_all_history))
-    data_dict["Train_Loss_Regression"] = train_loss_regression_history[:actual_epoch_lstm] + [0] * (actual_epoch_lstm - len(train_loss_regression_history))
     data_dict["Train_Loss_Classification"] = train_loss_classification_history[:actual_epoch_lstm] + [0] * (actual_epoch_lstm - len(train_loss_classification_history))
-    data_dict["Test_Loss_ALL"] = test_loss_all_history[:actual_epoch_lstm] + [0] * (actual_epoch_lstm - len(test_loss_all_history))
-    data_dict["Test_Loss_Regression"] = test_loss_regression_history[:actual_epoch_lstm] + [0] * (actual_epoch_lstm - len(test_loss_regression_history))
     data_dict["Test_Loss_Classification"] = test_loss_classification_history[:actual_epoch_lstm] + [0] * (actual_epoch_lstm - len(test_loss_classification_history))
 
     # Convert the dictionary to a pandas DataFrame
     model_performance = pd.DataFrame(data_dict)
 
     # Using the safe_create_dataframe function for each DataFrame
-    final_differences = safe_create_dataframe(final_test_diffs, ["lambda_diff", "mu_diff", "beta_n_diff", "beta_phi_diff", "gamma_n_diff", "gamma_phi_diff"])
-    final_predictions = safe_create_dataframe(final_test_predictions, ["lambda_pred", "mu_pred", "beta_n_pred", "beta_phi_pred", "gamma_n_pred", "gamma_phi_pred"])
     final_y = safe_create_dataframe(final_test_y, ["lambda", "mu", "beta_n", "beta_phi", "gamma_n", "gamma_phi"])
     final_nodes = safe_create_dataframe(final_test_nodes, ["num_nodes"])
     final_label_prob = safe_create_dataframe(final_test_label_pred, ["pd_prob", "ed_prob", "nnd_prob"])
     final_label_true = safe_create_dataframe(final_test_label_true, ["true_class"])
 
     # Column-wise combine all final DataFrames
-    final_result = pd.concat([final_differences, final_predictions, final_y, final_nodes, final_label_prob, final_label_true], axis=1)
+    final_result = pd.concat([final_y, final_nodes, final_label_prob, final_label_true], axis=1)
 
-    print("Final differences:")
-    print(abs(final_differences[["lambda_diff", "mu_diff", "beta_n_diff", "beta_phi_diff", "gamma_n_diff", "gamma_phi_diff"]]).mean())
     print("Final overall accuracy:", final_overall_accuracy)
     print("Final per-class accuracy:", final_per_class_accuracy)
 

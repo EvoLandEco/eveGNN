@@ -364,7 +364,6 @@ def main():
     name = sys.argv[1]
     gnn_depth = int(sys.argv[2])
 
-    # Now you can use the variables name and set_i in your code
     print(f'Name: {name}, Task Type: BD (Mispecified with DDD) Validation', f'GNN Depth: {gnn_depth}')
     print("Now on branch Multimodal-Stacking-Boosting")
 

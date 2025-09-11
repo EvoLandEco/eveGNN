@@ -289,7 +289,6 @@ def main():
     name = sys.argv[1]
     task_type = sys.argv[2]
 
-    # Now you can use the variables name and set_i in your code
     print(f'Name: {name}, Task Type: {task_type}')
 
     training_dataset_list = []

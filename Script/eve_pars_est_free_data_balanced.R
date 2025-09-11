@@ -83,7 +83,7 @@ fill_size_quota <- function(dists, age, metric, offset,
     warning(sprintf("Quota not fully met for sizes: %s", paste(unmet, collapse = ", ")))
   }
 
-  # flatten and transpose to the shape your exporter expects
+  # flatten and transpose to the shape exporter expects
   kept <- unlist(buckets, recursive = FALSE, use.names = FALSE)
   kept_nonnull <- Filter(function(x) !is.null(x$tes), kept)
   purrr::transpose(kept_nonnull)
