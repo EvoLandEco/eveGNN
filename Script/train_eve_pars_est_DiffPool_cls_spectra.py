@@ -1117,10 +1117,12 @@ def main():
         return out_loss_all
 
     @torch.no_grad()
-    def test_accu_lstm(loader, num_classes):
+    def test_accu_lstm(loader, num_classes, spec_store=None):
         model_lstm.eval()
         correct = 0
         total_samples = len(loader.dataset)
+
+        bins = np.linspace(0.0, 2.0, SPEC_BINS + 1)
 
         # Initialize counters for per-class correct predictions and total samples per class
         correct_per_class = torch.zeros(num_classes, dtype=torch.long).to(device)
@@ -1138,6 +1140,24 @@ def main():
 
             data = data.to(device)
             out_cl = model_lstm(packed_brts)
+
+            if spec_store is not None:
+                adj_batch = data.adj.detach().cpu().numpy()
+                mask_batch = data.mask.detach().cpu().numpy()
+                if adj_batch.ndim == 3:  # batched dense
+                    B = adj_batch.shape[0]
+                    for b in range(B):
+                        spec = compute_spectral_stats_from_dense(
+                            adj_batch[b], mask_batch[b], bins,
+                            SPEC_TAUS, SPEC_BAND_SPLITS
+                        )
+                        spec_store.append(spec)
+                else:  # single graph
+                    spec = compute_spectral_stats_from_dense(
+                        adj_batch, mask_batch, bins,
+                        SPEC_TAUS, SPEC_BAND_SPLITS
+                    )
+                    spec_store.append(spec)
 
             outputs_all = torch.cat((outputs_all, out_cl), dim=0)
             nodes_all = torch.cat((nodes_all, data.num_nodes), dim=0)
@@ -1184,6 +1204,7 @@ def main():
     final_test_label_true = []
     final_overall_accuracy = []
     final_per_class_accuracy = []
+    spec_rows_lstm = []
 
     # Set up the early stopper
     # early_stopper = EarlyStopper(patience=3, min_delta=0.05)
@@ -1198,7 +1219,7 @@ def main():
         train_loss_cls = train_lstm()
         test_loss_cls = compute_test_loss_lstm()
         test_loss_cls = test_loss_cls * train_test_ratio
-        test_accuracy_all, test_accuracy_class, test_label_pred, test_label_true, test_nodes_all, test_y = test_accu_lstm(test_loader, n_classes)
+        test_accuracy_all, test_accuracy_class, test_label_pred, test_label_true, test_nodes_all, test_y = test_accu_lstm(test_loader, n_classes, spec_store=spec_rows_lstm)
         print(f'Epoch: {epoch:03d}, Train Classification Loss: {train_loss_cls:.4f}')
         print(f'Epoch: {epoch:03d}, Test Classification Loss: {test_loss_cls:.4f}')
         print(f'Epoch: {epoch:03d}, Overall Classification Accuracy: {test_accuracy_all:.4f}')
@@ -1247,8 +1268,26 @@ def main():
     final_label_prob = safe_create_dataframe(final_test_label_pred, ["pd_prob", "ed_prob", "nnd_prob"])
     final_label_true = safe_create_dataframe(final_test_label_true, ["true_class"])
 
-    # Column-wise combine all final DataFrames
-    final_result = pd.concat([final_y, final_nodes, final_label_prob, final_label_true], axis=1)
+    # Convert list[dict] -> DataFrame (LSTM)
+    spec_df_lstm = pd.DataFrame(spec_rows_lstm)
+
+    # full densities for later analysis
+    if SPEC_SAVE_DENSITY and "spec_density" in spec_df_lstm.columns:
+        dens_mat = np.vstack([
+            np.array(json.loads(s)) if isinstance(s, str) else s
+            for s in spec_df_lstm["spec_density"].tolist()
+        ])
+        bin_edges = np.linspace(0.0, 2.0, SPEC_BINS + 1)
+        bin_centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])
+        np.savez(os.path.join(name, task_type, "STBO",
+                              f"{task_type}_spectral_densities_lstm_{SPEC_BINS}bins.npz"),
+                 density=dens_mat, bin_centers=bin_centers, taus=np.array(SPEC_TAUS))
+
+    final_result = pd.concat(
+        [final_y, final_nodes, final_label_prob, final_label_true,
+         spec_df_lstm.drop(columns=["spec_density"], errors="ignore")],
+        axis=1
+    )
 
     print("Final overall accuracy:", final_overall_accuracy)
     print("Final per-class accuracy:", final_per_class_accuracy)
