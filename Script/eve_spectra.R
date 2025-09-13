@@ -567,10 +567,10 @@ analyze_forest <- function(
 
   # -------- JSD by metric using RPANDA SDPs (baseline, keep serial) --------
   jsd_rpanda <- list()
-  for (mv in work_df %>% dplyr::distinct(metric, view) %>% dplyr::arrange(metric, view) %>% split(.$metric)) {
+  for (mv in df %>% dplyr::distinct(metric, view) %>% dplyr::arrange(metric, view) %>% split(.$metric)) {
     m <- unique(mv$metric)
-    for (v in unique(work_df$view)) {
-      trees <- work_df %>% dplyr::filter(metric == m, view == v) %>% dplyr::pull(tree)
+    for (v in unique(df$view)) {
+      trees <- df %>% dplyr::filter(metric == m, view == v) %>% dplyr::pull(tree)
       if (!length(trees)) next
       jsd_rpanda[[m]][[v]] <- list(
         standard = jsd_rpanda_matrix(trees, "standard"),
