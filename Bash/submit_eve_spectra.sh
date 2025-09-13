@@ -5,7 +5,7 @@
 #SBATCH --cpus-per-task=32
 #SBATCH --job-name=gnn_eve_spectra
 #SBATCH --output=logs/gnn_eve_spectra-%j.log
-#SBATCH --mem=128GB
+#SBATCH --mem=256GB
 #SBATCH --partition=regular
 
 ml R
