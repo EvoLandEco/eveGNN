@@ -928,8 +928,8 @@ df_all <- simulate_all_metrics_parallel(
   dists_nnd  = dists_nnd,
   age        = 10,
   offset     = "simtime",
-  n_per_param= 5,
-  replicates = 50,
+  n_per_param= 3,
+  replicates = 60,
   max_total_sims = Inf,      # cap total work (raise or set Inf as needed)
   ncores = parallel::detectCores(logical = FALSE) - 1L,
   backend = "auto"              # "auto" picks psock on Windows, multicore elsewhere
