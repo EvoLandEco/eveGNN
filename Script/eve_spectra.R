@@ -882,7 +882,7 @@ simulate_all_metrics_parallel <- function(
 
 
 # ---------------------- Example usage (commented) -------------------------------
-params <- yaml::read_yaml("config/eve_sim.yaml")
+params <- yaml::read_yaml("../config/eve_sim.yaml")
 
 dists_pd <- params$dists_pd
 dists_ed <- params$dists_ed
