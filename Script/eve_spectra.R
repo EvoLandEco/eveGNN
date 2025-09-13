@@ -46,7 +46,7 @@ suppressPackageStartupMessages({
 # --------------------------- CONFIG ---------------------------------------------
 SPEC_GRID_N  <- 512                 # grid points for Gaussian SDPs
 BAND_SPLITS  <- c(0.2, 1.2)         # low/mid/high boundaries (nMGL λ)
-OUT_DIR <- "spectral_out"; dir.create(OUT_DIR, showWarnings = FALSE)
+OUT_DIR <- "../spectral_out"; dir.create(OUT_DIR, showWarnings = FALSE)
 
 # RFF defaults
 RFF_BANDWIDTHS <- c(0.03, 0.05, 0.1, 0.2, 0.4)  # kernel bandwidths h to sweep
