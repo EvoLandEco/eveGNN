@@ -1,0 +1,55 @@
+# Tree-aware graph transformer config for eve/BD-ED-NND inference.
+# This file intentionally keeps several names from eve_train_diffpool.yaml so
+# existing shell/R workflows can be adapted with minimal changes.
+
+alpha: 0.5
+beta: 0.5
+huber_delta: 1.0
+n_predicted_values: 2      # set to 6 to estimate all eve parameters
+n_classes: 3
+
+# Use BD as the baseline class for the new BD/ED/NND experiment.
+# The parser also maps old "pd" filenames to this first class through metric_aliases.
+class_names: [bd, ed, nnd]
+metric_aliases:
+  pd: bd
+  PD: bd
+  BD: bd
+  ED: ed
+  NND: nnd
+
+# To maximize compatibility with old downstream R scripts that expect the first
+# probability column to be pd_prob, the BD class is written to pd_prob by default.
+# Rename this to [bd_prob, ed_prob, nnd_prob] if you prefer semantic names.
+class_probability_columns: [pd_prob, ed_prob, nnd_prob]
+
+seed: 12345
+train_fraction: 0.9
+shuffle_data: true
+min_nodes: 4
+max_nodes_limit: 2500
+normalize_edge_length: true
+target_standardization: true
+
+epoch_number_transformer: 51
+train_batch_size: 8
+test_batch_size: 8
+learning_rate: 0.0005
+weight_decay: 0.01
+d_model: 128
+num_heads: 4
+num_layers: 4
+dim_feedforward: 256
+dropout_ratio: 0.15
+
+# 0 = global full attention. Set to 6 or 8 for local tree-neighborhood attention
+# if very large trees make full attention too slow or memory-heavy.
+attention_radius_edges: 0
+
+gradient_clip_norm: 1.0
+num_workers: 0
+early_stopping_patience: 0
+
+output_tag: tree_transformer
+write_csv_fallback: true
+save_every_epoch_predictions: false

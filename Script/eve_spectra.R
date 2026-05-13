@@ -692,8 +692,9 @@ plot_jsd_heatmap <- function(M, title = "JSD between profiles") {
 }
 
 # Parallel simulator: one metric ("pd" | "ed" | "nnd")
+# CHANGED: mu is now swept from `dists` instead of sampled randomly.
 simulate_metric_grid_parallel <- function(
-  dists,                 # 5-element list: lambda, beta_n, beta_phi, gamma_n, gamma_phi (each has min/max)
+  dists,                 # 6-element list (named or unnamed): lambda, mu, beta_n, beta_phi, gamma_n, gamma_phi
   age,
   metric = c("pd", "ed", "nnd"),
   offset,
@@ -709,25 +710,39 @@ simulate_metric_grid_parallel <- function(
   metric  <- match.arg(metric)
   backend <- match.arg(backend)
 
-  if (length(dists) != 5L)
-    stop("dists must have 5 entries in this order: lambda, beta_n, beta_phi, gamma_n, gamma_phi")
+  # ---- Validate & extract parameter ranges from `dists` ----
+  has_names <- !is.null(names(dists)) && all(nzchar(names(dists)))
+  get_entry <- function(nm, idx) {
+    if (has_names) {
+      val <- dists[[nm]]
+      if (is.null(val))
+        stop(sprintf("`dists` must contain a '%s' entry when named.", nm))
+      val
+    } else {
+      if (length(dists) < 6L)
+        stop("`dists` must have 6 entries (lambda, mu, beta_n, beta_phi, gamma_n, gamma_phi) when unnamed.")
+      dists[[idx]]
+    }
+  }
 
-  # 1) Parameter grids (10 points, including endpoints)
-  lambda_grid    <- .mk_seq(dists[[1]], n_per_param)
-  beta_n_grid    <- .mk_seq(dists[[2]], n_per_param)
-  beta_phi_grid  <- .mk_seq(dists[[3]], n_per_param)
+  # 1) Parameter grids (including MU now)
+  lambda_grid    <- .mk_seq(get_entry("lambda",    1L), n_per_param)
+  mu_grid        <- .mk_seq(get_entry("mu",        2L), n_per_param)  # CHANGED: sweep mu from dists
+  beta_n_grid    <- .mk_seq(get_entry("beta_n",    3L), n_per_param)
+  beta_phi_grid  <- .mk_seq(get_entry("beta_phi",  4L), n_per_param)
 
-  if (fix_gamma_zero) {
+  if (isTRUE(fix_gamma_zero)) {
     gamma_n_grid   <- 0
     gamma_phi_grid <- 0
   } else {
-    gamma_n_grid   <- .mk_seq(dists[[4]], n_per_param)
-    gamma_phi_grid <- .mk_seq(dists[[5]], n_per_param)
+    gamma_n_grid   <- .mk_seq(get_entry("gamma_n",   5L), n_per_param)
+    gamma_phi_grid <- .mk_seq(get_entry("gamma_phi", 6L), n_per_param)
   }
 
   # 2) Full cartesian grid (shrinks automatically when gammas are fixed)
   grid <- expand.grid(
     lambda    = lambda_grid,
+    mu        = mu_grid,        # CHANGED: include mu in the grid
     beta_n    = beta_n_grid,
     beta_phi  = beta_phi_grid,
     gamma_n   = gamma_n_grid,
@@ -761,6 +776,7 @@ simulate_metric_grid_parallel <- function(
   # Worker: simulate `replicates` trees for combo i
   simulate_combo <- function(i, grid, metric, age, offset, replicates) {
     lam    <- grid$lambda[i]
+    mu     <- grid$mu[i]          # CHANGED: use grid mu (no random draw)
     beta_n <- grid$beta_n[i]
     beta_p <- grid$beta_phi[i]
     gam_n  <- if (is.null(grid$gamma_n)) 0 else grid$gamma_n[i]
@@ -772,8 +788,7 @@ simulate_metric_grid_parallel <- function(
     rows <- vector("list", length = replicates)
     kk <- 0L
     for (r in seq_len(replicates)) {
-      mu <- stats::runif(1, min = 0, max = 0.8 * lam)
-      pars_list <- c(lam, mu, beta_n, beta_p, gam_n, gam_p)
+      pars_list <- c(lam, mu, beta_n, beta_p, gam_n, gam_p)  # CHANGED: mu from grid
       raw <- evesim::edd_sim(
         pars   = pars_list,
         age    = as.double(age),
@@ -791,10 +806,10 @@ simulate_metric_grid_parallel <- function(
           tes       = list(tes),
           tas       = list(tas),
           lambda    = lam,
-          mu        = mu,
+          mu        = mu,       # CHANGED: record grid mu
           beta_n    = beta_n,
           beta_phi  = beta_p,
-          gamma_n   = 0,      # record zeros in output
+          gamma_n   = 0,        # record zeros in output (if fix_gamma_zero=TRUE)
           gamma_phi = 0
         )
       }
@@ -844,7 +859,8 @@ simulate_metric_grid_parallel <- function(
   if (!length(parts)) {
     warning(sprintf("[%s] No trees were generated.", metric))
     return(tibble::tibble(
-      tree_id = character(), metric = character(), tree = list(),
+      tree_id = character(), metric = character(),
+      tes = list(), tas = list(),
       lambda = numeric(), mu = numeric(), beta_n = numeric(), beta_phi = numeric(),
       gamma_n = numeric(), gamma_phi = numeric()
     ))
@@ -882,7 +898,7 @@ simulate_all_metrics_parallel <- function(
 
 
 # ---------------------- Example usage (commented) -------------------------------
-params <- yaml::read_yaml("../Config/eve_sim.yaml")
+params <- yaml::read_yaml("../Config/eve_sim_spectra.yaml")
 
 dists_pd <- params$dists_pd
 dists_ed <- params$dists_ed
@@ -904,18 +920,18 @@ dists_nnd <- params$dists_nnd
 # dists_nnd[[3]]$min <- 0
 
 # These lines set gammas to zero
-dists_pd[[4]]$max <- 0
-dists_pd[[4]]$min <- 0
-dists_ed[[4]]$max <- 0
-dists_ed[[4]]$min <- 0
-dists_nnd[[4]]$max <- 0
-dists_nnd[[4]]$min <- 0
 dists_pd[[5]]$max <- 0
 dists_pd[[5]]$min <- 0
 dists_ed[[5]]$max <- 0
 dists_ed[[5]]$min <- 0
 dists_nnd[[5]]$max <- 0
 dists_nnd[[5]]$min <- 0
+dists_pd[[6]]$max <- 0
+dists_pd[[6]]$min <- 0
+dists_ed[[6]]$max <- 0
+dists_ed[[6]]$min <- 0
+dists_nnd[[6]]$max <- 0
+dists_nnd[[6]]$min <- 0
 
 # Suppose df_all is your combined set across metrics:
 # Assuming you’ve parsed those YAML-like blocks into R lists `dists_pd`, `dists_ed`, `dists_nnd`
@@ -928,8 +944,8 @@ df_all <- simulate_all_metrics_parallel(
   dists_nnd  = dists_nnd,
   age        = 10,
   offset     = "simtime",
-  n_per_param= 3,
-  replicates = 60,
+  n_per_param= 2,
+  replicates = 500,
   max_total_sims = Inf,      # cap total work (raise or set Inf as needed)
   ncores = parallel::detectCores(logical = FALSE) - 1L,
   backend = "auto"              # "auto" picks psock on Windows, multicore elsewhere
@@ -937,18 +953,20 @@ df_all <- simulate_all_metrics_parallel(
 
 # Store backup trees df
 saveRDS(df_all, file.path(OUT_DIR, "simulated_trees.rds"))
+readRDS(file.path(OUT_DIR, "simulated_trees.rds")) -> df_all
 # df_all has: tree_id, metric, tree (phylo), lambda, mu, beta_n, beta_phi, gamma_n, gamma_phi
 
 ans <- analyze_forest(
   df_all,
   backend = "auto",
   unroll_mode = "grid",         # grid unrolling (uniform time slices)
-  grid_k = 20L,                 # 20 time points, including ends (ends are skipped for slicing internally)
+  grid_k = 30L,                 # 20 time points, including ends (ends are skipped for slicing internally)
   grid_age_target = 10.0,       # align all trees to age 10
   grid_rescale_each_tree = TRUE # rescale each tree to 10
 )
 # Store backup analysis results
 saveRDS(ans, file.path(OUT_DIR, "analysis_results.rds"))
+# readRDS(file.path(OUT_DIR, "analysis_results.rds")) -> ans
 
 # Save some plots:
 DPI_HIGH <- 600
@@ -962,3 +980,144 @@ ggsave(file.path(OUT_DIR, "unrolled_ridgelines_rff.png"), plot_unrolled_ridgelin
 M <- ans$jsd_rff[["0.1"]]
 if (!is.null(M)) ggsave(file.path(OUT_DIR, "JSD_RFF_h=0.1.png"), plot_jsd_heatmap(M, "JSD (RFF, nMGL, h=0.1)"), width=7, height=6, dpi=DPI_HIGH)
 # =================================================================================
+
+
+# New visualization code
+# ======================= Export ans -> CSVs for Python =======================
+suppressPackageStartupMessages({
+  library(dplyr)
+  library(tidyr)
+})
+
+# Safe CSV writer (readr if available; else base)
+.safe_write_csv <- function(df, path) {
+  dir.create(dirname(path), recursive = TRUE, showWarnings = FALSE)
+  if (requireNamespace("readr", quietly = TRUE)) {
+    readr::write_csv(df, path)
+  } else {
+    utils::write.csv(df, path, row.names = FALSE)
+  }
+}
+
+# Normalize a "series_*" table to have the columns expected by the Python script
+.normalize_series <- function(df, mode = c("gauss", "rff")) {
+  mode <- match.arg(mode)
+  stopifnot(is.data.frame(df))
+  nm <- names(df)
+
+  # Required columns for the Python script
+  req <- c("tree_id", "metric", "view", "lambda", "density")
+  missing <- setdiff(req, nm)
+  if (length(missing)) {
+    stop("Series table is missing columns: ", paste(missing, collapse = ", "))
+  }
+
+  # Add/fix time columns: prefer t_norm; else derive from height if possible
+  if (!("t_norm" %in% nm) && ("height" %in% nm)) {
+    df <- df %>%
+      group_by(tree_id, metric, view, dplyr::across(dplyr::all_of(intersect(nm, "lap")))) %>%
+      mutate(
+        t_norm = {
+          h <- suppressWarnings(as.numeric(height))
+          r <- range(h[is.finite(h)], na.rm = TRUE)
+          if (is.finite(r[1]) && is.finite(r[2]) && (r[2] - r[1]) > 0) {
+            (h - r[1]) / (r[2] - r[1])
+          } else {
+            NA_real_
+          }
+        }
+      ) %>%
+      ungroup()
+  }
+
+  # If both t_norm and height are absent, try to rename a plausible time column
+  if (!("t_norm" %in% names(df)) && !("height" %in% names(df))) {
+    for (cand in c("time", "age", "slice", "t")) {
+      if (cand %in% names(df)) {
+        names(df)[names(df) == cand] <- "height"
+        break
+      }
+    }
+  }
+
+  # Ensure 'lap' exists (default to nMGL if absent)
+  if (!("lap" %in% names(df))) {
+    df$lap <- "nMGL"
+  }
+
+  # RFF should have bandwidth column 'h' (warn if not)
+  if (mode == "rff" && !("h" %in% names(df))) {
+    warning("series_rff is missing 'h' (bandwidth). Python's --mode rff will not be able to filter by bandwidth.")
+  }
+
+  # Coerce numeric columns and clean rows
+  df <- df %>%
+    mutate(
+      lambda  = as.numeric(lambda),
+      density = as.numeric(density),
+      t_norm  = if ("t_norm" %in% names(.)) as.numeric(t_norm) else t_norm,
+      height  = if ("height" %in% names(.)) as.numeric(height) else height
+    ) %>%
+    arrange(view, metric, lap, tree_id, lambda)
+
+  # Keep only informative columns (but don't drop anything useful if already present)
+  keep <- unique(c(
+    "tree_id", "metric", "view", "lap", "lambda", "density",
+    intersect(c("t_norm", "height"), names(df)),
+    if (mode == "rff") "h" else character(),
+    intersect(c("rep", "bandwidth"), names(df)) # optional extras if present
+  ))
+  df[, keep, drop = FALSE]
+}
+
+# Main export function ---------------------------------------------------------
+# ans: the result from analyze_forest()
+# out_dir: where to write the CSVs
+# overwrite: overwrite existing files if TRUE
+write_eve_exports <- function(ans, out_dir = "py_exports", overwrite = TRUE) {
+  if (missing(ans) || !is.list(ans)) {
+    stop("Please pass the list returned by analyze_forest() as 'ans'.")
+  }
+  dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+
+  # ---------- summary.csv ----------
+  if (is.null(ans$summary) || !is.data.frame(ans$summary) || nrow(ans$summary) == 0) {
+    stop("ans$summary is missing or empty.")
+  }
+  summary_path <- file.path(out_dir, "summary.csv")
+  if (!overwrite && file.exists(summary_path)) stop(summary_path, " already exists and overwrite=FALSE.")
+  # Keep everything; Python script will pick needed columns and rename params to *_par
+  .safe_write_csv(ans$summary, summary_path)
+
+  # ---------- series_gauss.csv ----------
+  gauss_path <- NULL
+  if (!is.null(ans$series_gauss) && is.data.frame(ans$series_gauss) && nrow(ans$series_gauss) > 0) {
+    gauss_path <- file.path(out_dir, "series_gauss.csv")
+    if (!overwrite && file.exists(gauss_path)) stop(gauss_path, " already exists and overwrite=FALSE.")
+    ser_g <- .normalize_series(ans$series_gauss, mode = "gauss")
+    .safe_write_csv(ser_g, gauss_path)
+  } else {
+    message("No ans$series_gauss found or it is empty; skipping series_gauss.csv.")
+  }
+
+  # ---------- series_rff.csv ----------
+  rff_path <- NULL
+  if (!is.null(ans$series_rff) && is.data.frame(ans$series_rff) && nrow(ans$series_rff) > 0) {
+    rff_path <- file.path(out_dir, "series_rff.csv")
+    if (!overwrite && file.exists(rff_path)) stop(rff_path, " already exists and overwrite=FALSE.")
+    ser_r <- .normalize_series(ans$series_rff, mode = "rff")
+    .safe_write_csv(ser_r, rff_path)
+  } else {
+    message("No ans$series_rff found or it is empty; skipping series_rff.csv.")
+  }
+
+  invisible(list(
+    summary = summary_path,
+    series_gauss = gauss_path,
+    series_rff = rff_path
+  ))
+}
+
+# ----------------------------- Example usage ----------------------------------
+paths <- write_eve_exports(ans, out_dir = "spectral_out")
+paths

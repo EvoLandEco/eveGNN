@@ -21,3 +21,13 @@ Script/test.py
 *.png
 *.png
 *.pt
+
+cnn_rff_results/.DS_Store
+
+.DS_Store
+
+cnn_rff_results/
+
+spectral_out/
+
+spectral_out_plots/
