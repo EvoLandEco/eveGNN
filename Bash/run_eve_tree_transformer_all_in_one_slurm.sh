@@ -1,9 +1,4 @@
 #!/usr/bin/env bash
-# All-in-one SLURM launcher for the eve BD/ED/NND TreeTransformer workflow.
-#
-# Place this file in your project Bash/ directory and run from there, e.g.:
-#   bash run_eve_tree_transformer_all_in_one_slurm.sh my_run_name
-#
 # Default pipeline:
 #   1. Submit an R simulation/export job on the regular CPU partition.
 #   2. Submit a GPU training job with dependency=afterok:<simulation_job_id>.
@@ -267,10 +262,34 @@ run_training_worker() {
 }
 
 # Resolve paths before either launcher or worker mode.
-SELF_PATH="$(abs_path_of_this_script)"
-BASH_DIR="$(dirname "$SELF_PATH")"
-PROJECT_ROOT="$(cd "$BASH_DIR/.." >/dev/null 2>&1 && pwd)"
-LOG_DIR="${LOG_DIR:-${BASH_DIR}/logs}"
+#
+# Important SLURM detail:
+# When a script is passed directly to sbatch, SLURM copies it into its own spool
+# directory and executes that copy. Therefore BASH_SOURCE[0] inside the batch job
+# may point to /var/spool/slurmd/job... rather than to your project Bash/
+# directory. The launcher exports the original paths below; worker jobs prefer
+# those exported values. This avoids permission errors such as trying to create
+# /var/spool/slurmd/job.../logs and avoids resolving ../Script from the spool.
+DISCOVERED_SELF_PATH="$(abs_path_of_this_script)"
+if [[ -n "${EVE_TT_SELF_PATH:-}" && -f "${EVE_TT_SELF_PATH}" ]]; then
+  SELF_PATH="${EVE_TT_SELF_PATH}"
+else
+  SELF_PATH="$DISCOVERED_SELF_PATH"
+fi
+
+if [[ -n "${EVE_TT_BASH_DIR:-}" && -d "${EVE_TT_BASH_DIR}" ]]; then
+  BASH_DIR="${EVE_TT_BASH_DIR}"
+else
+  BASH_DIR="$(dirname "$SELF_PATH")"
+fi
+
+if [[ -n "${EVE_TT_PROJECT_ROOT:-}" && -d "${EVE_TT_PROJECT_ROOT}" ]]; then
+  PROJECT_ROOT="${EVE_TT_PROJECT_ROOT}"
+else
+  PROJECT_ROOT="$(cd "$BASH_DIR/.." >/dev/null 2>&1 && pwd)"
+fi
+
+LOG_DIR="${LOG_DIR:-${EVE_TT_LOG_DIR:-${BASH_DIR}/logs}}"
 mkdir -p "$LOG_DIR"
 
 # Defaults matching your current Bash/Script/Config layout.
@@ -303,6 +322,19 @@ ACCOUNT="${ACCOUNT:-}"
 QOS="${QOS:-}"
 MAIL_USER="${MAIL_USER:-}"
 MAIL_TYPE="${MAIL_TYPE:-}"
+
+# Export resolved settings so worker jobs inherit the launcher context even after
+# SLURM copies this script to its spool directory.
+export EVE_TT_SELF_PATH="$SELF_PATH"
+export EVE_TT_BASH_DIR="$BASH_DIR"
+export EVE_TT_PROJECT_ROOT="$PROJECT_ROOT"
+export EVE_TT_LOG_DIR="$LOG_DIR"
+export SIM_SCRIPT TRAIN_SCRIPT SIM_CONFIG TRAIN_CONFIG
+export R_MODULE PY_MODULE VENV_PATH INSTALL_R_PKGS
+export WAIT SKIP_SIM SKIP_TRAIN
+export SIM_TIME SIM_CPUS SIM_MEM SIM_PARTITION
+export TRAIN_TIME TRAIN_GPUS TRAIN_GPU_OPTION TRAIN_MEM TRAIN_PARTITION
+export ACCOUNT QOS MAIL_USER MAIL_TYPE
 
 mode="${1:-}"
 if [[ "$mode" == "__simulate" ]]; then
