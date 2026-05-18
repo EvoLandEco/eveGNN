@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
 if [ "$#" -lt 1 ] || [ "$#" -gt 3 ]; then
     echo "Usage: $0 <name> [task_type] [run_id]"
@@ -9,7 +9,6 @@ fi
 name=$1
 task_type=${2:-EVE_FREE_TES}
 run_id=${3:-1}
-poll_seconds=${POLL_SECONDS:-60}
 
 bash_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 project_root=$(cd "$bash_dir/.." && pwd)
@@ -18,6 +17,7 @@ sim_script=${SIM_SCRIPT:-$project_root/Script/eve_pars_est_bd_ed_nnd_data.R}
 sim_config=${SIM_CONFIG:-$project_root/Config/eve_sim.yaml}
 train_script=${TRAIN_SCRIPT:-$project_root/Script/train_eve_pars_est_TreeTransformer.py}
 train_config=${TRAIN_CONFIG:-$project_root/Config/eve_train_tree_transformer.yaml}
+r_lib_user=${R_LIBS_USER:-$HOME/R/eve_tt_r_libs}
 
 mkdir -p "$bash_dir/logs"
 
@@ -38,31 +38,8 @@ if [ ! -f "$train_config" ]; then
     exit 1
 fi
 
-wait_job_gone() {
-    local jid=$1
-    while squeue -h -j "$jid" 2>/dev/null | grep -q .; do
-        sleep "$poll_seconds"
-    done
-}
-
-job_state() {
-    local jid=$1
-    local state=""
-    for _ in $(seq 1 20); do
-        state=$(sacct -j "$jid" --format=State -n -X 2>/dev/null | awk 'NF {print $1; exit}')
-        if [ -n "$state" ]; then
-            echo "$state"
-            return 0
-        fi
-        sleep 3
-    done
-    echo "UNKNOWN"
-}
-
-echo "Submitting simulation job"
-sim_job_submit=$(sbatch --parsable --chdir="$bash_dir" <<EOF_SIM
+sim_submit=$(sbatch --parsable --chdir="$bash_dir" <<EOF_SIM
 #!/bin/bash
-set -e
 #SBATCH --time=23:59:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
@@ -72,25 +49,26 @@ set -e
 #SBATCH --mem=48GB
 #SBATCH --partition=regular
 
+set -euo pipefail
+
 name="$name"
 task_type="$task_type"
 sim_script="$sim_script"
 sim_config="$sim_config"
+export R_LIBS_USER="$r_lib_user"
+mkdir -p "\$R_LIBS_USER"
 
 ml R
-Rscript -e 'install.packages("devtools", repos="http://cran.us.r-project.org")'
-Rscript -e 'devtools::install_github("EvoLandEco/eveGNN@multimodal-stacking-boosting")'
-Rscript -e 'devtools::install_github("HHildenbrandt/evesim@tianjian")'
+Rscript -e '.libPaths(c(Sys.getenv("R_LIBS_USER"), .libPaths())); pkgs <- c("devtools", "yaml", "ape", "RcppParallel"); miss <- pkgs[!vapply(pkgs, requireNamespace, logical(1), quietly = TRUE)]; if (length(miss)) install.packages(miss, repos = "http://cran.us.r-project.org", lib = Sys.getenv("R_LIBS_USER"))'
+Rscript -e '.libPaths(c(Sys.getenv("R_LIBS_USER"), .libPaths())); devtools::install_github("EvoLandEco/eveGNN@multimodal-stacking-boosting", lib = Sys.getenv("R_LIBS_USER"), upgrade = "never")'
+Rscript -e '.libPaths(c(Sys.getenv("R_LIBS_USER"), .libPaths())); devtools::install_github("HHildenbrandt/evesim@tianjian", lib = Sys.getenv("R_LIBS_USER"), upgrade = "never")'
 Rscript "\$sim_script" "\$name" "\$sim_config" "\$task_type"
 EOF_SIM
 )
-sim_job_id=${sim_job_submit%%;*}
-echo "Simulation job: $sim_job_id"
+sim_job_id=${sim_submit%%;*}
 
-echo "Submitting training job with dependency afterok:$sim_job_id"
-train_job_submit=$(sbatch --parsable --dependency=afterok:${sim_job_id} --chdir="$bash_dir" <<EOF_TRAIN
+train_submit=$(sbatch --parsable --dependency=afterok:${sim_job_id} --chdir="$bash_dir" <<EOF_TRAIN
 #!/bin/bash
-set -e
 #SBATCH --time=2-22:59:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
@@ -99,6 +77,8 @@ set -e
 #SBATCH --output=logs/gnn_eve_pars_est_tree_transformer-%j.log
 #SBATCH --mem=64GB
 #SBATCH --partition=gpu
+
+set -euo pipefail
 
 name="$name"
 task_type="$task_type"
@@ -112,22 +92,11 @@ python "\$train_script" "\$name" "\$task_type" "\$run_id" --config "\$train_conf
 deactivate
 EOF_TRAIN
 )
-train_job_id=${train_job_submit%%;*}
-echo "Training job: $train_job_id"
+train_job_id=${train_submit%%;*}
 
-wait_job_gone "$sim_job_id"
-sim_state=$(job_state "$sim_job_id")
-if [ "$sim_state" != "COMPLETED" ]; then
-    echo "Simulation job $sim_job_id ended with state: $sim_state"
-    scancel "$train_job_id" >/dev/null 2>&1 || true
-    exit 1
-fi
-
-wait_job_gone "$train_job_id"
-train_state=$(job_state "$train_job_id")
-if [ "$train_state" != "COMPLETED" ]; then
-    echo "Training job $train_job_id ended with state: $train_state"
-    exit 1
-fi
-
-echo "Done: $name/$task_type/STBO"
+echo "simulation_job_id=$sim_job_id"
+echo "training_job_id=$train_job_id"
+echo "training_dependency=afterok:$sim_job_id"
+echo "simulation_log=$bash_dir/logs/gnn_eve_pars_free-${sim_job_id}.log"
+echo "training_log=$bash_dir/logs/gnn_eve_pars_est_tree_transformer-${train_job_id}.log"
+echo "output=$name/$task_type/STBO"
