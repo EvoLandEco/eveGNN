@@ -299,7 +299,7 @@ fi
 LOG_DIR="${LOG_DIR:-${EVE_TT_LOG_DIR:-${BASH_DIR}/logs}}"
 mkdir -p "$LOG_DIR"
 
-SIM_SCRIPT="${SIM_SCRIPT:-${PROJECT_ROOT}/Script/eve_pars_est_bd_ed_nnd_data_v2.R}"
+SIM_SCRIPT="${SIM_SCRIPT:-${PROJECT_ROOT}/Script/eve_pars_est_bd_ed_nnd_data.R}"
 TRAIN_SCRIPT="${TRAIN_SCRIPT:-${PROJECT_ROOT}/Script/train_eve_pars_est_TreeTransformer.py}"
 SIM_CONFIG="${SIM_CONFIG:-${PROJECT_ROOT}/Config/eve_sim.yaml}"
 TRAIN_CONFIG="${TRAIN_CONFIG:-${PROJECT_ROOT}/Config/eve_train_tree_transformer.yaml}"
