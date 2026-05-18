@@ -59,9 +59,7 @@ export R_LIBS_USER="$r_lib_user"
 mkdir -p "\$R_LIBS_USER"
 
 ml R
-Rscript -e '.libPaths(c(Sys.getenv("R_LIBS_USER"), .libPaths())); pkgs <- c("devtools", "yaml", "ape", "RcppParallel"); miss <- pkgs[!vapply(pkgs, requireNamespace, logical(1), quietly = TRUE)]; if (length(miss)) install.packages(miss, repos = "http://cran.us.r-project.org", lib = Sys.getenv("R_LIBS_USER"))'
-Rscript -e '.libPaths(c(Sys.getenv("R_LIBS_USER"), .libPaths())); devtools::install_github("EvoLandEco/eveGNN@multimodal-stacking-boosting", lib = Sys.getenv("R_LIBS_USER"), upgrade = "never")'
-Rscript -e '.libPaths(c(Sys.getenv("R_LIBS_USER"), .libPaths())); devtools::install_github("HHildenbrandt/evesim@tianjian", lib = Sys.getenv("R_LIBS_USER"), upgrade = "never")'
+Rscript -e '.libPaths(c(Sys.getenv("R_LIBS_USER"), .libPaths())); pkgs <- c("devtools", "yaml", "ape", "RcppParallel", "evesim"); miss <- pkgs[!vapply(pkgs, requireNamespace, logical(1), quietly = TRUE)]; if (length(miss)) install.packages(miss, repos = "http://cran.us.r-project.org", lib = Sys.getenv("R_LIBS_USER"))'
 Rscript "\$sim_script" "\$name" "\$sim_config" "\$task_type"
 EOF_SIM
 )
