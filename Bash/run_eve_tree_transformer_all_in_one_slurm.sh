@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # All-in-one SLURM launcher for the eve BD/ED/NND TreeTransformer workflow.
-# Version: 2026-05-18-hotfix2
+# Version: 2026-05-18-hotfix3
 # Fixes:
 #   - preserves project paths across SLURM spool execution;
 #   - installs/checks common CRAN R dependencies when INSTALL_R_PKGS=1;
 #   - exports R_LIBS_USER consistently;
 #   - passes task_type to the simulation script;
-#   - supports EVE_PARALLEL_BACKEND=mclapply|future|serial.
+#   - supports EVE_PARALLEL_BACKEND=mclapply|future|serial;
+#   - fixes R preflight getRversion() printing for package_version objects.
 
 set -euo pipefail
 
@@ -134,7 +135,7 @@ install_or_check_r_packages() {
 
   echo "[simulation] R package library path preflight"
   Rscript - <<'RSCRIPT'
-cat("R version:", getRversion(), "\n")
+cat("R version:", as.character(getRversion()), "\n")
 cat(".libPaths():\n")
 cat(paste0("  ", .libPaths(), collapse = "\n"), "\n")
 required <- c("yaml", "ape", "RcppParallel")
@@ -299,7 +300,7 @@ fi
 LOG_DIR="${LOG_DIR:-${EVE_TT_LOG_DIR:-${BASH_DIR}/logs}}"
 mkdir -p "$LOG_DIR"
 
-SIM_SCRIPT="${SIM_SCRIPT:-${PROJECT_ROOT}/Script/eve_pars_est_bd_ed_nnd_data.R}"
+SIM_SCRIPT="${SIM_SCRIPT:-${PROJECT_ROOT}/Script/eve_pars_est_bd_ed_nnd_data_v2.R}"
 TRAIN_SCRIPT="${TRAIN_SCRIPT:-${PROJECT_ROOT}/Script/train_eve_pars_est_TreeTransformer.py}"
 SIM_CONFIG="${SIM_CONFIG:-${PROJECT_ROOT}/Config/eve_sim.yaml}"
 TRAIN_CONFIG="${TRAIN_CONFIG:-${PROJECT_ROOT}/Config/eve_train_tree_transformer.yaml}"
