@@ -1,30 +1,12 @@
 #!/usr/bin/env bash
-# Default pipeline:
-#   1. Submit an R simulation/export job on the regular CPU partition.
-#   2. Submit a GPU training job with dependency=afterok:<simulation_job_id>.
-#   3. Wait for both jobs and print the output directory.
-#
-# Positional arguments:
-#   <name>       Output/data folder, same as the old workflow.
-#   [task_type]  Default: EVE_FREE_TES. The current BD/ED/NND R script writes EVE_FREE_TES.
-#   [run_id]     Default: 1. Used in TreeTransformer output filenames.
-#
-# Common environment overrides:
-#   WAIT=0                         Submit the pipeline and return immediately.
-#   SKIP_SIM=1                     Train on an already generated dataset.
-#   SKIP_TRAIN=1                   Generate/export the dataset only.
-#   SIM_SCRIPT=../Script/eve_pars_est_bd_ed_nnd_data.R
-#   TRAIN_SCRIPT=../Script/train_eve_pars_est_TreeTransformer.py
-#   SIM_CONFIG=../Config/eve_sim.yaml
-#   TRAIN_CONFIG=../Config/eve_train_tree_transformer.yaml
-#   INSTALL_R_PKGS=1               Reinstall devtools/eveGNN/evesim in the simulation job.
-#   VENV_PATH=$HOME/venvs/eve      Python venv used by the training job.
-#   TRAIN_EXTRA_ARGS="--device cuda"  Extra arguments appended to the Python command.
-#
-# Resource overrides:
-#   SIM_TIME=23:59:00 SIM_CPUS=24 SIM_MEM=64GB SIM_PARTITION=regular
-#   TRAIN_TIME=71:59:00 TRAIN_GPUS=1 TRAIN_MEM=64GB TRAIN_PARTITION=gpu
-#   ACCOUNT=<slurm_account> QOS=<slurm_qos>
+# All-in-one SLURM launcher for the eve BD/ED/NND TreeTransformer workflow.
+# Version: 2026-05-18-hotfix2
+# Fixes:
+#   - preserves project paths across SLURM spool execution;
+#   - installs/checks common CRAN R dependencies when INSTALL_R_PKGS=1;
+#   - exports R_LIBS_USER consistently;
+#   - passes task_type to the simulation script;
+#   - supports EVE_PARALLEL_BACKEND=mclapply|future|serial.
 
 set -euo pipefail
 
@@ -35,8 +17,8 @@ Usage:
 
 Examples:
   bash run_eve_tree_transformer_all_in_one_slurm.sh eve_tt_run
-  WAIT=0 bash run_eve_tree_transformer_all_in_one_slurm.sh eve_tt_run EVE_FREE_TES 1
-  INSTALL_R_PKGS=1 TRAIN_TIME=120:00:00 bash run_eve_tree_transformer_all_in_one_slurm.sh eve_tt_run
+  INSTALL_R_PKGS=1 bash run_eve_tree_transformer_all_in_one_slurm.sh eve_tt_run
+  EVE_PARALLEL_BACKEND=serial SKIP_TRAIN=1 bash run_eve_tree_transformer_all_in_one_slurm.sh debug_run
 
 Outputs are expected under:
   <name>/<task_type>/STBO/
@@ -54,10 +36,6 @@ abs_path_of_this_script() {
   local dir
   dir="$(cd -P "$(dirname "$src")" >/dev/null 2>&1 && pwd)"
   printf '%s/%s\n' "$dir" "$(basename "$src")"
-}
-
-abs_dir_of_this_script() {
-  dirname "$(abs_path_of_this_script)"
 }
 
 load_hpc_module() {
@@ -114,11 +92,9 @@ wait_for_slurm_job() {
         return 1
         ;;
       "")
-        # Some clusters delay sacct records. Wait a little rather than assuming success.
         sleep "$poll_interval"
         ;;
       *)
-        # PENDING/RUNNING/COMPLETING/CONFIGURING or accounting-delay states.
         sleep "$poll_interval"
         ;;
     esac
@@ -128,26 +104,69 @@ wait_for_slurm_job() {
 print_effective_settings() {
   cat <<SETTINGS
 Effective pipeline settings:
-  name:             ${RUN_NAME}
-  task_type:        ${TASK_TYPE}
-  run_id:           ${RUN_ID}
-  bash_dir:         ${BASH_DIR}
-  project_root:     ${PROJECT_ROOT}
-  sim_script:       ${SIM_SCRIPT}
-  sim_config:       ${SIM_CONFIG}
-  train_script:     ${TRAIN_SCRIPT}
-  train_config:     ${TRAIN_CONFIG}
-  log_dir:          ${LOG_DIR}
-  wait:             ${WAIT}
-  skip_sim:         ${SKIP_SIM}
-  skip_train:       ${SKIP_TRAIN}
-  install_r_pkgs:   ${INSTALL_R_PKGS}
-  R module:         ${R_MODULE}
-  Python module:    ${PY_MODULE}
-  Python venv:      ${VENV_PATH}
-  simulation job:   time=${SIM_TIME}, cpus=${SIM_CPUS}, mem=${SIM_MEM}, partition=${SIM_PARTITION}
-  training job:     time=${TRAIN_TIME}, gpus=${TRAIN_GPUS}, mem=${TRAIN_MEM}, partition=${TRAIN_PARTITION}
+  name:                 ${RUN_NAME}
+  task_type:            ${TASK_TYPE}
+  run_id:               ${RUN_ID}
+  bash_dir:             ${BASH_DIR}
+  project_root:         ${PROJECT_ROOT}
+  sim_script:           ${SIM_SCRIPT}
+  sim_config:           ${SIM_CONFIG}
+  train_script:         ${TRAIN_SCRIPT}
+  train_config:         ${TRAIN_CONFIG}
+  log_dir:              ${LOG_DIR}
+  wait:                 ${WAIT}
+  skip_sim:             ${SKIP_SIM}
+  skip_train:           ${SKIP_TRAIN}
+  install_r_pkgs:       ${INSTALL_R_PKGS}
+  R module:             ${R_MODULE}
+  R_LIBS_USER:          ${R_LIBS_USER}
+  EVE_PARALLEL_BACKEND: ${EVE_PARALLEL_BACKEND}
+  Python module:        ${PY_MODULE}
+  Python venv:          ${VENV_PATH}
+  simulation job:       time=${SIM_TIME}, cpus=${SIM_CPUS}, mem=${SIM_MEM}, partition=${SIM_PARTITION}
+  training job:         time=${TRAIN_TIME}, gpus=${TRAIN_GPUS}, mem=${TRAIN_MEM}, partition=${TRAIN_PARTITION}
 SETTINGS
+}
+
+install_or_check_r_packages() {
+  # Assumes R module has already been loaded and R_LIBS_USER exported.
+  mkdir -p "$R_LIBS_USER"
+
+  echo "[simulation] R package library path preflight"
+  Rscript - <<'RSCRIPT'
+cat("R version:", getRversion(), "\n")
+cat(".libPaths():\n")
+cat(paste0("  ", .libPaths(), collapse = "\n"), "\n")
+required <- c("yaml", "ape", "RcppParallel")
+missing <- required[!vapply(required, requireNamespace, quietly = TRUE, FUN.VALUE = logical(1))]
+if (length(missing) > 0) {
+  cat("Missing CRAN packages:", paste(missing, collapse = ", "), "\n")
+} else {
+  cat("Required CRAN packages visible.\n")
+}
+RSCRIPT
+
+  if [[ "$INSTALL_R_PKGS" == "1" ]]; then
+    echo "[simulation] Installing/updating R dependencies because INSTALL_R_PKGS=1"
+    Rscript - <<'RSCRIPT'
+options(repos = c(CRAN = "https://cloud.r-project.org"))
+if (!dir.exists(Sys.getenv("R_LIBS_USER"))) dir.create(Sys.getenv("R_LIBS_USER"), recursive = TRUE)
+.libPaths(c(Sys.getenv("R_LIBS_USER"), .libPaths()))
+
+cran <- c("yaml", "ape", "RcppParallel", "future", "future.apply", "devtools")
+missing <- cran[!vapply(cran, requireNamespace, quietly = TRUE, FUN.VALUE = logical(1))]
+if (length(missing) > 0) {
+  message("Installing CRAN packages: ", paste(missing, collapse = ", "))
+  install.packages(missing, dependencies = TRUE)
+}
+
+if (!requireNamespace("devtools", quietly = TRUE)) {
+  stop("devtools is still unavailable after attempted installation")
+}
+devtools::install_github("EvoLandEco/eveGNN@multimodal-stacking-boosting", upgrade = "never")
+devtools::install_github("HHildenbrandt/evesim@tianjian", upgrade = "never")
+RSCRIPT
+  fi
 }
 
 run_simulation_worker() {
@@ -161,13 +180,11 @@ run_simulation_worker() {
   echo "[simulation] run_name=${run_name}; task_type=${task_type}; run_id=${run_id}"
 
   load_hpc_module "$R_MODULE"
+  export R_LIBS_USER
+  export EVE_PARALLEL_BACKEND
+  mkdir -p "$R_LIBS_USER"
 
-  if [[ "$INSTALL_R_PKGS" == "1" ]]; then
-    echo "[simulation] Installing/updating required R packages because INSTALL_R_PKGS=1"
-    Rscript -e 'if (!requireNamespace("devtools", quietly = TRUE)) install.packages("devtools", repos = "https://cloud.r-project.org")'
-    Rscript -e 'devtools::install_github("EvoLandEco/eveGNN@multimodal-stacking-boosting", upgrade = "never")'
-    Rscript -e 'devtools::install_github("HHildenbrandt/evesim@tianjian", upgrade = "never")'
-  fi
+  install_or_check_r_packages
 
   if [[ ! -f "$SIM_SCRIPT" ]]; then
     echo "Simulation script not found: $SIM_SCRIPT" >&2
@@ -178,12 +195,12 @@ run_simulation_worker() {
     exit 2
   fi
 
-  Rscript "$SIM_SCRIPT" "$run_name" "$SIM_CONFIG"
+  Rscript "$SIM_SCRIPT" "$run_name" "$SIM_CONFIG" "$task_type"
 
   local tree_dir="${run_name}/${task_type}/GNN/tree"
   if [[ ! -d "$tree_dir" ]]; then
     echo "Expected exported tree directory not found: $tree_dir" >&2
-    echo "The current BD/ED/NND simulation script writes EVE_FREE_TES; check task_type or SIM_SCRIPT." >&2
+    echo "Check task_type or SIM_SCRIPT." >&2
     exit 3
   fi
 
@@ -241,8 +258,6 @@ run_training_worker() {
   export PYTHONUNBUFFERED=1
   local cmd=(python -u "$TRAIN_SCRIPT" "$run_name" "$task_type" "$run_id" --config "$TRAIN_CONFIG")
   if [[ -n "${TRAIN_EXTRA_ARGS:-}" ]]; then
-    # Split simple whitespace-delimited extra args, e.g. TRAIN_EXTRA_ARGS="--device cuda".
-    # Avoid quoting compound shell expressions here; keep extras to normal CLI flags.
     read -r -a extra_args <<< "$TRAIN_EXTRA_ARGS"
     cmd+=("${extra_args[@]}")
   fi
@@ -261,15 +276,7 @@ run_training_worker() {
   echo "[training] finished at $(date)"
 }
 
-# Resolve paths before either launcher or worker mode.
-#
-# Important SLURM detail:
-# When a script is passed directly to sbatch, SLURM copies it into its own spool
-# directory and executes that copy. Therefore BASH_SOURCE[0] inside the batch job
-# may point to /var/spool/slurmd/job... rather than to your project Bash/
-# directory. The launcher exports the original paths below; worker jobs prefer
-# those exported values. This avoids permission errors such as trying to create
-# /var/spool/slurmd/job.../logs and avoids resolving ../Script from the spool.
+# Resolve paths before launcher/worker mode.
 DISCOVERED_SELF_PATH="$(abs_path_of_this_script)"
 if [[ -n "${EVE_TT_SELF_PATH:-}" && -f "${EVE_TT_SELF_PATH}" ]]; then
   SELF_PATH="${EVE_TT_SELF_PATH}"
@@ -292,8 +299,7 @@ fi
 LOG_DIR="${LOG_DIR:-${EVE_TT_LOG_DIR:-${BASH_DIR}/logs}}"
 mkdir -p "$LOG_DIR"
 
-# Defaults matching your current Bash/Script/Config layout.
-SIM_SCRIPT="${SIM_SCRIPT:-${PROJECT_ROOT}/Script/eve_pars_est_bd_ed_nnd_data.R}"
+SIM_SCRIPT="${SIM_SCRIPT:-${PROJECT_ROOT}/Script/eve_pars_est_bd_ed_nnd_data_v2.R}"
 TRAIN_SCRIPT="${TRAIN_SCRIPT:-${PROJECT_ROOT}/Script/train_eve_pars_est_TreeTransformer.py}"
 SIM_CONFIG="${SIM_CONFIG:-${PROJECT_ROOT}/Config/eve_sim.yaml}"
 TRAIN_CONFIG="${TRAIN_CONFIG:-${PROJECT_ROOT}/Config/eve_train_tree_transformer.yaml}"
@@ -302,6 +308,8 @@ R_MODULE="${R_MODULE:-R}"
 PY_MODULE="${PY_MODULE:-Python/3.8.16-GCCcore-11.2.0}"
 VENV_PATH="${VENV_PATH:-${HOME}/venvs/eve}"
 INSTALL_R_PKGS="${INSTALL_R_PKGS:-0}"
+R_LIBS_USER="${R_LIBS_USER:-${HOME}/R/eve_tt_r_libs}"
+EVE_PARALLEL_BACKEND="${EVE_PARALLEL_BACKEND:-mclapply}"
 
 WAIT="${WAIT:-1}"
 SKIP_SIM="${SKIP_SIM:-0}"
@@ -323,14 +331,12 @@ QOS="${QOS:-}"
 MAIL_USER="${MAIL_USER:-}"
 MAIL_TYPE="${MAIL_TYPE:-}"
 
-# Export resolved settings so worker jobs inherit the launcher context even after
-# SLURM copies this script to its spool directory.
 export EVE_TT_SELF_PATH="$SELF_PATH"
 export EVE_TT_BASH_DIR="$BASH_DIR"
 export EVE_TT_PROJECT_ROOT="$PROJECT_ROOT"
 export EVE_TT_LOG_DIR="$LOG_DIR"
 export SIM_SCRIPT TRAIN_SCRIPT SIM_CONFIG TRAIN_CONFIG
-export R_MODULE PY_MODULE VENV_PATH INSTALL_R_PKGS
+export R_MODULE PY_MODULE VENV_PATH INSTALL_R_PKGS R_LIBS_USER EVE_PARALLEL_BACKEND
 export WAIT SKIP_SIM SKIP_TRAIN
 export SIM_TIME SIM_CPUS SIM_MEM SIM_PARTITION
 export TRAIN_TIME TRAIN_GPUS TRAIN_GPU_OPTION TRAIN_MEM TRAIN_PARTITION
@@ -378,18 +384,10 @@ if [[ "$SKIP_TRAIN" != "1" ]]; then
 fi
 
 common_sbatch_args=(--parsable --export=ALL --chdir="$BASH_DIR")
-if [[ -n "$ACCOUNT" ]]; then
-  common_sbatch_args+=(--account="$ACCOUNT")
-fi
-if [[ -n "$QOS" ]]; then
-  common_sbatch_args+=(--qos="$QOS")
-fi
-if [[ -n "$MAIL_USER" ]]; then
-  common_sbatch_args+=(--mail-user="$MAIL_USER")
-fi
-if [[ -n "$MAIL_TYPE" ]]; then
-  common_sbatch_args+=(--mail-type="$MAIL_TYPE")
-fi
+if [[ -n "$ACCOUNT" ]]; then common_sbatch_args+=(--account="$ACCOUNT"); fi
+if [[ -n "$QOS" ]]; then common_sbatch_args+=(--qos="$QOS"); fi
+if [[ -n "$MAIL_USER" ]]; then common_sbatch_args+=(--mail-user="$MAIL_USER"); fi
+if [[ -n "$MAIL_TYPE" ]]; then common_sbatch_args+=(--mail-type="$MAIL_TYPE"); fi
 
 safe_run="$(safe_job_component "$RUN_NAME")"
 SIM_JOB_ID=""
@@ -431,8 +429,6 @@ if [[ "$SKIP_TRAIN" != "1" ]]; then
   fi
   if [[ -n "$SIM_JOB_ID" ]]; then
     train_sbatch_args+=(--dependency="afterok:${SIM_JOB_ID}")
-    # Supported on modern SLURM, but not universal. Set KILL_INVALID_DEP_OPT=1
-    # if your cluster supports it and you want SLURM to cancel invalid dependencies.
     if [[ "${KILL_INVALID_DEP_OPT:-0}" == "1" ]]; then
       train_sbatch_args+=(--kill-on-invalid-dep=yes)
     fi
