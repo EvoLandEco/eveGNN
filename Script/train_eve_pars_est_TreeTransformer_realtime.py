@@ -41,11 +41,15 @@ classification head predicts the scenario class.
 from __future__ import annotations
 
 import argparse
+import builtins
 import json
 import math
 import os
 import random
+import signal
 import sys
+import time
+from functools import partial
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
@@ -55,6 +59,24 @@ import pandas as pd
 import torch
 import torch.nn.functional as F
 import yaml
+
+print = partial(builtins.print, flush=True)
+try:
+    sys.stdout.reconfigure(line_buffering=True, write_through=True)
+    sys.stderr.reconfigure(line_buffering=True, write_through=True)
+except AttributeError:
+    pass
+
+
+def _handle_signal(signum, frame):
+    print(f"Received signal {signum}; terminating.", file=sys.stderr)
+    sys.stdout.flush()
+    sys.stderr.flush()
+    raise SystemExit(128 + int(signum))
+
+for _sig in (getattr(signal, "SIGTERM", None), getattr(signal, "SIGUSR1", None)):
+    if _sig is not None:
+        signal.signal(_sig, _handle_signal)
 from torch import nn
 from torch.utils.data import DataLoader, Dataset
 
@@ -103,6 +125,9 @@ DEFAULT_CONFIG = {
     "output_tag": "tree_transformer",
     "write_csv_fallback": True,
     "save_every_epoch_predictions": False,
+    "load_progress_every": 100,
+    "train_progress_every": 10,
+    "eval_progress_every": 10,
 }
 
 PARAM_COLUMNS = ["lambda", "mu", "beta_n", "beta_phi", "gamma_n", "gamma_phi"]
@@ -629,7 +654,14 @@ def load_eve_examples(task_dir: Path, cfg: dict) -> List[TreeExample]:
     n_pred = int(cfg["n_predicted_values"])
     examples: List[TreeExample] = []
 
-    for tree_path, el_path, bt_path in triplets:
+    total_triplets = len(triplets)
+    load_progress_every = int(cfg.get("load_progress_every", 0) or 0)
+    load_start = time.time()
+    print(f"Found {total_triplets} matching tree/EL/BT triplets.")
+    for triplet_idx, (tree_path, el_path, bt_path) in enumerate(triplets, start=1):
+        if load_progress_every > 0 and (triplet_idx == 1 or triplet_idx % load_progress_every == 0 or triplet_idx == total_triplets):
+            elapsed = time.time() - load_start
+            print(f"Loading trees: {triplet_idx}/{total_triplets} elapsed={elapsed:.1f}s")
         metric, params = parse_eve_filename(tree_path.name, "tree", cfg)
         if metric not in class_to_idx:
             raise ValueError(
@@ -935,6 +967,7 @@ def evaluate(
     scaler: TargetScaler,
     device: torch.device,
     cfg: dict,
+    epoch: Optional[int] = None,
 ) -> dict:
     model.eval()
     total_loss = 0.0
@@ -957,7 +990,15 @@ def evaluate(
     per_class_correct = np.zeros(n_classes, dtype=np.int64)
     confusion = np.zeros((n_classes, n_classes), dtype=np.int64)
 
-    for batch in loader:
+    eval_progress_every = int(cfg.get("eval_progress_every", 0) or 0)
+    eval_start = time.time()
+    total_batches = len(loader)
+
+    for batch_idx, batch in enumerate(loader, start=1):
+        if eval_progress_every > 0 and (batch_idx == 1 or batch_idx % eval_progress_every == 0 or batch_idx == total_batches):
+            elapsed = time.time() - eval_start
+            prefix = f"Epoch {epoch:03d} " if epoch is not None else ""
+            print(f"{prefix}eval batch {batch_idx}/{total_batches} elapsed={elapsed:.1f}s")
         batch = move_batch(batch, device)
         pred_scaled, logits = model(batch)
         loss, reg_loss, cls_loss = combined_loss(pred_scaled, batch["y_re"], logits, batch["y_cl"], scaler, cfg)
@@ -1030,13 +1071,18 @@ def train_one_epoch(
     scaler: TargetScaler,
     device: torch.device,
     cfg: dict,
+    epoch: Optional[int] = None,
 ) -> dict:
     model.train()
     total_loss = 0.0
     total_reg = 0.0
     total_cls = 0.0
     total_n = 0
-    for batch in loader:
+    train_progress_every = int(cfg.get("train_progress_every", 0) or 0)
+    train_start = time.time()
+    total_batches = len(loader)
+
+    for batch_idx, batch in enumerate(loader, start=1):
         batch = move_batch(batch, device)
         optimizer.zero_grad(set_to_none=True)
         pred_scaled, logits = model(batch)
@@ -1047,6 +1093,10 @@ def train_one_epoch(
             torch.nn.utils.clip_grad_norm_(model.parameters(), clip)
         optimizer.step()
         bsz = batch["y_cl"].shape[0]
+        if train_progress_every > 0 and (batch_idx == 1 or batch_idx % train_progress_every == 0 or batch_idx == total_batches):
+            elapsed = time.time() - train_start
+            prefix = f"Epoch {epoch:03d} " if epoch is not None else ""
+            print(f"{prefix}train batch {batch_idx}/{total_batches} loss={float(loss.item()):.4f} reg={float(reg_loss.item()):.4f} cls={float(cls_loss.item()):.4f} elapsed={elapsed:.1f}s")
         total_loss += float(loss.item()) * bsz
         total_reg += float(reg_loss.item()) * bsz
         total_cls += float(cls_loss.item()) * bsz
@@ -1228,8 +1278,8 @@ def run_self_test(cfg: dict) -> None:
     model = TreeAwareGraphTransformer(train_dataset.node_feature_dim, cfg).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=float(cfg["learning_rate"]))
     for epoch in range(1, 3):
-        train_stats = train_one_epoch(model, train_loader, optimizer, scaler, device, cfg)
-        eval_stats = evaluate(model, test_loader, scaler, device, cfg)
+        train_stats = train_one_epoch(model, train_loader, optimizer, scaler, device, cfg, epoch=epoch)
+        eval_stats = evaluate(model, test_loader, scaler, device, cfg, epoch=epoch)
         print(f"self-test epoch {epoch}: train_loss={train_stats['loss_all']:.4f}, test_acc={eval_stats['accuracy']:.4f}")
     print("Self-test completed.")
 
@@ -1318,8 +1368,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     n_epochs = int(cfg["epoch_number_transformer"])
 
     for epoch in range(1, n_epochs):
-        train_stats = train_one_epoch(model, train_loader, optimizer, scaler, device, cfg)
-        test_stats = evaluate(model, test_loader, scaler, device, cfg)
+        train_stats = train_one_epoch(model, train_loader, optimizer, scaler, device, cfg, epoch=epoch)
+        test_stats = evaluate(model, test_loader, scaler, device, cfg, epoch=epoch)
         history.append({"epoch": epoch, "train": train_stats, "test": test_stats})
         per_class = test_stats["per_class_accuracy"]
         per_class_text = ", ".join(
