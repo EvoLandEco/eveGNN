@@ -34,7 +34,7 @@ fi
 
 job_id=$(sbatch --parsable --chdir="$bash_dir" <<EOF_SLURM
 #!/bin/bash
-#SBATCH --time=6-22:59:00
+#SBATCH --time=2-22:59:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --gpus-per-node=1

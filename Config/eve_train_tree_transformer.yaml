@@ -31,7 +31,7 @@ max_nodes_limit: 2500
 normalize_edge_length: true
 target_standardization: true
 
-epoch_number_transformer: 51
+epoch_number_transformer: 26
 train_batch_size: 8
 test_batch_size: 8
 learning_rate: 0.0005
